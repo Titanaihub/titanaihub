@@ -1,21 +1,13 @@
 export default async function handler(req, res) {
   try {
-    const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd");
     const data = await r.json();
-
-    if (!data || !data.price) {
-      return res.status(200).json({
-        ok: false,
-        error: "no price data"
-      });
-    }
 
     res.status(200).json({
       ok: true,
-      price: Number(data.price),
+      price: Number(data.bitcoin.usd),
       volume: 0
     });
-
   } catch (e) {
     res.status(500).json({
       ok: false,
