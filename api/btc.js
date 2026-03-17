@@ -5,7 +5,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       ok: true,
-      price: parseFloat(data.price),
+      price: Number(data.price),
       volume: 0
     });
 
