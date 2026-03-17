@@ -1,3 +1,18 @@
+<!doctype html>
+<html>
+<head>
+  <title>Titan AI</title>
+</head>
+<body style="background:black;color:white;text-align:center;font-family:sans-serif">
+
+<h1>🚀 Titan AI Hub</h1>
+<p>Whale Tracking + AI Signal</p>
+
+<h2 id="price">BTC: Loading...</h2>
+
+<h2 id="signal" style="color:lime;">WAIT</h2>
+<p id="confidence">Confidence: 70%</p>
+
 <script>
 let lastPrice = null;
 
@@ -5,7 +20,6 @@ async function updateData() {
   try {
     const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
     const data = await res.json();
-
     let price = parseFloat(data.price || 0);
 
     document.getElementById("price").innerText = "BTC: $" + price.toFixed(0);
@@ -32,13 +46,14 @@ async function updateData() {
       "Confidence: " + confidence + "%";
 
     lastPrice = price;
-
   } catch (e) {
     document.getElementById("price").innerText = "Error loading data";
-    console.log(e);
   }
 }
 
 setInterval(updateData, 5000);
 updateData();
 </script>
+
+</body>
+</html>
