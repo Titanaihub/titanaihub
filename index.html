@@ -2,34 +2,41 @@
 let lastPrice = null;
 
 async function updateData() {
-  const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
-  const data = await res.json();
-  let price = parseFloat(data.price);
+  try {
+    const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const data = await res.json();
 
-  document.getElementById("price").innerText = "BTC: $" + price.toFixed(0);
+    let price = parseFloat(data.price || 0);
 
-  let signal = "WAIT";
-  let confidence = 70;
+    document.getElementById("price").innerText = "BTC: $" + price.toFixed(0);
 
-  if (lastPrice !== null) {
-    if (price > lastPrice) {
-      signal = "BUY";
-      confidence = 80 + Math.random() * 10;
-    } else if (price < lastPrice) {
-      signal = "SELL";
-      confidence = 80 + Math.random() * 10;
+    let signal = "WAIT";
+    let confidence = 70;
+
+    if (lastPrice !== null) {
+      if (price > lastPrice) {
+        signal = "BUY";
+        confidence = 85;
+      } else if (price < lastPrice) {
+        signal = "SELL";
+        confidence = 85;
+      }
     }
+
+    document.getElementById("signal").innerText = signal;
+    document.getElementById("signal").style.color =
+      signal === "BUY" ? "lime" :
+      signal === "SELL" ? "red" : "white";
+
+    document.getElementById("confidence").innerText =
+      "Confidence: " + confidence + "%";
+
+    lastPrice = price;
+
+  } catch (e) {
+    document.getElementById("price").innerText = "Error loading data";
+    console.log(e);
   }
-
-  document.getElementById("signal").innerText = signal;
-  document.getElementById("signal").style.color =
-    signal === "BUY" ? "lime" :
-    signal === "SELL" ? "red" : "white";
-
-  document.getElementById("confidence").innerText =
-    "Confidence: " + Math.floor(confidence) + "%";
-
-  lastPrice = price;
 }
 
 setInterval(updateData, 5000);
