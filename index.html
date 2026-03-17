@@ -16,64 +16,52 @@
   <p id="confidence">Confidence: 70%</p>
   <p id="whale">Whale: Loading...</p>
 
-  <script>
-    let prices = [];
+<script>
+let prices = [];
 
-    async function updateData() {
-      try {
-        const res = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT");
-        const data = await res.json();
+async function updateData() {
+  try {
+    const res = await fetch("/api/btc");
+    const data = await res.json();
 
-        let price = parseFloat(data.lastPrice);
-        let volume = parseFloat(data.volume);
+    let price = data.price;
 
-        document.getElementById("price").innerText = "BTC: $" + price.toFixed(0);
+    document.getElementById("price").innerText = "BTC: $" + price;
 
-        prices.push(price);
-        if (prices.length > 10) prices.shift();
+    prices.push(price);
+    if (prices.length > 10) prices.shift();
 
-        let signal = "WAIT";
-        let confidence = 70;
+    let signal = "WAIT";
+    let confidence = 70;
 
-        if (prices.length >= 5) {
-          let avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    if (prices.length >= 5) {
+      let avg = prices.reduce((a,b)=>a+b,0) / prices.length;
 
-          if (price > avg && volume > 1000) {
-            signal = "BUY";
-            confidence = 85 + Math.random() * 10;
-          } else if (price < avg && volume > 1000) {
-            signal = "SELL";
-            confidence = 85 + Math.random() * 10;
-          }
-        }
-
-        document.getElementById("signal").innerText = signal;
-        document.getElementById("signal").style.color =
-          signal === "BUY" ? "lime" :
-          signal === "SELL" ? "red" : "white";
-
-        document.getElementById("confidence").innerText =
-          "Confidence: " + Math.floor(confidence) + "%";
-
-        // ตัวอย่าง Whale ชั่วคราว
-        if (volume > 50000) {
-          document.getElementById("whale").innerText = "Whale: Large market activity detected";
-        } else {
-          document.getElementById("whale").innerText = "Whale: No unusual whale activity";
-        }
-
-      } catch (e) {
-        document.getElementById("price").innerText = "Error loading BTC price";
-        document.getElementById("signal").innerText = "ERROR";
-        document.getElementById("signal").style.color = "orange";
-        document.getElementById("confidence").innerText = "Confidence: -";
-        document.getElementById("whale").innerText = "Whale: Error loading data";
+      if (price > avg) {
+        signal = "BUY";
+        confidence = 85 + Math.random() * 10;
+      } else if (price < avg) {
+        signal = "SELL";
+        confidence = 85 + Math.random() * 10;
       }
     }
 
-    setInterval(updateData, 5000);
-    updateData();
-  </script>
+    document.getElementById("signal").innerText = signal;
+    document.getElementById("signal").style.color =
+      signal === "BUY" ? "lime" :
+      signal === "SELL" ? "red" : "white";
+
+    document.getElementById("confidence").innerText =
+      "Confidence: " + Math.floor(confidence) + "%";
+
+  } catch (e) {
+    document.getElementById("price").innerText = "Error";
+  }
+}
+
+setInterval(updateData, 5000);
+updateData();
+</script>
 
 </body>
 </html>
