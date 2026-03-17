@@ -18,15 +18,16 @@ let prices = [];
 
 async function updateData() {
   try {
-    const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const res = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT");
     const data = await res.json();
-    let price = parseFloat(data.price);
+
+    let price = parseFloat(data.lastPrice);
+    let volume = parseFloat(data.volume);
 
     document.getElementById("price").innerText = "BTC: $" + price.toFixed(0);
 
-    // เก็บราคา
     prices.push(price);
-    if (prices.length > 10) prices.shift(); // เก็บแค่ 10 ค่า
+    if (prices.length > 10) prices.shift();
 
     let signal = "WAIT";
     let confidence = 70;
@@ -34,12 +35,12 @@ async function updateData() {
     if (prices.length >= 5) {
       let avg = prices.reduce((a,b)=>a+b,0) / prices.length;
 
-      if (price > avg) {
+      if (price > avg && volume > 1000) {
         signal = "BUY";
-        confidence = 80 + Math.random() * 10;
-      } else if (price < avg) {
+        confidence = 85 + Math.random() * 10;
+      } else if (price < avg && volume > 1000) {
         signal = "SELL";
-        confidence = 80 + Math.random() * 10;
+        confidence = 85 + Math.random() * 10;
       }
     }
 
