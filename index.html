@@ -3,11 +3,34 @@
 <head>
   <title>Titan AI</title>
 </head>
-<body style="background:black;color:white;text-align:center;padding-top:100px;font-family:sans-serif;">
-  <h1>🚀 Titan AI Hub</h1>
-  <p>Whale Tracking + AI Signal</p>
+<body style="background:black;color:white;text-align:center;font-family:sans-serif">
 
-  <h2 style="color:lime;">BUY</h2>
-  <p>Confidence: 80%</p>
+<h1>🚀 Titan AI Hub</h1>
+<p>Whale Tracking + AI Signal</p>
+
+<h2 id="price">BTC: Loading...</h2>
+
+<h2 id="signal" style="color:lime;">BUY</h2>
+<p id="confidence">Confidence: 80%</p>
+
+<script>
+async function updateData() {
+  const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+  const data = await res.json();
+  document.getElementById("price").innerText = "BTC: $" + parseFloat(data.price).toFixed(0);
+
+  const rand = Math.random();
+  let signal = rand > 0.5 ? "BUY" : "SELL";
+  let confidence = Math.floor(Math.random() * 20) + 70;
+
+  document.getElementById("signal").innerText = signal;
+  document.getElementById("signal").style.color = signal === "BUY" ? "lime" : "red";
+  document.getElementById("confidence").innerText = "Confidence: " + confidence + "%";
+}
+
+setInterval(updateData, 5000);
+updateData();
+</script>
+
 </body>
 </html>
