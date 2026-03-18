@@ -1,19 +1,19 @@
 export default async function handler(req, res) {
   try {
-    const r = await fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT");
+    const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
     const data = await r.json();
 
-    const price = Number(data.lastPrice);
-    const volume = Number(data.volume);
+    const price = Number(data.price);
+
+    if (!price) throw new Error("No price");
 
     let signal = "WAIT";
     let confidence = 70;
 
-    if (price && volume) {
-      if (volume > 10000) {
-        signal = Math.random() > 0.5 ? "BUY" : "SELL";
-        confidence = 80 + Math.floor(Math.random() * 15);
-      }
+    // logic ง่ายๆก่อน
+    if (price > 0) {
+      signal = Math.random() > 0.5 ? "BUY" : "SELL";
+      confidence = 80 + Math.floor(Math.random() * 10);
     }
 
     res.status(200).json({
