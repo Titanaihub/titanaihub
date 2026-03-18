@@ -5,179 +5,299 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       background: #0a0a0a;
       color: #fff;
-      font-family: Arial;
+      font-family: Arial, sans-serif;
     }
 
-    h1 {
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .hero {
       text-align: center;
+      padding: 20px 10px 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 42px;
       color: gold;
-      margin-top: 20px;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      color: #bbb;
+      font-size: 18px;
     }
 
     .grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 15px;
-      padding: 15px;
-      max-width: 900px;
-      margin: auto;
+      gap: 16px;
+      margin-top: 18px;
     }
 
     .card {
-      background: #111;
-      padding: 15px;
-      border-radius: 15px;
-      box-shadow: 0 0 10px rgba(255,215,0,0.15);
+      background: linear-gradient(180deg, #111, #0d0d0d);
+      border: 1px solid #1f1f1f;
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 0 14px rgba(255, 215, 0, 0.08);
     }
 
     .title {
-      font-size: 18px;
+      font-size: 15px;
       color: gold;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .coin-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .coin-name {
+      font-size: 18px;
+      font-weight: bold;
     }
 
     .price {
-      font-size: 24px;
+      font-size: 30px;
       font-weight: bold;
+      margin-top: 8px;
     }
 
     .signal {
       font-size: 28px;
       font-weight: bold;
+      margin-top: 10px;
     }
 
     .buy { color: lime; }
-    .sell { color: red; }
-    .wait { color: gray; }
+    .sell { color: #ff4d4d; }
+    .wait { color: #aaa; }
 
-    .row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 5px;
+    .muted {
+      color: #aaa;
       font-size: 14px;
+      margin-top: 8px;
+    }
+
+    .market-box {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 10px;
     }
 
     table {
       width: 100%;
-      margin-top: 10px;
       border-collapse: collapse;
+      margin-top: 10px;
     }
 
-    td {
-      padding: 6px;
-      border-bottom: 1px solid #333;
-      font-size: 13px;
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #262626;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      color: gold;
+      font-weight: bold;
+    }
+
+    .empty {
+      color: #888;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    @media (min-width: 820px) {
+      .grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
     }
   </style>
 </head>
 
 <body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>🚀 Titan AI Hub</h1>
+      <p>Whale Tracking + AI Signal</p>
+    </div>
 
-<h1>🚀 Titan AI Hub</h1>
+    <div class="grid">
+      <!-- BTC -->
+      <div class="card">
+        <div class="title">COIN</div>
+        <div class="coin-top">
+          <div class="coin-name">BTC</div>
+        </div>
+        <div id="btc-price" class="price">Loading...</div>
+        <div id="btc-signal" class="signal wait">WAIT</div>
+        <div id="btc-confidence" class="muted">Confidence: --</div>
+      </div>
 
-<div class="grid">
+      <!-- ETH -->
+      <div class="card">
+        <div class="title">COIN</div>
+        <div class="coin-top">
+          <div class="coin-name">ETH</div>
+        </div>
+        <div id="eth-price" class="price">Loading...</div>
+        <div id="eth-signal" class="signal wait">WAIT</div>
+        <div id="eth-confidence" class="muted">Confidence: --</div>
+      </div>
 
-  <!-- BTC -->
-  <div class="card">
-    <div class="title">BTC</div>
-    <div id="btc-price" class="price">Loading...</div>
-    <div id="btc-signal" class="signal wait">WAIT</div>
-    <div id="btc-confidence"></div>
+      <!-- BNB -->
+      <div class="card">
+        <div class="title">COIN</div>
+        <div class="coin-top">
+          <div class="coin-name">BNB</div>
+        </div>
+        <div id="bnb-price" class="price">Loading...</div>
+        <div id="bnb-signal" class="signal wait">WAIT</div>
+        <div id="bnb-confidence" class="muted">Confidence: --</div>
+      </div>
+
+      <!-- MARKET -->
+      <div class="card full">
+        <div class="title">AI MARKET INSIGHT</div>
+        <div id="market" class="market-box">Analyzing...</div>
+        <div id="market-detail" class="muted">Waiting for live signal data</div>
+      </div>
+
+      <!-- PERFORMANCE -->
+      <div class="card full">
+        <div class="title">PERFORMANCE</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="perf-body"></tbody>
+        </table>
+        <div id="perf-empty" class="empty" style="display:none;">No performance data yet</div>
+      </div>
+    </div>
   </div>
 
-  <!-- ETH -->
-  <div class="card">
-    <div class="title">ETH</div>
-    <div id="eth-price" class="price">Loading...</div>
-    <div id="eth-signal" class="signal wait">WAIT</div>
-    <div id="eth-confidence"></div>
-  </div>
+  <script>
+    async function fetchSignal(url) {
+      try {
+        const r = await fetch(url);
+        return await r.json();
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
 
-  <!-- BNB -->
-  <div class="card">
-    <div class="title">BNB</div>
-    <div id="bnb-price" class="price">Loading...</div>
-    <div id="bnb-signal" class="signal wait">WAIT</div>
-    <div id="bnb-confidence"></div>
-  </div>
+    function setUI(prefix, data) {
+      const priceEl = document.getElementById(prefix + "-price");
+      const signalEl = document.getElementById(prefix + "-signal");
+      const confEl = document.getElementById(prefix + "-confidence");
 
-  <!-- MARKET -->
-  <div class="card">
-    <div class="title">AI Market Insight</div>
-    <div id="market">Analyzing...</div>
-  </div>
+      if (!data || !data.ok || typeof data.price !== "number") {
+        priceEl.innerText = "Unavailable";
+        signalEl.innerText = "WAIT";
+        signalEl.className = "signal wait";
+        confEl.innerText = "Confidence: --";
+        return;
+      }
 
-  <!-- PERFORMANCE -->
-  <div class="card">
-    <div class="title">Performance</div>
-    <table id="perf"></table>
-  </div>
+      priceEl.innerText = "$" + Math.round(data.price);
+      signalEl.innerText = data.signal || "WAIT";
+      signalEl.className = "signal " + (data.signal || "WAIT").toLowerCase();
+      confEl.innerText = "Confidence: " + (data.confidence ?? "--") + "%";
+    }
 
-</div>
+    function renderPerformance(perf) {
+      const tbody = document.getElementById("perf-body");
+      const empty = document.getElementById("perf-empty");
 
-<script>
+      if (!perf || !perf.ok || !Array.isArray(perf.trades) || perf.trades.length === 0) {
+        tbody.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
 
-async function fetchSignal(url) {
-  const r = await fetch(url);
-  return await r.json();
-}
+      empty.style.display = "none";
+      tbody.innerHTML = perf.trades.map(t => `
+        <tr>
+          <td>${t.time || "-"}</td>
+          <td>${t.result || "-"}</td>
+        </tr>
+      `).join("");
+    }
 
-function setUI(prefix, data) {
-  document.getElementById(prefix+"-price").innerText =
-    "$" + Math.round(data.price);
+    function renderMarket(btc, eth, bnb) {
+      const market = document.getElementById("market");
+      const detail = document.getElementById("market-detail");
 
-  let el = document.getElementById(prefix+"-signal");
-  el.innerText = data.signal;
-  el.className = "signal " + data.signal.toLowerCase();
+      const arr = [btc, eth, bnb].filter(x => x && x.ok);
+      const buy = arr.filter(x => x.signal === "BUY").length;
+      const sell = arr.filter(x => x.signal === "SELL").length;
+      const wait = arr.filter(x => x.signal === "WAIT").length;
 
-  document.getElementById(prefix+"-confidence").innerText =
-    "Confidence: " + data.confidence + "%";
-}
+      let text = "Sideway ⚪";
+      let sub = `BUY ${buy} | SELL ${sell} | WAIT ${wait}`;
 
-async function update() {
-  try {
+      if (buy >= 2) {
+        text = "Bullish 🟢";
+      } else if (sell >= 2) {
+        text = "Bearish 🔴";
+      }
 
-    const btc = await fetchSignal("/api/signal-btc");
-    const eth = await fetchSignal("/api/signal-eth");
-    const bnb = await fetchSignal("/api/signal-bnb");
+      if (arr.length === 0) {
+        text = "No market data";
+        sub = "API not responding";
+      }
 
-    setUI("btc", btc);
-    setUI("eth", eth);
-    setUI("bnb", bnb);
+      market.innerText = text;
+      detail.innerText = sub;
+    }
 
-    // Market Insight
-    let buy = [btc, eth, bnb].filter(x=>x.signal==="BUY").length;
-    let sell = [btc, eth, bnb].filter(x=>x.signal==="SELL").length;
+    async function update() {
+      try {
+        const [btc, eth, bnb, perf] = await Promise.all([
+          fetchSignal("/api/signal-btc"),
+          fetchSignal("/api/signal-eth"),
+          fetchSignal("/api/signal-bnb"),
+          fetch("/api/performance").then(r => r.json()).catch(() => ({ ok: false }))
+        ]);
 
-    let text = "Sideway";
+        setUI("btc", btc);
+        setUI("eth", eth);
+        setUI("bnb", bnb);
+        renderMarket(btc, eth, bnb);
+        renderPerformance(perf);
+      } catch (e) {
+        console.log("update error:", e);
+      }
+    }
 
-    if (buy >= 2) text = "Bullish 🟢";
-    if (sell >= 2) text = "Bearish 🔴";
-
-    document.getElementById("market").innerText = text;
-
-    // Performance
-    const perf = await fetch("/api/performance").then(r=>r.json());
-
-    let html = "";
-    perf.trades.forEach(t=>{
-      html += `<tr><td>${t.time}</td><td>${t.result}</td></tr>`;
-    });
-
-    document.getElementById("perf").innerHTML = html;
-
-  } catch (e) {
-    console.log(e);
-  }
-}
-
-setInterval(update, 5000);
-update();
-
-</script>
-
+    setInterval(update, 5000);
+    update();
+  </script>
 </body>
 </html>
