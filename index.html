@@ -1,25 +1,120 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Titan AI</title>
+  <title>Titan AI Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    .container {
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-top: 20px;
+      color: gold;
+    }
+
+    .card {
+      background: #111;
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 15px;
+      box-shadow: 0 0 10px rgba(255,215,0,0.2);
+    }
+
+    .price {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .signal {
+      font-size: 40px;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+
+    .buy { color: lime; }
+    .sell { color: red; }
+    .wait { color: gray; }
+
+    .small {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 10px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #333;
+      font-size: 14px;
+    }
+
+    th {
+      color: gold;
+    }
+  </style>
 </head>
-<body style="background:black;color:white;text-align:center;font-family:sans-serif;padding-top:40px;">
+
+<body>
+
+<div class="container">
 
   <h1>🚀 Titan AI Hub</h1>
-  <p>Whale Tracking + AI Signal</p>
+  <p class="small">Whale Tracking + AI Signal</p>
 
-  <h2 id="price">BTC: Loading...</h2>
+  <!-- PRICE -->
+  <div class="card">
+    <div class="price" id="price">BTC: Loading...</div>
+  </div>
 
-  <h2 id="signal" style="color:lime;">WAIT</h2>
-  <p id="confidence">Confidence: 70%</p>
-  <p id="whale">Whale: Loading...</p>
+  <!-- SIGNAL -->
+  <div class="card">
+    <div id="signal" class="signal wait">WAIT</div>
+    <div id="confidence">Confidence: 70%</div>
+  </div>
+
+  <!-- WHALE -->
+  <div class="card">
+    <div id="whale">Whale: Loading...</div>
+  </div>
+
+  <!-- PERFORMANCE -->
+  <div class="card">
+    <h3>📊 AI Performance (Simulation)</h3>
+    <table>
+      <tr>
+        <th>Trade</th>
+        <th>Entry</th>
+        <th>Result</th>
+      </tr>
+      <tbody id="history">
+      </tbody>
+    </table>
+  </div>
+
+</div>
 
 <script>
 let prices = [];
+let history = [];
 
-async function updateData() {
+async function update() {
   try {
     const res = await fetch("/api/btc");
     const data = await res.json();
@@ -35,32 +130,67 @@ async function updateData() {
     let confidence = 70;
 
     if (prices.length >= 5) {
-      let avg = prices.reduce((a,b)=>a+b,0) / prices.length;
+      let avg = prices.reduce((a,b)=>a+b,0)/prices.length;
 
       if (price > avg) {
         signal = "BUY";
-        confidence = 85 + Math.random() * 10;
+        confidence = 80 + Math.random()*15;
       } else if (price < avg) {
         signal = "SELL";
-        confidence = 85 + Math.random() * 10;
+        confidence = 80 + Math.random()*15;
       }
     }
 
-    document.getElementById("signal").innerText = signal;
-    document.getElementById("signal").style.color =
-      signal === "BUY" ? "lime" :
-      signal === "SELL" ? "red" : "white";
+    let signalEl = document.getElementById("signal");
+    signalEl.innerText = signal;
+    signalEl.className = "signal " + signal.toLowerCase();
 
     document.getElementById("confidence").innerText =
       "Confidence: " + Math.floor(confidence) + "%";
+
+    // Whale fake
+    document.getElementById("whale").innerText =
+      Math.random() > 0.5 ? "Whale: Accumulating 🟢" : "Whale: Selling 🔴";
+
+    // Simulate trade
+    if (signal !== "WAIT") {
+      let result = Math.random() > 0.5 ? "+ Profit" : "- Loss";
+
+      history.unshift({
+        signal,
+        price,
+        result
+      });
+
+      if (history.length > 5) history.pop();
+
+      renderHistory();
+    }
 
   } catch (e) {
     document.getElementById("price").innerText = "Error";
   }
 }
 
-setInterval(updateData, 5000);
-updateData();
+function renderHistory() {
+  let html = "";
+
+  history.forEach((h, i) => {
+    html += `
+      <tr>
+        <td>${h.signal}</td>
+        <td>$${h.price}</td>
+        <td>${h.result}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("history").innerHTML = html;
+}
+
+setInterval(update, 5000);
+update();
+
 </script>
 
 </body>
