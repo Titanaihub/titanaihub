@@ -7,40 +7,45 @@
   <style>
     body {
       margin: 0;
-      background: #000;
+      background: #0a0a0a;
       color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-
-    .container {
-      padding: 20px;
-      max-width: 500px;
-      margin: auto;
+      font-family: Arial;
     }
 
     h1 {
-      font-size: 32px;
-      margin-top: 20px;
+      text-align: center;
       color: gold;
+      margin-top: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 15px;
+      padding: 15px;
+      max-width: 900px;
+      margin: auto;
     }
 
     .card {
       background: #111;
+      padding: 15px;
       border-radius: 15px;
-      padding: 20px;
-      margin-top: 15px;
-      box-shadow: 0 0 10px rgba(255,215,0,0.2);
+      box-shadow: 0 0 10px rgba(255,215,0,0.15);
+    }
+
+    .title {
+      font-size: 18px;
+      color: gold;
     }
 
     .price {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
     }
 
     .signal {
-      font-size: 40px;
-      margin: 10px 0;
+      font-size: 28px;
       font-weight: bold;
     }
 
@@ -48,9 +53,11 @@
     .sell { color: red; }
     .wait { color: gray; }
 
-    .small {
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
       font-size: 14px;
-      color: #aaa;
     }
 
     table {
@@ -59,133 +66,112 @@
       border-collapse: collapse;
     }
 
-    th, td {
-      padding: 8px;
+    td {
+      padding: 6px;
       border-bottom: 1px solid #333;
-      font-size: 14px;
-    }
-
-    th {
-      color: gold;
+      font-size: 13px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+<h1>🚀 Titan AI Hub</h1>
 
-  <h1>🚀 Titan AI Hub</h1>
-  <p class="small">Whale Tracking + AI Signal</p>
+<div class="grid">
 
-  <!-- PRICE -->
+  <!-- BTC -->
   <div class="card">
-    <div class="price" id="price">BTC: Loading...</div>
+    <div class="title">BTC</div>
+    <div id="btc-price" class="price">Loading...</div>
+    <div id="btc-signal" class="signal wait">WAIT</div>
+    <div id="btc-confidence"></div>
   </div>
 
-  <!-- SIGNAL -->
+  <!-- ETH -->
   <div class="card">
-    <div id="signal" class="signal wait">WAIT</div>
-    <div id="confidence">Confidence: 70%</div>
+    <div class="title">ETH</div>
+    <div id="eth-price" class="price">Loading...</div>
+    <div id="eth-signal" class="signal wait">WAIT</div>
+    <div id="eth-confidence"></div>
   </div>
 
-  <!-- WHALE -->
+  <!-- BNB -->
   <div class="card">
-    <div id="whale">Whale: Loading...</div>
+    <div class="title">BNB</div>
+    <div id="bnb-price" class="price">Loading...</div>
+    <div id="bnb-signal" class="signal wait">WAIT</div>
+    <div id="bnb-confidence"></div>
+  </div>
+
+  <!-- MARKET -->
+  <div class="card">
+    <div class="title">AI Market Insight</div>
+    <div id="market">Analyzing...</div>
   </div>
 
   <!-- PERFORMANCE -->
   <div class="card">
-    <h3>📊 AI Performance (Simulation)</h3>
-    <table>
-      <tr>
-        <th>Trade</th>
-        <th>Entry</th>
-        <th>Result</th>
-      </tr>
-      <tbody id="history">
-      </tbody>
-    </table>
+    <div class="title">Performance</div>
+    <table id="perf"></table>
   </div>
 
 </div>
 
 <script>
-let prices = [];
-let history = [];
+
+async function fetchSignal(url) {
+  const r = await fetch(url);
+  return await r.json();
+}
+
+function setUI(prefix, data) {
+  document.getElementById(prefix+"-price").innerText =
+    "$" + Math.round(data.price);
+
+  let el = document.getElementById(prefix+"-signal");
+  el.innerText = data.signal;
+  el.className = "signal " + data.signal.toLowerCase();
+
+  document.getElementById(prefix+"-confidence").innerText =
+    "Confidence: " + data.confidence + "%";
+}
 
 async function update() {
   try {
-    const res = await fetch("/api/btc");
-    const data = await res.json();
 
-    let price = data.price;
+    const btc = await fetchSignal("/api/signal-btc");
+    const eth = await fetchSignal("/api/signal-eth");
+    const bnb = await fetchSignal("/api/signal-bnb");
 
-    document.getElementById("price").innerText = "BTC: $" + price;
+    setUI("btc", btc);
+    setUI("eth", eth);
+    setUI("bnb", bnb);
 
-    prices.push(price);
-    if (prices.length > 10) prices.shift();
+    // Market Insight
+    let buy = [btc, eth, bnb].filter(x=>x.signal==="BUY").length;
+    let sell = [btc, eth, bnb].filter(x=>x.signal==="SELL").length;
 
-    let signal = "WAIT";
-    let confidence = 70;
+    let text = "Sideway";
 
-    if (prices.length >= 5) {
-      let avg = prices.reduce((a,b)=>a+b,0)/prices.length;
+    if (buy >= 2) text = "Bullish 🟢";
+    if (sell >= 2) text = "Bearish 🔴";
 
-      if (price > avg) {
-        signal = "BUY";
-        confidence = 80 + Math.random()*15;
-      } else if (price < avg) {
-        signal = "SELL";
-        confidence = 80 + Math.random()*15;
-      }
-    }
+    document.getElementById("market").innerText = text;
 
-    let signalEl = document.getElementById("signal");
-    signalEl.innerText = signal;
-    signalEl.className = "signal " + signal.toLowerCase();
+    // Performance
+    const perf = await fetch("/api/performance").then(r=>r.json());
 
-    document.getElementById("confidence").innerText =
-      "Confidence: " + Math.floor(confidence) + "%";
+    let html = "";
+    perf.trades.forEach(t=>{
+      html += `<tr><td>${t.time}</td><td>${t.result}</td></tr>`;
+    });
 
-    // Whale fake
-    document.getElementById("whale").innerText =
-      Math.random() > 0.5 ? "Whale: Accumulating 🟢" : "Whale: Selling 🔴";
-
-    // Simulate trade
-    if (signal !== "WAIT") {
-      let result = Math.random() > 0.5 ? "+ Profit" : "- Loss";
-
-      history.unshift({
-        signal,
-        price,
-        result
-      });
-
-      if (history.length > 5) history.pop();
-
-      renderHistory();
-    }
+    document.getElementById("perf").innerHTML = html;
 
   } catch (e) {
-    document.getElementById("price").innerText = "Error";
+    console.log(e);
   }
-}
-
-function renderHistory() {
-  let html = "";
-
-  history.forEach((h, i) => {
-    html += `
-      <tr>
-        <td>${h.signal}</td>
-        <td>$${h.price}</td>
-        <td>${h.result}</td>
-      </tr>
-    `;
-  });
-
-  document.getElementById("history").innerHTML = html;
 }
 
 setInterval(update, 5000);
