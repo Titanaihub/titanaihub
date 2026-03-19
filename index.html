@@ -1,1 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Titan AI Hub</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #050505;
+      color: #ffffff;
+      background-image:
+        radial-gradient(circle at top, rgba(255, 215, 0, 0.08), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 215, 0, 0.05), transparent 25%);
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      font-size: 26px;
+      font-weight: 800;
+      color: #f4c430;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      color: #cfcfcf;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .live-badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(22, 163, 74, 0.12);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #0d0d0d 0%, #111111 100%);
+      border: 1px solid rgba(255, 215, 0, 0.12);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 0 22px rgba(255, 200, 0, 0.08);
+    }
+
+    .card-title {
+      color: #f4c430;
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .coin-name {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .price {
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 14px;
+    }
+
+    .signal {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .buy {
+      color: #39ff14;
+    }
+
+    .sell {
+      color: #ff4d4f;
+    }
+
+    .wait {
+      color: #a3a3a3;
+    }
+
+    .meta {
+      font-size: 15px;
+      color: #d4d4d4;
+      margin-bottom: 7px;
+    }
+
+    .submeta {
+      font-size: 13px;
+      color: #a8a8a8;
+      margin-top: 8px;
+    }
+
+    .market-value {
+      font-size: 30px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-box {
+      background: #0a0a0a;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .stat-label {
+      color: #aaaaaa;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      letter-spacing: 0.7px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .positive {
+      color: #39ff14;
+    }
+
+    .negative {
+      color: #ff4d4f;
+    }
+
+    .neutral {
+      color: #e5e5e5;
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+    }
+
+    .history-table th,
+    .history-table td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 14px;
+    }
+
+    .history-table th {
+      color: #f4c430;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .history-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .loader {
+      color: #9a9a9a;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      color: #8d8d8d;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .top-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .price {
+        font-size: 34px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">🚀 Titan AI Hub</div>
+      <div class="subtitle">Whale Tracking + AI Signal</div>
+      <div class="live-badge">● LIVE DATA + MONITOR ONLY</div>
+    </div>
+
+    <div class="top-grid">
+      <div class="card">
+        <div class="card-title">Coin</div>
+        <div class="coin-name">BTC</div>
+        <div id="btc-price" class="price loader">Loading...</div>
+        <div id="btc-signal" class="signal wait">WAIT</div>
+        <div id="btc-confidence" class="meta">Confidence: --</div>
+        <div id="btc-entry" class="meta">Entry: --</div>
+        <div id="btc-sl" class="meta">Stop Loss: --</div>
+        <div id="btc-tp" class="meta">Take Profit: --</div>
+        <div id="btc-source" class="submeta">Source: --</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Coin</div>
+        <div class="coin-name">ETH</div>
+        <div id="eth-price" class="price loader">Loading...</div>
+        <div id="eth-signal" class="signal wait">WAIT</div>
+        <div id="eth-confidence" class="meta">Confidence: --</div>
+        <div id="eth-entry" class="meta">Entry: --</div>
+        <div id="eth-sl" class="meta">Stop Loss: --</div>
+        <div id="eth-tp" class="meta">Take Profit: --</div>
+        <div id="eth-source" class="submeta">Source: --</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Coin</div>
+        <div class="coin-name">BNB</div>
+        <div id="bnb-price" class="price loader">Loading...</div>
+        <div id="bnb-signal" class="signal wait">WAIT</div>
+        <div id="bnb-confidence" class="meta">Confidence: --</div>
+        <div id="bnb-entry" class="meta">Entry: --</div>
+        <div id="bnb-sl" class="meta">Stop Loss: --</div>
+        <div id="bnb-tp" class="meta">Take Profit: --</div>
+        <div id="bnb-source" class="submeta">Source: --</div>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="card">
+        <div class="card-title">Market Insight</div>
+        <div id="market" class="market-value loader">Analyzing...</div>
+        <div id="market-detail" class="meta">BUY 0 | SELL 0 | WAIT 0</div>
+        <div class="footer-note">AI monitor shows live market direction, not auto execution.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Performance Summary</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Total Trades</div>
+            <div id="total-trades" class="stat-value neutral">--</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Winrate</div>
+            <div id="winrate" class="stat-value neutral">--</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Total PnL</div>
+            <div id="total-pnl" class="stat-value neutral">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div class="card">
+      <div class="card-title">Trade History</div>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Result</th>
+            <th>PnL</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="trade-history">
+          <tr>
+            <td colspan="4" class="loader">Loading history...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-note">
+      Titan AI Hub · Live Signal Dashboard · Monitor Only
+    </div>
+  </div>
+
+  <script>
+    async function get(url) {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error("Request failed: " + url);
+      }
+      return await res.json();
+    }
+
+    function formatPrice(value) {
+      if (value === null || value === undefined || isNaN(value)) return "--";
+      return "$" + Number(value).toLocaleString(undefined, {
+        maximumFractionDigits: 2
+      });
+    }
+
+    function setSignalClass(el, signal) {
+      el.classList.remove("buy", "sell", "wait");
+      if (signal === "BUY") el.classList.add("buy");
+      else if (signal === "SELL") el.classList.add("sell");
+      else el.classList.add("wait");
+    }
+
+    function setCoinUI(prefix, data) {
+      document.getElementById(prefix + "-price").innerText = formatPrice(data.price);
+
+      const signalEl = document.getElementById(prefix + "-signal");
+      signalEl.innerText = data.signal || "WAIT";
+      setSignalClass(signalEl, data.signal);
+
+      document.getElementById(prefix + "-confidence").innerText =
+        "Confidence: " + (data.confidence ?? "--") + "%";
+
+      document.getElementById(prefix + "-entry").innerText =
+        "Entry: " + formatPrice(data.entry);
+
+      document.getElementById(prefix + "-sl").innerText =
+        "Stop Loss: " + formatPrice(data.stopLoss);
+
+      document.getElementById(prefix + "-tp").innerText =
+        "Take Profit: " + formatPrice(data.takeProfit);
+
+      document.getElementById(prefix + "-source").innerText =
+        "Source: " + (data.source || "--");
+    }
+
+    function setMarketInsight(btc, eth, bnb) {
+      const signals = [btc, eth, bnb];
+      const buy = signals.filter(x => x.signal === "BUY").length;
+      const sell = signals.filter(x => x.signal === "SELL").length;
+      const wait = signals.filter(x => x.signal === "WAIT").length;
+
+      let marketText = "Sideway";
+      if (buy >= 2) marketText = "Bullish 🟢";
+      if (sell >= 2) marketText = "Bearish 🔴";
+
+      document.getElementById("market").innerText = marketText;
+      document.getElementById("market-detail").innerText =
+        `BUY ${buy} | SELL ${sell} | WAIT ${wait}`;
+    }
+
+    function setPerformance(perf) {
+      document.getElementById("total-trades").innerText = perf.totalTrades ?? "--";
+      document.getElementById("winrate").innerText = (perf.winrate ?? "--") + "%";
+
+      const pnlEl = document.getElementById("total-pnl");
+      const pnl = Number(perf.totalPnl ?? 0);
+      pnlEl.innerText = (pnl > 0 ? "+" : "") + pnl.toFixed(2);
+
+      pnlEl.classList.remove("positive", "negative", "neutral");
+      if (pnl > 0) pnlEl.classList.add("positive");
+      else if (pnl < 0) pnlEl.classList.add("negative");
+      else pnlEl.classList.add("neutral");
+    }
+
+    function setTradeHistory(perf) {
+      const tbody = document.getElementById("trade-history");
+      const trades = Array.isArray(perf.trades) ? perf.trades : [];
+
+      if (!trades.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="loader">No trades yet</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = trades.map(t => {
+        const pnl = Number(t.pnl || 0);
+        const pnlClass = pnl > 0 ? "positive" : pnl < 0 ? "negative" : "neutral";
+        const resultClass = t.result === "WIN" ? "positive" : t.result === "LOSS" ? "negative" : "neutral";
+
+        return `
+          <tr>
+            <td>${t.symbol || "--"}</td>
+            <td class="${resultClass}">${t.result || "--"}</td>
+            <td class="${pnlClass}">${pnl > 0 ? "+" : ""}${pnl.toFixed(2)}</td>
+            <td>${t.time || "--"}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function updateDashboard() {
+      try {
+        const [btc, eth, bnb, perf] = await Promise.all([
+          get("/api/signal-btc"),
+          get("/api/signal-eth"),
+          get("/api/signal-bnb"),
+          get("/api/performance")
+        ]);
+
+        setCoinUI("btc", btc);
+        setCoinUI("eth", eth);
+        setCoinUI("bnb", bnb);
+
+        setMarketInsight(btc, eth, bnb);
+        setPerformance(perf);
+        setTradeHistory(perf);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
+  </script>
+</body>
+</html>
