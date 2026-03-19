@@ -731,11 +731,10 @@
     async function loadDashboard() {
       try {
         const [btcRaw, ethRaw, bnbRaw] = await Promise.all([
-          fetchJson("/api/decision-btc"),
-          fetchJson("/api/market-data-eth"),
-          fetchJson("/api/market-data-bnb")
-        ]);
-
+  fetchJson("https://titan-ai-api.onrender.com/api/decision-btc"),
+  fetchJson("https://titan-ai-api.onrender.com/api/market-data-eth"),
+  fetchJson("https://titan-ai-api.onrender.com/api/market-data-bnb")
+]);
         const btc = normalizeSymbolData("BTC", btcRaw);
         const eth = normalizeSymbolData("ETH", ethRaw);
         const bnb = normalizeSymbolData("BNB", bnbRaw);
