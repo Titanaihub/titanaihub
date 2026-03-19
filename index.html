@@ -1,1 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Titan AI Hub</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #050505;
+      color: #ffffff;
+      background-image:
+        radial-gradient(circle at top, rgba(255, 215, 0, 0.08), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(255, 215, 0, 0.05), transparent 25%);
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      font-size: 26px;
+      font-weight: 800;
+      color: #f4c430;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      color: #cfcfcf;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .live-badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(22, 163, 74, 0.12);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #0d0d0d 0%, #111111 100%);
+      border: 1px solid rgba(255, 215, 0, 0.12);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 0 22px rgba(255, 200, 0, 0.08);
+    }
+
+    .card-title {
+      color: #f4c430;
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .coin-name {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .price {
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 14px;
+    }
+
+    .signal {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .buy {
+      color: #39ff14;
+    }
+
+    .sell {
+      color: #ff4d4f;
+    }
+
+    .wait {
+      color: #a3a3a3;
+    }
+
+    .meta {
+      font-size: 15px;
+      color: #d4d4d4;
+      margin-bottom: 7px;
+    }
+
+    .submeta {
+      font-size: 13px;
+      color: #a8a8a8;
+      margin-top: 8px;
+    }
+
+    .market-value {
+      font-size: 30px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-box {
+      background: #0a0a0a;
+      border: 1px solid
