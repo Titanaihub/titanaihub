@@ -1,1 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Titan AI Hub</title>
+  <style>
+    :root {
+      --bg: #060606;
+      --panel: rgba(16, 16, 16, 0.92);
+      --panel-2: rgba(22, 22, 22, 0.92);
+      --line: rgba(255, 208, 64, 0.16);
+      --gold: #f3c84b;
+      --gold-soft: #b88c12;
+      --text: #f3f3f3;
+      --muted: #a9a9a9;
+      --green: #64ff6a;
+      --red: #ff6868;
+      --yellow: #ffd84a;
+      --shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 10px 30px rgba(0,0,0,0.45);
+      --radius: 24px;
+    }
 
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top center, rgba(255, 196, 0, 0.10), transparent 28%),
+        radial-gradient(circle at bottom center, rgba(255, 196, 0, 0.06), transparent 20%),
+        var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 28px 18px 48px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: clamp(34px, 5vw, 64px);
+      font-weight: 800;
+      color: var(--gold);
+      text-shadow: 0 0 18px rgba(243, 200, 75, 0.18);
+      margin: 0;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #e9e9e9;
+      font-size: clamp(18px, 2.4vw, 32px);
+      font-weight: 500;
+    }
+
+    .badge-row {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .badge {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #f0f0f0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .badge.live::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin: 24px 0 18px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(10,10,10,0.95));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .stat-card {
+      padding: 22px 24px;
+      min-height: 118px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .value {
+      font-size: clamp(28px, 3vw, 48px);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .value.green { color: var(--green); }
+    .value.red { color: var(--red); }
+    .value.gold { color: var(--gold); }
+
+    .coin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .coin-card {
+      padding: 24px;
+      min-height: 370px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .coin-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -120px auto;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(circle, rgba(243,200,75,0.09), transparent 60%);
+      pointer-events: none;
+    }
+
+    .coin-symbol {
+      color: var(--gold);
+      font-size: 15px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .coin-name {
+      font-size: 38px;
+      font-weight: 800;
+      margin: 0 0 8px;
+    }
+
+    .coin-price {
+      font-size: clamp(34px, 4vw, 58px);
+      font-weight: 800;
+      margin: 0 0 14px;
+      word-break: break-word;
+    }
+
+    .signal {
+      font-size: clamp(28px, 3vw, 44px);
+      font-weight: 900;
+      margin: 0 0 18px;
+      line-height: 1;
+    }
+
+    .signal.buy { color: var(--green); }
+    .signal.sell { color: var(--red); }
+    .signal.wait { color: #f2f2f2; }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      color: #e8e8e8;
+      margin-bottom: 8px;
+    }
+
+    .bar {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #9f7d18, var(--yellow));
+      transition: width 0.5s ease;
+    }
+
+    .details {
+      display: grid;
+      gap: 8px;
+      color: #ededed;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .details .muted {
+      color: var(--muted);
+    }
+
+    .reason {
+      margin-top: 12px;
+      color: #d2d2d2;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .section-card {
+      padding: 22px 24px;
+    }
+
+    .section-title {
+      color: var(--gold);
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .big-bias {
+      font-size: clamp(34px, 3vw, 52px);
+      font-weight: 800;
+      margin: 0 0 8px;
+    }
+
+    .summary-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .mini-stat {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 18px;
+      padding: 16px 18px;
+    }
+
+    .mini-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .mini-value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .history-card {
+      padding: 22px 24px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 14px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-size: 13px;
+    }
+
+    td {
+      color: #ededed;
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-block;
+      min-width: 72px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 800;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .pill.buy { color: var(--green); }
+    .pill.sell { color: var(--red); }
+    .pill.wait { color: #f0f0f0; }
+
+    .footer-note {
+      text-align: center;
+      color: #b5b5b5;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+
+    .loading {
+      opacity: 0.7;
+    }
+
+    @media (max-width: 1080px) {
+      .top-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coin-grid { grid-template-columns: 1fr; }
+      .lower-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 16px 12px 30px; }
+      .stat-card, .coin-card, .section-card, .history-card { padding: 18px; }
+      .top-grid { grid-template-columns: 1fr; }
+      .coin-price { font-size: 30px; }
+      .signal { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1 class="brand">🚀 Titan AI Hub</h1>
+      <div class="subtitle">Whale Tracking + AI Signal</div>
+
+      <div class="badge-row">
+        <div class="badge live">Live Monitor</div>
+        <div class="badge">Monitor Only</div>
+        <div class="badge">AI Confidence Engine</div>
+      </div>
+    </section>
+
+    <section class="top-grid">
+      <div class="panel stat-card">
+        <div class="label">Active Models</div>
+        <div class="value" id="active-models">3</div>
+      </div>
+
+      <div class="panel stat-card">
+        <div class="label">Avg Confidence</div>
+        <div class="value" id="avg-confidence">--</div>
+      </div>
+
+      <div class="panel stat-card">
+        <div class="label">Signal Balance</div>
+        <div class="value gold" id="signal-balance">--</div>
+      </div>
+
+      <div class="panel stat-card">
+        <div class="label">Market Bias</div>
+        <div class="value" id="global-bias">Loading</div>
+      </div>
+    </section>
+
+    <section class="coin-grid">
+      <article class="panel coin-card" id="card-btc">
+        <div class="coin-symbol">Coin</div>
+        <h2 class="coin-name">BTC</h2>
+        <div class="coin-price" id="btc-price">$--</div>
+        <div class="signal wait" id="btc-signal">Loading</div>
+
+        <div class="meta-row">
+          <span>Confidence</span>
+          <span id="btc-confidence">--%</span>
+        </div>
+        <div class="bar"><div class="bar-fill" id="btc-bar"></div></div>
+
+        <div class="details">
+          <div>Entry: <span id="btc-entry">—</span></div>
+          <div>Stop Loss: <span id="btc-stop">—</span></div>
+          <div>Take Profit: <span id="btc-tp">—</span></div>
+          <div class="muted">Source: <span id="btc-source">—</span></div>
+          <div class="muted">Last Updated: <span id="btc-updated">—</span></div>
+        </div>
+
+        <div class="reason" id="btc-reason">AI signal reasoning will appear here.</div>
+      </article>
+
+      <article class="panel coin-card" id="card-eth">
+        <div class="coin-symbol">Coin</div>
+        <h2 class="coin-name">ETH</h2>
+        <div class="coin-price" id="eth-price">$--</div>
+        <div class="signal wait" id="eth-signal">Loading</div>
+
+        <div class="meta-row">
+          <span>Confidence</span>
+          <span id="eth-confidence">--%</span>
+        </div>
+        <div class="bar"><div class="bar-fill" id="eth-bar"></div></div>
+
+        <div class="details">
+          <div>Entry: <span id="eth-entry">—</span></div>
+          <div>Stop Loss: <span id="eth-stop">—</span></div>
+          <div>Take Profit: <span id="eth-tp">—</span></div>
+          <div class="muted">Source: <span id="eth-source">—</span></div>
+          <div class="muted">Last Updated: <span id="eth-updated">—</span></div>
+        </div>
+
+        <div class="reason" id="eth-reason">Derived from current market structure.</div>
+      </article>
+
+      <article class="panel coin-card" id="card-bnb">
+        <div class="coin-symbol">Coin</div>
+        <h2 class="coin-name">BNB</h2>
+        <div class="coin-price" id="bnb-price">$--</div>
+        <div class="signal wait" id="bnb-signal">Loading</div>
+
+        <div class="meta-row">
+          <span>Confidence</span>
+          <span id="bnb-confidence">--%</span>
+        </div>
+        <div class="bar"><div class="bar-fill" id="bnb-bar"></div></div>
+
+        <div class="details">
+          <div>Entry: <span id="bnb-entry">—</span></div>
+          <div>Stop Loss: <span id="bnb-stop">—</span></div>
+          <div>Take Profit: <span id="bnb-tp">—</span></div>
+          <div class="muted">Source: <span id="bnb-source">—</span></div>
+          <div class="muted">Last Updated: <span id="bnb-updated">—</span></div>
+        </div>
+
+        <div class="reason" id="bnb-reason">Derived from current market structure.</div>
+      </article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel section-card">
+        <div class="section-title">Market Insight</div>
+        <div class="big-bias" id="market-insight-bias">Loading</div>
+        <div id="market-insight-text">Analyzing current BTC, ETH and BNB structures...</div>
+      </article>
+
+      <article class="panel section-card">
+        <div class="section-title">AI Summary</div>
+        <div class="summary-grid">
+          <div class="mini-stat">
+            <div class="mini-label">Buy / Sell / Wait</div>
+            <div class="mini-value" id="summary-counts">--</div>
+          </div>
+          <div class="mini-stat">
+            <div class="mini-label">Strongest Coin</div>
+            <div class="mini-value" id="summary-strongest">--</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel section-card">
+        <div class="section-title">Model Notes</div>
+        <div id="model-notes" style="line-height:1.7;color:#dcdcdc;">
+          This dashboard is monitor-only. It shows AI signal interpretation from live market data and feature scoring, not direct exchange execution.
+        </div>
+      </article>
+    </section>
+
+    <section class="panel history-card">
+      <div class="section-title">Live Snapshot</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Signal</th>
+              <th>Bias</th>
+              <th>Price</th>
+              <th>Confidence</th>
+              <th>Entry</th>
+              <th>Stop</th>
+              <th>Take Profit</th>
+            </tr>
+          </thead>
+          <tbody id="snapshot-table">
+            <tr><td colspan="8">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="footer-note">Titan AI Hub · AI Signal Brain v1 · Premium Monitor Interface</div>
+    </section>
+  </div>
+
+  <script>
+    function qs(id) {
+      return document.getElementById(id);
+    }
+
+    function safeNum(v, fallback = 0) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function fmtPrice(v) {
+      const n = safeNum(v, null);
+      if (n === null) return "—";
+      return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    function fmtPercent(v) {
+      const n = safeNum(v, null);
+      if (n === null) return "—";
+      return `${Math.round(n)}%`;
+    }
+
+    function formatUnixSeconds(ts) {
+      const n = safeNum(ts, null);
+      if (!n) return "—";
+      const d = new Date(n * 1000);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function deriveBiasLabel(data) {
+      if (data.marketBias) return data.marketBias;
+
+      const r1 = safeNum(data?.stats?.return1h);
+      const r4 = safeNum(data?.stats?.return4h);
+
+      const composite = r1 * 0.4 + r4 * 0.6;
+      if (composite >= 0.25) return "Bullish";
+      if (composite <= -0.25) return "Bearish";
+      return "Sideway";
+    }
+
+    function deriveSignalLabel(data) {
+      if (data.signal) return data.signal;
+
+      const r15 = safeNum(data?.stats?.return15m);
+      const r1 = safeNum(data?.stats?.return1h);
+      const r4 = safeNum(data?.stats?.return4h);
+
+      if (r4 <= -0.6 || (r1 <= -0.25 && r15 <= -0.05)) return "SELL";
+      if (r4 >= 0.6 || (r1 >= 0.25 && r15 >= 0.05)) return "BUY";
+      return "WAIT";
+    }
+
+    function deriveConfidence(data) {
+      if (data.confidence) return safeNum(data.confidence, 65);
+
+      const r1 = Math.abs(safeNum(data?.stats?.return1h));
+      const r4 = Math.abs(safeNum(data?.stats?.return4h));
+      const range1 = safeNum(data?.stats?.range1hPct);
+      const range4 = safeNum(data?.stats?.range4hPct);
+
+      let conf = 58 + (r1 * 8) + (r4 * 5) + (Math.min(range1, 2) * 3) + (Math.min(range4, 4) * 2);
+      return Math.max(55, Math.min(88, Math.round(conf)));
+    }
+
+    function deriveRiskPlan(data, signal) {
+      if (data.entry !== undefined) {
+        return {
+          entry: data.entry ?? null,
+          stopLoss: data.stopLoss ?? null,
+          takeProfit: data.takeProfit ?? null
+        };
+      }
+
+      const price = safeNum(data.price, null);
+      if (price === null) {
+        return { entry: null, stopLoss: null, takeProfit: null };
+      }
+
+      return {
+        entry: price,
+        stopLoss: null,
+        takeProfit: null
+      };
+    }
+
+    function deriveReason(data, signal, bias) {
+      if (data.reason) return data.reason;
+
+      const stats = data?.stats || {};
+      return `Derived from market-data API. return15m=${safeNum(stats.return15m)}, return1h=${safeNum(stats.return1h)}, return4h=${safeNum(stats.return4h)}, bias=${bias}, signal=${signal}`;
+    }
+
+    function normalizeSymbolData(symbol, data) {
+      const signal = deriveSignalLabel(data);
+      const marketBias = deriveBiasLabel(data);
+      const confidence = deriveConfidence(data);
+      const risk = deriveRiskPlan(data, signal);
+      const reason = deriveReason(data, signal, marketBias);
+
+      return {
+        symbol,
+        source: data.source || "coingecko",
+        price: safeNum(data.price, null),
+        signal,
+        confidence,
+        marketBias,
+        entry: risk.entry,
+        stopLoss: risk.stopLoss,
+        takeProfit: risk.takeProfit,
+        lastUpdatedAt: data.lastUpdatedAt || null,
+        reason
+      };
+    }
+
+    function setSignalStyle(el, signal) {
+      el.classList.remove("buy", "sell", "wait");
+      if (signal === "BUY") el.classList.add("buy");
+      else if (signal === "SELL") el.classList.add("sell");
+      else el.classList.add("wait");
+    }
+
+    function renderCard(symbol, data) {
+      const key = symbol.toLowerCase();
+      qs(`${key}-price`).textContent = fmtPrice(data.price);
+
+      const sigEl = qs(`${key}-signal`);
+      sigEl.textContent = data.signal;
+      setSignalStyle(sigEl, data.signal);
+
+      qs(`${key}-confidence`).textContent = fmtPercent(data.confidence);
+      qs(`${key}-bar`).style.width = `${safeNum(data.confidence, 0)}%`;
+
+      qs(`${key}-entry`).textContent = fmtPrice(data.entry);
+      qs(`${key}-stop`).textContent = data.stopLoss == null ? "—" : fmtPrice(data.stopLoss);
+      qs(`${key}-tp`).textContent = data.takeProfit == null ? "—" : fmtPrice(data.takeProfit);
+      qs(`${key}-source`).textContent = data.source || "—";
+      qs(`${key}-updated`).textContent = formatUnixSeconds(data.lastUpdatedAt);
+      qs(`${key}-reason`).textContent = data.reason || "—";
+    }
+
+    function computeGlobalSummary(items) {
+      const buy = items.filter(x => x.signal === "BUY").length;
+      const sell = items.filter(x => x.signal === "SELL").length;
+      const wait = items.filter(x => x.signal === "WAIT").length;
+
+      const avgConfidence = items.length
+        ? Math.round(items.reduce((sum, x) => sum + safeNum(x.confidence), 0) / items.length)
+        : 0;
+
+      let bias = "Sideway";
+      if (sell > buy && sell >= wait) bias = "Bearish";
+      else if (buy > sell && buy >= wait) bias = "Bullish";
+
+      const strongest = [...items].sort((a, b) => safeNum(b.confidence) - safeNum(a.confidence))[0];
+
+      return {
+        buy,
+        sell,
+        wait,
+        avgConfidence,
+        bias,
+        strongest: strongest ? `${strongest.symbol} ${strongest.signal}` : "—"
+      };
+    }
+
+    function renderSummary(items) {
+      const s = computeGlobalSummary(items);
+
+      qs("avg-confidence").textContent = `${s.avgConfidence}%`;
+      qs("signal-balance").textContent = `${s.buy}/${s.sell}/${s.wait}`;
+      qs("global-bias").textContent = s.bias;
+      qs("market-insight-bias").textContent = s.bias;
+      qs("summary-counts").textContent = `B ${s.buy} · S ${s.sell} · W ${s.wait}`;
+      qs("summary-strongest").textContent = s.strongest;
+
+      let insight = "Mixed structure, waiting for clearer alignment.";
+      if (s.bias === "Bearish") insight = "Downside pressure dominates current model alignment. BTC has the highest decision priority.";
+      if (s.bias === "Bullish") insight = "Upside structure dominates current model alignment. Momentum is supporting continuation.";
+      qs("market-insight-text").textContent = insight;
+    }
+
+    function renderTable(items) {
+      const tbody = qs("snapshot-table");
+      tbody.innerHTML = items.map(item => {
+        const signalClass = item.signal === "BUY" ? "buy" : item.signal === "SELL" ? "sell" : "wait";
+        return `
+          <tr>
+            <td>${item.symbol}</td>
+            <td><span class="pill ${signalClass}">${item.signal}</span></td>
+            <td>${item.marketBias}</td>
+            <td>${fmtPrice(item.price)}</td>
+            <td>${fmtPercent(item.confidence)}</td>
+            <td>${fmtPrice(item.entry)}</td>
+            <td>${item.stopLoss == null ? "—" : fmtPrice(item.stopLoss)}</td>
+            <td>${item.takeProfit == null ? "—" : fmtPrice(item.takeProfit)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+      return await res.json();
+    }
+
+    async function loadDashboard() {
+      try {
+        const [btcRaw, ethRaw, bnbRaw] = await Promise.all([
+          fetchJson("/api/decision-btc"),
+          fetchJson("/api/market-data-eth"),
+          fetchJson("/api/market-data-bnb")
+        ]);
+
+        const btc = normalizeSymbolData("BTC", btcRaw);
+        const eth = normalizeSymbolData("ETH", ethRaw);
+        const bnb = normalizeSymbolData("BNB", bnbRaw);
+
+        const items = [btc, eth, bnb];
+
+        renderCard("BTC", btc);
+        renderCard("ETH", eth);
+        renderCard("BNB", bnb);
+        renderSummary(items);
+        renderTable(items);
+      } catch (err) {
+        qs("market-insight-bias").textContent = "Error";
+        qs("market-insight-text").textContent = err.toString();
+      }
+    }
+
+    loadDashboard();
+    setInterval(loadDashboard, 30000);
+  </script>
+</body>
+          </html>
