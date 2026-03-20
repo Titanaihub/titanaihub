@@ -33,11 +33,25 @@
       </div>
     </header>
 
+    <section class="quick-bar">
+      <button class="quick-nav" onclick="document.getElementById('overviewSection').scrollIntoView({behavior:'smooth'})">Overview</button>
+      <button class="quick-nav" onclick="document.getElementById('coinsSection').scrollIntoView({behavior:'smooth'})">Coins</button>
+      <button class="quick-nav" onclick="document.getElementById('whalesSection').scrollIntoView({behavior:'smooth'})">Whales</button>
+      <button class="quick-nav" onclick="document.getElementById('chatSection').scrollIntoView({behavior:'smooth'})">AI Chat</button>
+      <button class="quick-nav" onclick="document.getElementById('rawSection').scrollIntoView({behavior:'smooth'})">Raw</button>
+    </section>
+
     <main class="dashboard-layout">
       <section class="main-content">
-        <section class="hero-grid">
+        <section class="hero-grid" id="overviewSection">
           <div class="hero-card large">
-            <div class="card-title">Market Overview</div>
+            <div class="section-row">
+              <div>
+                <div class="card-title">Market Overview</div>
+                <div class="section-subtitle">Core macro snapshot for current market conditions</div>
+              </div>
+            </div>
+
             <div class="overview-grid">
               <div class="overview-item">
                 <span>Total Market Cap</span>
@@ -60,6 +74,8 @@
 
           <div class="hero-card">
             <div class="card-title">AI Summary</div>
+            <div class="section-subtitle">Current model output snapshot</div>
+
             <div class="ai-summary-box">
               <div class="summary-line">
                 <span>Top Setup</span>
@@ -77,14 +93,14 @@
           </div>
         </section>
 
-        <section class="coin-section">
+        <section class="coin-section" id="coinsSection">
           <div class="section-head">
             <h2>Coin Focus</h2>
             <p>Live multi-asset dashboard for BTC, ETH and BNB</p>
           </div>
 
           <div class="coin-grid">
-            <article class="coin-card" id="coin-btc">
+            <article class="coin-card compact" id="coin-btc">
               <div class="coin-head">
                 <h3>BTC</h3>
                 <span id="btcSignal" class="signal neutral">--</span>
@@ -103,7 +119,7 @@
               </div>
             </article>
 
-            <article class="coin-card" id="coin-eth">
+            <article class="coin-card compact" id="coin-eth">
               <div class="coin-head">
                 <h3>ETH</h3>
                 <span id="ethSignal" class="signal neutral">--</span>
@@ -122,7 +138,7 @@
               </div>
             </article>
 
-            <article class="coin-card" id="coin-bnb">
+            <article class="coin-card compact" id="coin-bnb">
               <div class="coin-head">
                 <h3>BNB</h3>
                 <span id="bnbSignal" class="signal neutral">--</span>
@@ -144,11 +160,16 @@
         </section>
 
         <section class="data-row">
-          <div class="panel">
-            <div class="section-head">
-              <h2>Whale Activity</h2>
-              <p>Latest large-position flow and smart money movement</p>
+          <div class="panel" id="whalesSection">
+            <div class="section-row">
+              <div>
+                <div class="section-head">
+                  <h2>Whale Activity</h2>
+                  <p>Latest large-position flow and smart money movement</p>
+                </div>
+              </div>
             </div>
+
             <div class="table-wrap">
               <table>
                 <thead>
@@ -168,47 +189,84 @@
             </div>
           </div>
 
-          <div class="panel">
-            <div class="section-head">
-              <h2>Raw Market Snapshot</h2>
-              <p>Debug / validation view for your own review</p>
+          <div class="panel" id="rawSection">
+            <div class="section-row">
+              <div>
+                <div class="section-head">
+                  <h2>Raw Market Snapshot</h2>
+                  <p>Debug / validation view for your own review</p>
+                </div>
+              </div>
+              <button class="toggle-btn" onclick="toggleRawBox()">Hide</button>
             </div>
+
             <pre id="rawSnapshot" class="raw-box">Loading...</pre>
           </div>
         </section>
       </section>
 
-      <aside class="sidebar">
+      <aside class="sidebar" id="chatSection">
         <section class="chat-panel">
-          <div class="section-head">
-            <h2>Private AI Chat</h2>
-            <p>For owner-only analysis and follow-up questions</p>
+          <div class="section-row">
+            <div>
+              <div class="section-head">
+                <h2>Private AI Chat</h2>
+                <p>For owner-only analysis and follow-up questions</p>
+              </div>
+            </div>
+            <button class="toggle-btn" onclick="toggleChatPanel()">Hide</button>
           </div>
 
-          <div class="login-box">
-            <input id="loginUser" type="text" placeholder="Username" />
-            <input id="loginPass" type="password" placeholder="Password" />
-            <button id="loginBtn">Login</button>
-          </div>
+          <div id="chatPanelBody">
+            <div class="login-box">
+              <input id="loginUser" type="text" placeholder="Username" />
+              <input id="loginPass" type="password" placeholder="Password" />
+              <button id="loginBtn">Login</button>
+            </div>
 
-          <div id="chatMessages" class="chat-messages">
-            <div class="chat-message ai">AI chat ready. Login first.</div>
-          </div>
+            <div id="chatMessages" class="chat-messages">
+              <div class="chat-message ai">AI chat ready. Login first.</div>
+            </div>
 
-          <div class="chat-actions">
-            <button class="quick-btn" data-question="Analyze BTC now">Analyze BTC</button>
-            <button class="quick-btn" data-question="Compare BTC ETH BNB">Compare Coins</button>
-            <button class="quick-btn" data-question="Show current market risk">Ask Risk</button>
-          </div>
+            <div class="chat-actions">
+              <button class="quick-btn" data-question="Analyze BTC now">Analyze BTC</button>
+              <button class="quick-btn" data-question="Compare BTC ETH BNB">Compare Coins</button>
+              <button class="quick-btn" data-question="Show current market risk">Ask Risk</button>
+            </div>
 
-          <div class="chat-input-wrap">
-            <textarea id="chatInput" placeholder="Ask AI about current data..."></textarea>
-            <button id="sendChatBtn">Send</button>
+            <div class="chat-input-wrap">
+              <textarea id="chatInput" placeholder="Ask AI about current data..."></textarea>
+              <button id="sendChatBtn">Send</button>
+            </div>
           </div>
         </section>
       </aside>
     </main>
   </div>
+
+  <script>
+    function toggleChatPanel() {
+      const body = document.getElementById("chatPanelBody");
+      const btns = document.querySelectorAll(".toggle-btn");
+      if (!body) return;
+      const hidden = body.style.display === "none";
+      body.style.display = hidden ? "block" : "none";
+      btns.forEach(btn => {
+        if (btn.closest(".chat-panel")) btn.textContent = hidden ? "Hide" : "Show";
+      });
+    }
+
+    function toggleRawBox() {
+      const raw = document.getElementById("rawSnapshot");
+      const btns = document.querySelectorAll(".toggle-btn");
+      if (!raw) return;
+      const hidden = raw.style.display === "none";
+      raw.style.display = hidden ? "block" : "none";
+      btns.forEach(btn => {
+        if (btn.closest("#rawSection")) btn.textContent = hidden ? "Hide" : "Show";
+      });
+    }
+  </script>
 
   <script src="./app.js"></script>
 </body>
