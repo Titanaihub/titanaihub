@@ -141,32 +141,44 @@ app.get("/api/ai-analysis-btc", async (req, res) => {
 
     const rawText = data?.choices?.[0]?.message?.content?.trim() || "";
 
-    if (!rawText) {
-      return res.status(500).json({
-        ok: false,
-        symbol: "BTC",
-        error: "OpenRouter returned empty output"
-      });
-    }
+if (!rawText) {
+  return res.status(500).json({
+    ok: false,
+    symbol: "BTC",
+    error: "OpenRouter returned empty output"
+  });
+}
 
-    const cleanedText = rawText
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim();
+const cleanedText = rawText
+  .replace(/^```json\s*/i, "")
+  .replace(/^```\s*/i, "")
+  .replace(/\s*```$/, "")
+  .trim();
 
-    let analysis;
-    try {
-      analysis = JSON.parse(cleanedText);
-    } catch (parseErr) {
-      return res.status(500).json({
-        ok: false,
-        symbol: "BTC",
-        error: "Failed to parse OpenRouter JSON output",
-        raw: rawText,
-        cleaned: cleanedText
-      });
-    }
+let analysis;
+
+try {
+  analysis = JSON.parse(cleanedText);
+} catch (firstErr) {
+  try {
+    const unescaped = cleanedText
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t")
+      .replace(/\\\\/g, "\\");
+
+    analysis = JSON.parse(unescaped);
+  } catch (secondErr) {
+    return res.status(500).json({
+      ok: false,
+      symbol: "BTC",
+      error: "Failed to parse OpenRouter JSON output",
+      raw: rawText,
+      cleaned: cleanedText
+    });
+  }
+}
 
     res.json({
       ok: true,
