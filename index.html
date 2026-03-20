@@ -615,6 +615,57 @@
     }
 
     function normalizeSymbolData(symbol, data) {
+  const isAiPayload =
+    data &&
+    data.source === "openrouter" &&
+    data.analysis &&
+    typeof data.analysis === "object";
+
+  if (isAiPayload) {
+    const analysis = data.analysis || {};
+    const marketData = data.marketData || {};
+
+    return {
+      symbol,
+      source: data.source || "openrouter",
+      price: safeNum(marketData.price ?? analysis.entry, null),
+      signal: analysis.action || "WAIT",
+      confidence: safeNum(analysis.confidence, 50),
+      marketBias: analysis.market_bias || "Sideway",
+      entry: safeNum(analysis.entry, null),
+      stopLoss: safeNum(analysis.stopLoss, null),
+      takeProfit: safeNum(analysis.takeProfit, null),
+      lastUpdatedAt: marketData.lastUpdatedAt || null,
+      reason: Array.isArray(analysis.reasoning)
+        ? analysis.reasoning.join(" | ")
+        : (analysis.reasoning || "AI analysis"),
+      riskNotes: Array.isArray(analysis.risk_notes)
+        ? analysis.risk_notes
+        : [],
+      regime: analysis.regime || ""
+    };
+  }
+
+  const signal = deriveSignalLabel(data);
+  const marketBias = deriveBiasLabel(data);
+  const confidence = deriveConfidence(data);
+  const risk = deriveRiskPlan(data, signal);
+  const reason = deriveReason(data, signal, marketBias);
+
+  return {
+    symbol,
+    source: data.source || "coingecko",
+    price: safeNum(data.price, null),
+    signal,
+    confidence,
+    marketBias,
+    entry: risk.entry,
+    stopLoss: risk.stopLoss,
+    takeProfit: risk.takeProfit,
+    lastUpdatedAt: data.lastUpdatedAt || null,
+    reason
+  };
+}
       const signal = deriveSignalLabel(data);
       const marketBias = deriveBiasLabel(data);
       const confidence = deriveConfidence(data);
@@ -731,7 +782,7 @@
     async function loadDashboard() {
       try {
         const [btcRaw, ethRaw, bnbRaw] = await Promise.all([
-  fetchJson("https://titan-ai-api.onrender.com/api/decision-btc"),
+  fetchJson("https://titan-ai-api.onrender.com/api/ai-analysis-btc"),
   fetchJson("https://titan-ai-api.onrender.com/api/market-data-eth"),
   fetchJson("https://titan-ai-api.onrender.com/api/market-data-bnb")
 ]);
