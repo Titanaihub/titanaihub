@@ -37,11 +37,11 @@
       <button class="quick-nav" onclick="document.getElementById('overviewSection').scrollIntoView({behavior:'smooth'})">Overview</button>
       <button class="quick-nav" onclick="document.getElementById('coinsSection').scrollIntoView({behavior:'smooth'})">Coins</button>
       <button class="quick-nav" onclick="document.getElementById('whalesSection').scrollIntoView({behavior:'smooth'})">Whales</button>
-      <button class="quick-nav" onclick="document.getElementById('chatSection').scrollIntoView({behavior:'smooth'})">AI Chat</button>
       <button class="quick-nav" onclick="document.getElementById('rawSection').scrollIntoView({behavior:'smooth'})">Raw</button>
+      <button class="quick-nav" onclick="document.getElementById('chatSection').scrollIntoView({behavior:'smooth'})">AI Chat</button>
     </section>
 
-    <main class="dashboard-layout">
+    <main class="dashboard-layout single-column">
       <section class="main-content">
         <section class="hero-grid" id="overviewSection">
           <div class="hero-card large">
@@ -203,10 +203,8 @@
             <pre id="rawSnapshot" class="raw-box">Loading...</pre>
           </div>
         </section>
-      </section>
 
-      <aside class="sidebar" id="chatSection">
-        <section class="chat-panel">
+        <section class="panel full-width-chat" id="chatSection">
           <div class="section-row">
             <div>
               <div class="section-head">
@@ -240,34 +238,30 @@
             </div>
           </div>
         </section>
-      </aside>
+      </section>
     </main>
   </div>
 
   <script>
     function toggleChatPanel() {
       const body = document.getElementById("chatPanelBody");
-      const btns = document.querySelectorAll(".toggle-btn");
-      if (!body) return;
+      const btn = document.querySelector("#chatSection .toggle-btn");
+      if (!body || !btn) return;
       const hidden = body.style.display === "none";
       body.style.display = hidden ? "block" : "none";
-      btns.forEach(btn => {
-        if (btn.closest(".chat-panel")) btn.textContent = hidden ? "Hide" : "Show";
-      });
+      btn.textContent = hidden ? "Hide" : "Show";
     }
 
     function toggleRawBox() {
       const raw = document.getElementById("rawSnapshot");
-      const btns = document.querySelectorAll(".toggle-btn");
-      if (!raw) return;
+      const btn = document.querySelector("#rawSection .toggle-btn");
+      if (!raw || !btn) return;
       const hidden = raw.style.display === "none";
       raw.style.display = hidden ? "block" : "none";
-      btns.forEach(btn => {
-        if (btn.closest("#rawSection")) btn.textContent = hidden ? "Hide" : "Show";
-      });
+      btn.textContent = hidden ? "Hide" : "Show";
     }
   </script>
 
   <script src="./app.js"></script>
 </body>
-</html>
+  </html>
