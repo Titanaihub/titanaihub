@@ -1,1 +1,293 @@
+<script>
+const API_BASE = "https://titan-ai-api.onrender.com";
 
+function safeNum(value, fallback = null) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function formatPrice(value) {
+  const n = safeNum(value, null);
+  if (n === null) return "$--";
+  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function formatPercent(value) {
+  const n = safeNum(value, null);
+  if (n === null) return "--%";
+  return `${Math.round(n)}%`;
+}
+
+function formatDate(ts) {
+  if (!ts) return "--";
+  try {
+    const d = new Date(Number(ts) * 1000 || ts);
+    if (Number.isNaN(d.getTime())) return "--";
+    return d.toLocaleString();
+  } catch {
+    return "--";
+  }
+}
+
+function titleCase(str) {
+  if (!str) return "Sideway";
+  return String(str)
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  return await res.json();
+}
+  function deriveSignalFromMarketData(data) {
+  const stats = data?.stats || {};
+  const r1h = safeNum(stats.return1h, 0);
+  const r4h = safeNum(stats.return4h, 0);
+
+  if (r1h > 0.25 && r4h > 0) return "BUY";
+  if (r1h < -0.25 && r4h < 0) return "SELL";
+  return "WAIT";
+}
+
+function deriveBiasFromMarketData(data) {
+  const stats = data?.stats || {};
+  const r1h = safeNum(stats.return1h, 0);
+  const r4h = safeNum(stats.return4h, 0);
+
+  if (r1h > 0.15 && r4h > 0.15) return "Bullish";
+  if (r1h < -0.15 && r4h < -0.15) return "Bearish";
+  return "Sideway";
+}
+
+function deriveConfidenceFromMarketData(data) {
+  const stats = data?.stats || {};
+  const range1h = Math.abs(safeNum(stats.range1hPct, 0));
+  const range4h = Math.abs(safeNum(stats.range4hPct, 0));
+  const strength =
+    Math.abs(safeNum(stats.return1h, 0)) +
+    Math.abs(safeNum(stats.return4h, 0));
+
+  const score = Math.min(
+    85,
+    Math.max(45, Math.round(45 + strength * 18 + (range1h + range4h) * 3))
+  );
+
+  return score;
+}
+
+function deriveRiskPlanFromMarketData(data, signal) {
+  const price = safeNum(data?.price, null);
+  const tfs = data?.timeframes || {};
+  const h1 = tfs["1h"] || {};
+  const h4 = tfs["4h"] || {};
+
+  if (price === null) {
+    return { entry: null, stopLoss: null, takeProfit: null };
+  }
+
+  if (signal === "BUY") {
+    const stop = safeNum(h1.low, price * 0.99);
+    const take = safeNum(h4.high, price * 1.015);
+    return { entry: price, stopLoss: stop, takeProfit: take };
+  }
+
+  if (signal === "SELL") {
+    const stop = safeNum(h1.high, price * 1.01);
+    const take = safeNum(h4.low, price * 0.985);
+    return { entry: price, stopLoss: stop, takeProfit: take };
+  }
+
+  return { entry: price, stopLoss: null, takeProfit: null };
+}
+
+function deriveReasonFromMarketData(data, signal, marketBias) {
+  const stats = data?.stats || {};
+  return `Derived from market structure. 1h: ${safeNum(stats.return1h, 0)}%, 4h: ${safeNum(stats.return4h, 0)}%, bias: ${marketBias}, signal: ${signal}.`;
+}
+  function normalizeSymbolData(symbol, data) {
+  const isAiPayload =
+    data &&
+    data.source === "openrouter" &&
+    data.analysis &&
+    typeof data.analysis === "object";
+
+  if (isAiPayload) {
+    const analysis = data.analysis || {};
+    const marketData = data.marketData || {};
+
+    return {
+      symbol,
+      source: data.source || "openrouter",
+      price: safeNum(marketData.price ?? analysis.entry, null),
+      signal: analysis.action || "WAIT",
+      confidence: safeNum(analysis.confidence, 50),
+      marketBias: titleCase(analysis.market_bias || "sideway"),
+      entry: safeNum(analysis.entry, null),
+      stopLoss: safeNum(analysis.stopLoss, null),
+      takeProfit: safeNum(analysis.takeProfit, null),
+      lastUpdatedAt: marketData.lastUpdatedAt || null,
+      reason: Array.isArray(analysis.reasoning)
+        ? analysis.reasoning.join(" | ")
+        : String(analysis.reasoning || "AI analysis"),
+      regime: analysis.regime || ""
+    };
+  }
+
+  const signal = deriveSignalFromMarketData(data);
+  const marketBias = deriveBiasFromMarketData(data);
+  const confidence = deriveConfidenceFromMarketData(data);
+  const risk = deriveRiskPlanFromMarketData(data, signal);
+  const reason = deriveReasonFromMarketData(data, signal, marketBias);
+
+  return {
+    symbol,
+    source: data?.source || "coingecko",
+    price: safeNum(data?.price, null),
+    signal,
+    confidence,
+    marketBias,
+    entry: risk.entry,
+    stopLoss: risk.stopLoss,
+    takeProfit: risk.takeProfit,
+    lastUpdatedAt: data?.lastUpdatedAt || null,
+    reason,
+    regime: ""
+  };
+}
+
+function signalClass(signal) {
+  if (signal === "BUY") return "buy";
+  if (signal === "SELL") return "sell";
+  return "wait";
+}
+  function renderCard(targetId, item) {
+  const el = document.getElementById(targetId);
+  const klass = signalClass(item.signal);
+
+  el.innerHTML = `
+    <div class="coin-label">COIN</div>
+    <div class="coin-symbol">${item.symbol}</div>
+    <div class="coin-price">${formatPrice(item.price)}</div>
+    <div class="signal ${klass}">${item.signal}</div>
+
+    <div class="confidence-label">Confidence</div>
+    <div class="progress-wrap">
+      <div class="progress"><div style="width:${Math.max(0, Math.min(100, item.confidence || 0))}%"></div></div>
+      <div class="progress-text">${formatPercent(item.confidence)}</div>
+    </div>
+
+    <div class="details">
+      <div><span>Bias:</span> ${item.marketBias || "--"}</div>
+      <div><span>Entry:</span> ${formatPrice(item.entry)}</div>
+      <div><span>Stop Loss:</span> ${formatPrice(item.stopLoss)}</div>
+      <div><span>Take Profit:</span> ${formatPrice(item.takeProfit)}</div>
+      <div><span>Source:</span> ${item.source || "--"}</div>
+      <div><span>Last Updated:</span> ${formatDate(item.lastUpdatedAt)}</div>
+    </div>
+
+    <div class="reason">${item.reason || "No reasoning available."}</div>
+  `;
+  }
+  function renderSummary(items) {
+  const buyCount = items.filter(x => x.signal === "BUY").length;
+  const sellCount = items.filter(x => x.signal === "SELL").length;
+  const waitCount = items.filter(x => x.signal === "WAIT").length;
+
+  const avg = items.length
+    ? Math.round(items.reduce((sum, x) => sum + safeNum(x.confidence, 0), 0) / items.length)
+    : 0;
+
+  const biasMap = {};
+  items.forEach(x => {
+    const key = x.marketBias || "Sideway";
+    biasMap[key] = (biasMap[key] || 0) + 1;
+  });
+
+  const dominantBias =
+    Object.entries(biasMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "Sideway";
+
+  const strongest =
+    [...items].sort((a, b) => safeNum(b.confidence, 0) - safeNum(a.confidence, 0))[0];
+
+  document.getElementById("avgConfidence").textContent = `${avg}%`;
+  document.getElementById("signalBalance").textContent = `${buyCount}/${sellCount}/${waitCount}`;
+  document.getElementById("marketBiasSummary").textContent = dominantBias;
+  document.getElementById("summaryMix").textContent = `B ${buyCount} • S ${sellCount} • W ${waitCount}`;
+  document.getElementById("strongestCoin").textContent = strongest
+    ? `${strongest.symbol} ${strongest.signal}`
+    : "-";
+
+  document.getElementById("marketInsightTitle").textContent = dominantBias;
+
+  let text = "Mixed structure across current model alignment.";
+  if (dominantBias === "Bullish") {
+    text = "Upside momentum dominates current model alignment. Watch breakout continuation.";
+  }
+  if (dominantBias === "Bearish") {
+    text = "Downside pressure dominates current model alignment. Focus on defensive risk control.";
+  }
+  if (dominantBias === "Sideway") {
+    text = "Market remains mixed and range-bound. Clear edge is limited for now.";
+  }
+
+  document.getElementById("marketInsightText").textContent = text;
+    }
+  function renderTable(items) {
+  const tbody = document.getElementById("liveTableBody");
+
+  tbody.innerHTML = items.map(item => `
+    <tr>
+      <td>${item.symbol}</td>
+      <td><span class="badge ${signalClass(item.signal)}">${item.signal}</span></td>
+      <td>${item.marketBias || "--"}</td>
+      <td>${formatPrice(item.price)}</td>
+      <td>${formatPercent(item.confidence)}</td>
+      <td>${formatPrice(item.entry)}</td>
+      <td>${formatPrice(item.stopLoss)}</td>
+      <td>${formatPrice(item.takeProfit)}</td>
+    </tr>
+  `).join("");
+  }
+  async function loadDashboard() {
+  try {
+    const [btcRaw, ethRaw, bnbRaw] = await Promise.all([
+      fetchJson(`${API_BASE}/api/ai-analysis-btc`),
+      fetchJson(`${API_BASE}/api/market-data-eth`),
+      fetchJson(`${API_BASE}/api/market-data-bnb`)
+    ]);
+
+    const btc = normalizeSymbolData("BTC", btcRaw);
+    const eth = normalizeSymbolData("ETH", ethRaw);
+    const bnb = normalizeSymbolData("BNB", bnbRaw);
+
+    const items = [btc, eth, bnb];
+
+    renderCard("card-btc", btc);
+    renderCard("card-eth", eth);
+    renderCard("card-bnb", bnb);
+    renderSummary(items);
+    renderTable(items);
+  } catch (err) {
+    console.error(err);
+
+    document.getElementById("marketInsightTitle").textContent = "Error";
+    document.getElementById("marketInsightText").textContent = err.message || String(err);
+
+    ["card-btc", "card-eth", "card-bnb"].forEach(id => {
+      const el = document.getElementById(id);
+      el.innerHTML = `
+        <div class="coin-label">SYSTEM</div>
+        <div class="coin-symbol" style="font-size:40px;">Error</div>
+        <div class="reason">Failed to load dashboard data.</div>
+      `;
+    });
+  }
+  }
+  loadDashboard();
+setInterval(loadDashboard, 60000);
+</script>
+</body>
+</html>
