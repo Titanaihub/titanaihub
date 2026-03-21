@@ -634,3 +634,180 @@ textarea:focus {
 .quick-nav.active:hover {
   transform: translateY(-2px);
 }
+.quick-bar {
+  margin-bottom: 28px;
+  gap: 12px;
+}
+
+.quick-nav {
+  min-width: 110px;
+  text-align: center;
+}
+
+.quick-nav:hover,
+.quick-nav.active:hover {
+  transform: translateY(-2px);
+}
+
+.quick-nav.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color: #111;
+  border: 1px solid transparent;
+  box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
+}
+
+.signal {
+  min-width: 88px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.signal.neutral {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.signal.long {
+  background: rgba(49, 213, 123, 0.18);
+  color: #7bf0ae;
+  border-color: rgba(49, 213, 123, 0.24);
+}
+
+.signal.short {
+  background: rgba(255, 109, 109, 0.18);
+  color: #ff9d9d;
+  border-color: rgba(255, 109, 109, 0.24);
+}
+
+.hero-card,
+.coin-card,
+.panel {
+  backdrop-filter: blur(10px);
+}
+
+.coin-card {
+  padding: 22px;
+}
+
+.coin-head h3 {
+  font-size: 20px;
+}
+
+.coin-price {
+  margin: 14px 0 18px;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.coin-metrics div,
+.coin-extra div {
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.coin-metrics strong,
+.coin-extra strong {
+  font-weight: 800;
+}
+
+.overview-item,
+.summary-line,
+.coin-metrics div,
+.coin-extra div {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.chat-messages {
+  padding: 14px;
+  scrollbar-width: thin;
+}
+
+.chat-message {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+}
+
+.chat-message.user {
+  border-bottom-right-radius: 8px;
+}
+
+.chat-message.ai {
+  border-bottom-left-radius: 8px;
+}
+
+.login-box input,
+.chat-input-wrap textarea {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.table-wrap {
+  box-shadow: var(--shadow);
+}
+
+thead th {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+tbody td {
+  vertical-align: middle;
+}
+
+.raw-box {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.section-head h2,
+.card-title,
+.brand-text h1 {
+  text-wrap: balance;
+}
+
+@media (max-width: 900px) {
+  .quick-bar {
+    gap: 10px;
+  }
+
+  .coin-card {
+    padding: 18px;
+  }
+
+  .coin-price {
+    font-size: 26px;
+  }
+
+  .signal {
+    min-width: 82px;
+    height: 36px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 600px) {
+  .quick-nav,
+  .quick-btn,
+  #loginBtn,
+  #sendChatBtn {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .coin-head {
+    align-items: flex-start;
+  }
+
+  .coin-price {
+    font-size: 24px;
+  }
+
+  .chat-messages {
+    padding: 12px;
+  }
+}
