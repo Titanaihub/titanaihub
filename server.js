@@ -147,9 +147,7 @@ app.post("/api/chat", (req, res) => {
     : `Market is ${String(overview.marketBias || "mixed").toLowerCase()}. BTC dominance is ${fmt(overview.btcDominance)}% and fear & greed is ${fmt(overview.fearGreed)}. Best approach is controlled risk until cleaner confirmation appears.`;
 
   if (q.includes("compare") || q.includes("เทียบ") || q.includes("เปรียบเทียบ")) {
-    reply = isThai
-  ? `COMPARE-TH | ${compareReplyTH()}`
-  : `COMPARE-EN | ${compareReplyEN()}`;
+  reply = "COMPARE TEST OK";
   } else if (
     q.includes("risk") ||
     q.includes("ความเสี่ยง") ||
