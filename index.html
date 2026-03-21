@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Titan AI Hub</title>
-  <link rel="stylesheet" href="./styles.css?v=100" />
+  <link rel="stylesheet" href="./styles.css?v=200" />
 </head>
 <body>
   <div class="app-shell">
@@ -45,7 +45,7 @@
     </nav>
 
     <main class="main-grid">
-      <section class="panel">
+      <section class="panel" id="overviewSection">
         <div class="section-head">
           <div>
             <h2>Market Overview</h2>
@@ -97,7 +97,7 @@
         </div>
       </section>
 
-      <section class="panel panel-full">
+      <section class="panel panel-full" id="coinsSection">
         <div class="section-head">
           <div>
             <h2>Coin Focus</h2>
@@ -171,7 +171,7 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="whalesSection">
         <div class="section-head">
           <div>
             <h2>Whale Activity</h2>
@@ -200,7 +200,7 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="rawPanel">
         <div class="section-head">
           <div>
             <h2>Raw Market Snapshot</h2>
@@ -263,19 +263,4 @@
             rows="4"
             disabled
           ></textarea>
-          <button id="sendChatBtn" class="btn btn-primary chat-send-btn" type="button" disabled>
-            Send
-          </button>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <script src="./js/config.js?v=101"></script>
-  <script src="./js/helpers.js?v=101"></script>
-  <script src="./js/mock-data.js?v=101"></script>
-  <script src="./js/api-client.js?v=101"></script>
-  <script src="./js/dashboard.js?v=101"></script>
-  <script src="./js/chat.js?v=101"></script>
-</body>
-</html>
+          <button id="sendChatBt
