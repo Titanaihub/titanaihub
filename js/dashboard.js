@@ -32,30 +32,63 @@ function shortAddr(addr) {
   return `${s.slice(0, 10)}...${s.slice(-6)}`;
 }
 
-function setSignal(id, signal) {
-  const node = el(id);
+function clearColorClasses(node) {
   if (!node) return;
-
-  const s = String(signal || "WAIT").toUpperCase();
-  node.textContent = s;
-  node.classList.remove("signal-long", "signal-short", "signal-wait");
-
-  if (s.includes("LONG")) node.classList.add("signal-long");
-  else if (s.includes("SHORT")) node.classList.add("signal-short");
-  else node.classList.add("signal-wait");
+  node.classList.remove(
+    "bullish-text",
+    "bearish-text",
+    "neutral-text",
+    "live-status",
+    "error-status",
+    "signal-long",
+    "signal-short",
+    "signal-wait"
+  );
 }
 
 function setColor(id, mode) {
   const node = el(id);
   if (!node) return;
-
-  node.classList.remove("bullish-text", "bearish-text", "neutral-text", "live-status", "error-status");
+  clearColorClasses(node);
 
   if (mode === "bull") node.classList.add("bullish-text");
   else if (mode === "bear") node.classList.add("bearish-text");
   else if (mode === "live") node.classList.add("live-status");
   else if (mode === "error") node.classList.add("error-status");
   else node.classList.add("neutral-text");
+}
+
+function setSignedValue(id, value, formatter) {
+  const node = el(id);
+  if (!node) return;
+
+  const n = Number(value);
+  clearColorClasses(node);
+
+  if (!Number.isFinite(n)) {
+    node.textContent = "--";
+    node.classList.add("neutral-text");
+    return;
+  }
+
+  node.textContent = formatter(value);
+
+  if (n > 0) node.classList.add("bullish-text");
+  else if (n < 0) node.classList.add("bearish-text");
+  else node.classList.add("neutral-text");
+}
+
+function setSignal(id, signal) {
+  const node = el(id);
+  if (!node) return;
+
+  const s = String(signal || "WAIT").toUpperCase();
+  node.textContent = s;
+  clearColorClasses(node);
+
+  if (s.includes("LONG")) node.classList.add("signal-long");
+  else if (s.includes("SHORT")) node.classList.add("signal-short");
+  else node.classList.add("signal-wait");
 }
 
 async function getJson(url) {
@@ -70,8 +103,18 @@ function renderOverview(data) {
   text("globalBias", data.marketBias || "--");
   text("totalMarketCap", money(data.totalMarketCap));
   text("totalVolume24h", money(data.totalVolume24h));
-  text("btcDominance", Number.isFinite(Number(data.btcDominance)) ? `${Number(data.btcDominance).toFixed(1)}%` : "--");
-  text("fearGreed", Number.isFinite(Number(data.fearGreed)) ? String(Math.round(Number(data.fearGreed))) : "--");
+  text(
+    "btcDominance",
+    Number.isFinite(Number(data.btcDominance))
+      ? `${Number(data.btcDominance).toFixed(1)}%`
+      : "--"
+  );
+  text(
+    "fearGreed",
+    Number.isFinite(Number(data.fearGreed))
+      ? String(Math.round(Number(data.fearGreed)))
+      : "--"
+  );
 
   text("topSetup", "BTC / LIVE");
   text("summaryConfidence", "72%");
@@ -97,11 +140,13 @@ function renderCoin(prefix, coin) {
   const signal = String(coin.signal || "WAIT").toUpperCase();
 
   text(`${prefix}Price`, money(coin.price));
-  text(`${prefix}5m`, pct(coin.change5m));
-  text(`${prefix}15m`, pct(coin.change15m));
-  text(`${prefix}1h`, pct(coin.change1h));
-  text(`${prefix}4h`, pct(coin.change4h));
-  text(`${prefix}Funding`, Number.isFinite(Number(coin.funding)) ? `${Number(coin.funding).toFixed(3)}%` : "--");
+
+  setSignedValue(`${prefix}5m`, coin.change5m, pct);
+  setSignedValue(`${prefix}15m`, coin.change15m, pct);
+  setSignedValue(`${prefix}1h`, coin.change1h, pct);
+  setSignedValue(`${prefix}4h`, coin.change4h, pct);
+  setSignedValue(`${prefix}Funding`, coin.funding, (v) => `${Number(v).toFixed(3)}%`);
+
   text(`${prefix}OI`, money(coin.oi));
   text(`${prefix}Bias`, coin.bias || "--");
   text(`${prefix}Entry`, money(coin.entry));
@@ -199,12 +244,15 @@ function bindTabs() {
   });
 }
 
+let started = false;
+let timer = null;
+
 async function loadDashboard() {
-  const overview = await getJson(`${API_BASE}/api/overview?v=202`);
-  const btc = await getJson(`${API_BASE}/api/coin/btc?v=202`);
-  const eth = await getJson(`${API_BASE}/api/coin/eth?v=202`);
-  const bnb = await getJson(`${API_BASE}/api/coin/bnb?v=202`);
-  const whales = await getJson(`${API_BASE}/api/whales?v=202`);
+  const overview = await getJson(`${API_BASE}/api/overview`);
+  const btc = await getJson(`${API_BASE}/api/coin/btc`);
+  const eth = await getJson(`${API_BASE}/api/coin/eth`);
+  const bnb = await getJson(`${API_BASE}/api/coin/bnb`);
+  const whales = await getJson(`${API_BASE}/api/whales`);
 
   renderOverview(overview);
   renderCoin("btc", btc);
@@ -215,10 +263,20 @@ async function loadDashboard() {
 }
 
 async function startDashboard() {
+  if (started) return;
+  started = true;
+
   try {
     bindTabs();
     await loadDashboard();
-    setInterval(loadDashboard, 60000);
+
+    timer = setInterval(async () => {
+      try {
+        await loadDashboard();
+      } catch (err) {
+        console.error("refresh error:", err);
+      }
+    }, 60000);
   } catch (err) {
     console.error("dashboard error:", err);
     text("systemStatus", "ERROR");
@@ -226,5 +284,8 @@ async function startDashboard() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", startDashboard);
-window.addEventListener("load", startDashboard);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startDashboard, { once: true });
+} else {
+  startDashboard();
+}
