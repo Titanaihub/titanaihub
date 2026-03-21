@@ -1,16 +1,19 @@
-function loadMockOverviewData() {
+window.loadMockOverviewData = function () {
   return {
     status: "LIVE",
-    lastUpdated: new Date().toLocaleString(),
+    lastUpdate: "--",
     marketBias: "Sideway",
     totalMarketCap: 2960000000000,
     totalVolume24h: 102800000000,
     btcDominance: 56.5,
-    fearGreed: 71
+    fearGreed: 71,
+    topSetup: "BTC / WAIT",
+    summaryConfidence: 64,
+    riskLevel: "Medium"
   };
-}
+};
 
-function loadMockCoinData() {
+window.loadMockCoinData = function () {
   return {
     btc: {
       price: 70909,
@@ -27,7 +30,7 @@ function loadMockCoinData() {
       tp: 72150
     },
     eth: {
-      price: 2158.14,
+      price: 2160,
       signal: "WAIT",
       change5m: 0.05,
       change15m: -0.11,
@@ -55,34 +58,49 @@ function loadMockCoinData() {
       tp: 658
     }
   };
-}
+};
 
-function loadMockWhaleData() {
+window.loadMockWhaleData = function () {
   return [
-    { address: "0xcab5...6e", symbol: "ETH", action: "Open Long", position: "$6.47M", price: "$2157.93", time: "18:14" },
-    { address: "0xec32...82", symbol: "BTC", action: "Open Long", position: "$15.56M", price: "$70775.6", time: "18:11" },
-    { address: "0xcb84...cd", symbol: "SOL", action: "Close Short", position: "$1.01M", price: "$89.56", time: "18:08" },
-    { address: "0xe84f...64", symbol: "HYPE", action: "Close Long", position: "$1.19M", price: "$39.42", time: "18:07" },
-    { address: "0x7cb0...20", symbol: "BTC", action: "Open Short", position: "$1.11M", price: "$70215.3", time: "18:05" }
+    {
+      address: "0xcab5...6e",
+      symbol: "ETH",
+      action: "Open Long",
+      position: "$6.47M",
+      price: "$2157.93",
+      time: "18:14"
+    },
+    {
+      address: "0xec32...82",
+      symbol: "BTC",
+      action: "Open Long",
+      position: "$15.56M",
+      price: "$70775.6",
+      time: "18:11"
+    },
+    {
+      address: "0xcb84...cd",
+      symbol: "SOL",
+      action: "Close Short",
+      position: "$1.01M",
+      price: "$89.56",
+      time: "18:08"
+    },
+    {
+      address: "0xe84f...64",
+      symbol: "HYPE",
+      action: "Close Long",
+      position: "$1.19M",
+      price: "$39.42",
+      time: "18:07"
+    },
+    {
+      address: "0x7cb0...20",
+      symbol: "BTC",
+      action: "Open Short",
+      position: "$1.11M",
+      price: "$70215.3",
+      time: "18:05"
+    }
   ];
-}
-
-if (typeof window !== "undefined") {
-  window.loadMockOverviewData = loadMockOverviewData;
-  window.loadMockCoinData = loadMockCoinData;
-  window.loadMockWhaleData = loadMockWhaleData;
-}
-
-if (typeof global !== "undefined") {
-  global.loadMockOverviewData = loadMockOverviewData;
-  global.loadMockCoinData = loadMockCoinData;
-  global.loadMockWhaleData = loadMockWhaleData;
-}
-
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = {
-    loadMockOverviewData,
-    loadMockCoinData,
-    loadMockWhaleData
-  };
-}
+};
