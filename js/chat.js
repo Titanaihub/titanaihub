@@ -1,24 +1,79 @@
 window.TitanChat = {
   isLoggedIn: false,
+  username: "",
+  thinkingNode: null,
 
   el(id) {
     return document.getElementById(id);
   },
 
-  addMessage(role, text) {
-    const box = this.el("chatMessages");
-    if (!box) return;
+  getMessagesBox() {
+    return this.el("chatMessages");
+  },
 
-    const div = document.createElement("div");
-    div.className = `chat-message ${role}`;
-    div.textContent = text;
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
+  scrollToBottom() {
+    const box = this.getMessagesBox();
+    if (box) box.scrollTop = box.scrollHeight;
   },
 
   clearMessages() {
-    const box = this.el("chatMessages");
+    const box = this.getMessagesBox();
     if (box) box.innerHTML = "";
+  },
+
+  createMessage(role, text) {
+    const div = document.createElement("div");
+    div.className = `chat-message ${role}`;
+    div.textContent = text;
+    return div;
+  },
+
+  addMessage(role, text) {
+    const box = this.getMessagesBox();
+    if (!box) return null;
+
+    const node = this.createMessage(role, text);
+    box.appendChild(node);
+    this.scrollToBottom();
+    return node;
+  },
+
+  removeThinking() {
+    if (this.thinkingNode && this.thinkingNode.parentNode) {
+      this.thinkingNode.parentNode.removeChild(this.thinkingNode);
+    }
+    this.thinkingNode = null;
+  },
+
+  showThinking() {
+    this.removeThinking();
+    this.thinkingNode = this.addMessage("system", "AI is thinking...");
+  },
+
+  setStatus(text, tone = "neutral") {
+    const status = this.el("chatStatus");
+    if (!status) return;
+
+    status.textContent = text;
+    status.className = `chat-status ${tone}`;
+  },
+
+  buildSnapshot() {
+    const raw = this.el("rawSnapshot");
+    return raw ? raw.textContent : "{}";
+  },
+
+  setControlsDisabled(disabled) {
+    const input = this.el("chatInput");
+    const sendBtn = this.el("sendChatBtn");
+    const quickButtons = document.querySelectorAll(".chat-actions .quick-btn");
+
+    if (input) input.disabled = disabled;
+    if (sendBtn) sendBtn.disabled = disabled;
+
+    quickButtons.forEach((btn) => {
+      btn.disabled = disabled;
+    });
   },
 
   setLoginUI(loggedIn) {
@@ -26,8 +81,9 @@ window.TitanChat = {
     const loginPass = this.el("loginPass");
     const loginBtn = this.el("loginBtn");
     const chatInput = this.el("chatInput");
-    const sendBtn = this.el("sendChatBtn");
-    const quickButtons = document.querySelectorAll(".chat-actions .quick-btn");
+    const authNote = this.el("chatAuthNote");
+
+    this.isLoggedIn = loggedIn;
 
     if (loginUser) loginUser.disabled = loggedIn;
     if (loginPass) loginPass.disabled = loggedIn;
@@ -37,36 +93,33 @@ window.TitanChat = {
     }
 
     if (chatInput) {
-      chatInput.disabled = !loggedIn;
       chatInput.placeholder = loggedIn
-        ? "Ask AI about current data..."
+        ? "Ask AI about the current market..."
         : "Login first to use AI chat...";
     }
 
-    if (sendBtn) {
-      sendBtn.disabled = !loggedIn;
-      sendBtn.style.opacity = loggedIn ? "1" : "0.6";
-      sendBtn.style.cursor = loggedIn ? "pointer" : "not-allowed";
+    if (authNote) {
+      authNote.textContent = loggedIn
+        ? `Logged in as ${this.username || "admin"}`
+        : "Owner-only analysis";
     }
 
-    quickButtons.forEach((btn) => {
-      btn.disabled = !loggedIn;
-      btn.style.opacity = loggedIn ? "1" : "0.6";
-      btn.style.cursor = loggedIn ? "pointer" : "not-allowed";
-    });
-  },
+    this.setControlsDisabled(!loggedIn);
 
-  buildSnapshot() {
-    const raw = this.el("rawSnapshot");
-    return raw ? raw.textContent : "{}";
+    if (loggedIn) {
+      this.setStatus("Connected", "success");
+    } else {
+      this.setStatus("Locked", "muted");
+    }
   },
 
   async loginOrLogout() {
     if (this.isLoggedIn) {
-      this.isLoggedIn = false;
-      this.setLoginUI(false);
+      this.username = "";
+      this.removeThinking();
       this.clearMessages();
       this.addMessage("ai", "AI chat ready. Login first.");
+      this.setLoginUI(false);
       return;
     }
 
@@ -74,23 +127,28 @@ window.TitanChat = {
     const password = (this.el("loginPass")?.value || "").trim();
 
     if (!username || !password) {
-      this.addMessage("ai", "Please enter username and password.");
+      this.addMessage("system", "Please enter username and password.");
+      this.setStatus("Missing credentials", "warning");
       return;
     }
 
     try {
+      this.setStatus("Checking login...", "warning");
+
       const result = await window.TitanApi.login(username, password);
 
       if (result?.ok || result?.success) {
-        this.isLoggedIn = true;
-        this.setLoginUI(true);
+        this.username = username;
         this.clearMessages();
         this.addMessage("ai", `Login successful. Welcome, ${username}.`);
+        this.setLoginUI(true);
       } else {
-        this.addMessage("ai", result?.message || "Login failed.");
+        this.setStatus("Login failed", "danger");
+        this.addMessage("system", result?.message || "Login failed.");
       }
     } catch (err) {
-      this.addMessage("ai", err?.message || "Login failed.");
+      this.setStatus("Login failed", "danger");
+      this.addMessage("system", err?.message || "Login failed.");
     }
   },
 
@@ -99,7 +157,8 @@ window.TitanChat = {
     if (!text) return;
 
     if (!this.isLoggedIn) {
-      this.addMessage("ai", "Login first.");
+      this.addMessage("system", "Login first.");
+      this.setStatus("Locked", "muted");
       return;
     }
 
@@ -107,27 +166,21 @@ window.TitanChat = {
     if (input) input.value = "";
 
     this.addMessage("user", text);
-    this.addMessage("ai", "Thinking...");
-
-    const box = this.el("chatMessages");
-    const pending = box ? box.lastElementChild : null;
+    this.showThinking();
+    this.setStatus("Processing...", "warning");
 
     try {
       const snapshot = this.buildSnapshot();
       const result = await window.TitanApi.askChat(text, snapshot);
       const reply = result?.reply || "No reply received.";
 
-      if (pending) {
-        pending.textContent = reply;
-      } else {
-        this.addMessage("ai", reply);
-      }
+      this.removeThinking();
+      this.addMessage("ai", reply);
+      this.setStatus("Connected", "success");
     } catch (err) {
-      if (pending) {
-        pending.textContent = err?.message || "Chat request failed.";
-      } else {
-        this.addMessage("ai", err?.message || "Chat request failed.");
-      }
+      this.removeThinking();
+      this.addMessage("system", err?.message || "Chat request failed.");
+      this.setStatus("Request failed", "danger");
     }
   },
 
@@ -152,7 +205,8 @@ window.TitanChat = {
 
     if (chatInput) {
       chatInput.addEventListener("keydown", (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
           this.sendQuestion(chatInput.value);
         }
       });
