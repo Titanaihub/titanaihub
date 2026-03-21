@@ -171,7 +171,7 @@
       setText(`${prefix}Bias`, "--");
       setText(`${prefix}Entry`, "--");
       setText(`${prefix}SL`, "--");
-      setText(`${prefix}TP`, "--`);
+      setText(`${prefix}TP`, "--");
       setSignal(prefix, "WAIT");
     });
 
