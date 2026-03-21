@@ -697,3 +697,19 @@ textarea:focus {
     font-size: 13px;
   }
 }
+.whale-address {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+  max-width: 220px;
+}
+
+.whale-long {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.whale-short {
+  color: #ef4444;
+  font-weight: 700;
+}
