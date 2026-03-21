@@ -1,5 +1,9 @@
 const API_BASE = window.location.origin;
 
+let started = false;
+let refreshTimer = null;
+let lastGoodData = null;
+
 function el(id) {
   return document.getElementById(id);
 }
@@ -97,6 +101,23 @@ async function getJson(url) {
   return res.json();
 }
 
+async function getJsonWithRetry(url, retries = 2, delayMs = 1200) {
+  let lastError = null;
+
+  for (let i = 0; i <= retries; i += 1) {
+    try {
+      return await getJson(url);
+    } catch (err) {
+      lastError = err;
+      if (i < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 function renderOverview(data) {
   text("systemStatus", data.status || "LIVE");
   text("lastUpdated", data.lastUpdated || "--");
@@ -140,7 +161,6 @@ function renderCoin(prefix, coin) {
   const signal = String(coin.signal || "WAIT").toUpperCase();
 
   text(`${prefix}Price`, money(coin.price));
-
   setSignedValue(`${prefix}5m`, coin.change5m, pct);
   setSignedValue(`${prefix}15m`, coin.change15m, pct);
   setSignedValue(`${prefix}1h`, coin.change1h, pct);
@@ -181,33 +201,35 @@ function renderWhales(rows) {
     return;
   }
 
-  tbody.innerHTML = rows.map((row) => {
-    const action = String(row.action || "--");
-    const cls = action.toLowerCase().includes("long")
-      ? "whale-long"
-      : action.toLowerCase().includes("short")
-      ? "whale-short"
-      : "";
+  tbody.innerHTML = rows
+    .map((row) => {
+      const action = String(row.action || "--");
+      const cls = action.toLowerCase().includes("long")
+        ? "whale-long"
+        : action.toLowerCase().includes("short")
+        ? "whale-short"
+        : "";
 
-    return `
-      <tr>
-        <td class="whale-address-cell">
-          <a
-            class="whale-address-link"
-            href="${row.explorerUrl || "#"}"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="${row.address || "--"}"
-          >${shortAddr(row.address)}</a>
-        </td>
-        <td>${row.symbol || "--"}</td>
-        <td class="${cls}">${action}</td>
-        <td>${row.position || "--"}</td>
-        <td>${row.price || "--"}</td>
-        <td>${row.time || "--"}</td>
-      </tr>
-    `;
-  }).join("");
+      return `
+        <tr>
+          <td class="whale-address-cell">
+            <a
+              class="whale-address-link"
+              href="${row.explorerUrl || "#"}"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="${row.address || "--"}"
+            >${shortAddr(row.address)}</a>
+          </td>
+          <td>${row.symbol || "--"}</td>
+          <td class="${cls}">${action}</td>
+          <td>${row.position || "--"}</td>
+          <td>${row.price || "--"}</td>
+          <td>${row.time || "--"}</td>
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function hideRawPanel() {
@@ -244,44 +266,56 @@ function bindTabs() {
   });
 }
 
-let started = false;
-let timer = null;
+function renderAll(data) {
+  renderOverview(data.overview);
+  renderCoin("btc", data.btc);
+  renderCoin("eth", data.eth);
+  renderCoin("bnb", data.bnb);
+  renderWhales(data.whales);
+  hideRawPanel();
+}
 
 async function loadDashboard() {
-  const overview = await getJson(`${API_BASE}/api/overview`);
-  const btc = await getJson(`${API_BASE}/api/coin/btc`);
-  const eth = await getJson(`${API_BASE}/api/coin/eth`);
-  const bnb = await getJson(`${API_BASE}/api/coin/bnb`);
-  const whales = await getJson(`${API_BASE}/api/whales`);
+  const [overview, btc, eth, bnb, whales] = await Promise.all([
+    getJsonWithRetry(`${API_BASE}/api/overview`),
+    getJsonWithRetry(`${API_BASE}/api/coin/btc`),
+    getJsonWithRetry(`${API_BASE}/api/coin/eth`),
+    getJsonWithRetry(`${API_BASE}/api/coin/bnb`),
+    getJsonWithRetry(`${API_BASE}/api/whales`)
+  ]);
 
-  renderOverview(overview);
-  renderCoin("btc", btc);
-  renderCoin("eth", eth);
-  renderCoin("bnb", bnb);
-  renderWhales(whales);
-  hideRawPanel();
+  const data = { overview, btc, eth, bnb, whales };
+  lastGoodData = data;
+  renderAll(data);
+}
+
+async function refreshDashboard() {
+  try {
+    await loadDashboard();
+  } catch (err) {
+    console.error("refresh error:", err);
+
+    if (lastGoodData) {
+      renderAll(lastGoodData);
+      text("systemStatus", "LIVE");
+      setColor("systemStatus", "live");
+    } else {
+      text("systemStatus", "ERROR");
+      setColor("systemStatus", "error");
+    }
+  }
 }
 
 async function startDashboard() {
   if (started) return;
   started = true;
 
-  try {
-    bindTabs();
-    await loadDashboard();
+  bindTabs();
+  hideRawPanel();
 
-    timer = setInterval(async () => {
-      try {
-        await loadDashboard();
-      } catch (err) {
-        console.error("refresh error:", err);
-      }
-    }, 60000);
-  } catch (err) {
-    console.error("dashboard error:", err);
-    text("systemStatus", "ERROR");
-    setColor("systemStatus", "error");
-  }
+  await refreshDashboard();
+
+  refreshTimer = setInterval(refreshDashboard, 30000);
 }
 
 if (document.readyState === "loading") {
