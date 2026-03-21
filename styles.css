@@ -713,3 +713,33 @@ textarea:focus {
   color: #ef4444;
   font-weight: 700;
 }
+.whale-address {
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.whale-long {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.whale-short {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.signal-long {
+  color: #22c55e !important;
+  font-weight: 700;
+}
+
+.signal-short {
+  color: #ef4444 !important;
+  font-weight: 700;
+}
+
+.signal-wait {
+  color: #e5e7eb !important;
+  font-weight: 700;
+}
