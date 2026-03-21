@@ -32,13 +32,70 @@ app.post("/api/login", (req, res) => {
 });
 
 app.post("/api/chat", (req, res) => {
-  const q = String(req.body?.question || "").toLowerCase();
-  let reply = "Current market is mixed. Use small risk and wait for clearer confirmation.";
-  if (q.includes("btc")) reply = "BTC is neutral. Entry near 70650, stop near 69980, take profit near 72150.";
-  if (q.includes("eth")) reply = "ETH is relatively stable. Entry near 2142, stop near 2108, take profit near 2205.";
-  if (q.includes("bnb")) reply = "BNB is calmer. Entry near 642, stop near 631, take profit near 658.";
-  if (q.includes("risk")) reply = "Main risk is unclear direction. Keep size small and respect stop loss.";
-  res.json({ ok: true, reply });
+  const { question, snapshot } = req.body || {};
+  const q = String(question || "").toLowerCase();
+
+  let parsed = null;
+  try {
+    parsed = snapshot ? JSON.parse(snapshot) : null;
+  } catch (_) {
+    parsed = null;
+  }
+
+  const coins = parsed?.coins || {};
+  const overview = parsed?.overview || {};
+
+  const btc = coins.btc || buildCoin("btc");
+  const eth = coins.eth || buildCoin("eth");
+  const bnb = coins.bnb || buildCoin("bnb");
+
+  function coinBrief(symbol, coin) {
+    return `${symbol}: signal ${coin.signal || "--"}, bias ${coin.bias || "--"}, entry ${coin.entry || "--"}, stop loss ${coin.sl || "--"}, take profit ${coin.tp || "--"}.`;
+  }
+
+  function coinTradeView(symbol, coin) {
+    return `${symbol} looks ${String(coin.bias || "neutral").toLowerCase()}. Current signal is ${coin.signal || "WAIT"}. Suggested structure: entry near ${coin.entry || "--"}, stop loss near ${coin.sl || "--"}, and take profit near ${coin.tp || "--"}. Funding is ${coin.funding ?? "--"}% and open interest is ${coin.oi || "--"}.`;
+  }
+
+  let reply = `Market is ${String(overview.marketBias || "mixed").toLowerCase()}. BTC dominance is ${overview.btcDominance ?? "--"}% and fear & greed is ${overview.fearGreed ?? "--"}. Best approach is controlled risk until cleaner confirmation appears.`;
+
+  if (q.includes("btc")) {
+    reply = coinTradeView("BTC", btc);
+  } else if (q.includes("eth")) {
+    reply = coinTradeView("ETH", eth);
+  } else if (q.includes("bnb")) {
+    reply = coinTradeView("BNB", bnb);
+  } else if (q.includes("compare") || q.includes("เทียบ")) {
+    reply =
+      `Comparison now: ${coinBrief("BTC", btc)} ${coinBrief("ETH", eth)} ${coinBrief("BNB", bnb)} ` +
+      `BTC is the main reference asset, ETH is the secondary setup, and BNB is the calmer watchlist asset.`;
+  } else if (
+    q.includes("risk") ||
+    q.includes("ความเสี่ยง") ||
+    q.includes("เสี่ยง")
+  ) {
+    reply =
+      `Current risk view: market bias is ${overview.marketBias || "--"}. ` +
+      `BTC fear & greed is ${overview.fearGreed ?? "--"}, so chasing is not ideal. ` +
+      `Use small position size, respect stop loss strictly, and avoid overtrading while the market stays ${String(overview.marketBias || "mixed").toLowerCase()}.`;
+  } else if (
+    q.includes("entry") ||
+    q.includes("sl") ||
+    q.includes("tp") ||
+    q.includes("stop") ||
+    q.includes("take profit")
+  ) {
+    reply =
+      `Current trade map: ` +
+      `BTC entry ${btc.entry || "--"}, SL ${btc.sl || "--"}, TP ${btc.tp || "--"}; ` +
+      `ETH entry ${eth.entry || "--"}, SL ${eth.sl || "--"}, TP ${eth.tp || "--"}; ` +
+      `BNB entry ${bnb.entry || "--"}, SL ${bnb.sl || "--"}, TP ${bnb.tp || "--"}.`;
+  }
+
+  res.json({
+    ok: true,
+    reply
+  });
 });
 
 app.get("/", (req, res) => {
