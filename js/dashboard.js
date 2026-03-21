@@ -144,7 +144,6 @@
       })
       .join("");
   }
-
   function renderRawSnapshot(data) {
     const pre = byId("rawSnapshot");
     if (!pre) return;
