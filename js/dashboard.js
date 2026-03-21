@@ -8,7 +8,7 @@ window.TitanDashboard = {
     if (node) node.textContent = value ?? "--";
   },
 
-  formatCompactNumber(value, digits = 2) {
+  formatCompactCurrency(value, digits = 2) {
     const num = Number(value);
     if (!Number.isFinite(num)) return "--";
 
@@ -22,13 +22,13 @@ window.TitanDashboard = {
     return `$${num.toFixed(digits)}`;
   },
 
-  formatNumber(value, digits = 2) {
+  formatPrice(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return "--";
-    return num.toLocaleString(undefined, {
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits
-    });
+
+    if (num >= 1000) return this.formatCompactCurrency(num, 2);
+    if (num >= 1) return `$${num.toFixed(2)}`;
+    return `$${num.toFixed(4)}`;
   },
 
   formatPercent(value, digits = 2) {
@@ -50,20 +50,13 @@ window.TitanDashboard = {
     return `${num.toFixed(3)}%`;
   },
 
-  formatOI(value) {
+  formatNumber(value, digits = 0) {
     const num = Number(value);
     if (!Number.isFinite(num)) return "--";
-    return this.formatCompactNumber(num, 2);
-  },
-
-  formatPrice(value) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return "--";
-
-    if (num >= 1000) return this.formatCompactNumber(num, 2);
-    if (num >= 100) return `$${num.toFixed(2)}`;
-    if (num >= 1) return `$${num.toFixed(2)}`;
-    return `$${num.toFixed(4)}`;
+    return num.toLocaleString(undefined, {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    });
   },
 
   normalizeSignal(signal) {
@@ -81,24 +74,32 @@ window.TitanDashboard = {
   },
 
   renderOverview(overview = {}) {
+    const lastUpdateValue =
+      overview.lastUpdate ||
+      overview.lastUpdated ||
+      "--";
+
     this.setText("systemStatus", overview.status || "LIVE");
-    this.setText("lastUpdated", overview.lastUpdate || "--");
+    this.setText("lastUpdated", lastUpdateValue);
     this.setText("globalBias", overview.marketBias || "--");
 
-    this.setText("totalMarketCap", this.formatCompactNumber(overview.totalMarketCap, 2));
-    this.setText("totalVolume24h", this.formatCompactNumber(overview.totalVolume24h, 2));
+    this.setText("totalMarketCap", this.formatCompactCurrency(overview.totalMarketCap, 2));
+    this.setText("totalVolume24h", this.formatCompactCurrency(overview.totalVolume24h, 2));
     this.setText("btcDominance", this.formatPlainPercent(overview.btcDominance, 1));
     this.setText("fearGreed", Number.isFinite(Number(overview.fearGreed)) ? String(overview.fearGreed) : "--");
 
-    this.setText("topSetup", `BTC / ${String(overview.topSetupSignal || "WAIT").toUpperCase()}`);
-    this.setText("summaryConfidence", overview.summaryConfidence ? `${overview.summaryConfidence}%` : "64%");
+    this.setText("topSetup", overview.topSetup || "BTC / WAIT");
+    this.setText(
+      "summaryConfidence",
+      overview.summaryConfidence
+        ? `${overview.summaryConfidence}%`
+        : "64%"
+    );
     this.setText("riskLevel", overview.riskLevel || "Medium");
   },
 
   renderCoin(symbol, coin = {}) {
     const key = String(symbol).toLowerCase();
-    const upper = key.toUpperCase();
-
     const signalNode = this.el(`${key}Signal`);
     const signal = this.normalizeSignal(coin.signal);
 
@@ -114,16 +115,11 @@ window.TitanDashboard = {
     this.setText(`${key}4h`, this.formatPercent(coin.change4h, 2));
 
     this.setText(`${key}Funding`, this.formatFunding(coin.funding));
-    this.setText(`${key}OI`, this.formatOI(coin.oi));
+    this.setText(`${key}OI`, this.formatCompactCurrency(coin.oi, 2));
     this.setText(`${key}Bias`, coin.bias || "--");
-    this.setText(`${key}Entry`, Number.isFinite(Number(coin.entry)) ? this.formatNumber(coin.entry, 0) : "--");
-    this.setText(`${key}SL`, Number.isFinite(Number(coin.sl)) ? this.formatNumber(coin.sl, 0) : "--");
-    this.setText(`${key}TP`, Number.isFinite(Number(coin.tp)) ? this.formatNumber(coin.tp, 0) : "--");
-
-    const card = this.el(`coin-${key}`);
-    if (card) {
-      card.setAttribute("data-symbol", upper);
-    }
+    this.setText(`${key}Entry`, this.formatNumber(coin.entry, 0));
+    this.setText(`${key}SL`, this.formatNumber(coin.sl, 0));
+    this.setText(`${key}TP`, this.formatNumber(coin.tp, 0));
   },
 
   renderWhales(rows = []) {
@@ -137,12 +133,11 @@ window.TitanDashboard = {
 
     body.innerHTML = rows
       .map((row) => {
-        const action = String(row.action || "--");
         return `
           <tr>
             <td>${row.address || "--"}</td>
             <td>${row.symbol || "--"}</td>
-            <td>${action}</td>
+            <td>${row.action || "--"}</td>
             <td>${row.position || "--"}</td>
             <td>${row.price || "--"}</td>
             <td>${row.time || "--"}</td>
@@ -158,7 +153,7 @@ window.TitanDashboard = {
 
     try {
       raw.textContent = JSON.stringify(snapshot, null, 2);
-    } catch {
+    } catch (err) {
       raw.textContent = "Unable to render raw snapshot.";
     }
   }
