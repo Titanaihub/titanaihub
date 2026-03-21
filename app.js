@@ -1,37 +1,63 @@
 window.TitanApp = {
-  setActiveNav(activeId) {
-    const buttons = document.querySelectorAll(".quick-nav");
-    buttons.forEach((btn) => {
-      btn.classList.toggle("active", btn.id === activeId);
+  navButtons: [],
+  sections: [],
+
+  setActiveNavByIndex(index) {
+    this.navButtons.forEach((btn, i) => {
+      btn.classList.toggle("active", i === index);
     });
   },
 
   bindNav() {
-    const sections = {
-      overviewBtn: document.getElementById("heroOverviewSection"),
-      coinsBtn: document.getElementById("coinsSection"),
-      whalesBtn: document.getElementById("whalesSection"),
-      rawBtn: document.getElementById("rawSection"),
-      chatBtn: document.getElementById("chatSection")
-    };
+    this.navButtons = Array.from(document.querySelectorAll(".quick-nav"));
+    this.sections = [
+      document.getElementById("overviewSection"),
+      document.getElementById("coinsSection"),
+      document.getElementById("whalesSection"),
+      document.getElementById("rawSection"),
+      document.getElementById("chatSection")
+    ];
 
-    const buttons = document.querySelectorAll(".quick-nav");
-
-    buttons.forEach((btn) => {
+    this.navButtons.forEach((btn, index) => {
       btn.addEventListener("click", () => {
-        const target = sections[btn.id];
-        this.setActiveNav(btn.id);
-
-        if (target) {
-          target.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
-        }
+        this.setActiveNavByIndex(index);
       });
     });
 
-    this.setActiveNav("overviewBtn");
+    const visibleMap = new Map();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const index = this.sections.indexOf(entry.target);
+          if (index >= 0) {
+            visibleMap.set(index, entry.isIntersecting ? entry.intersectionRatio : 0);
+          }
+        });
+
+        let activeIndex = 0;
+        let maxRatio = 0;
+
+        visibleMap.forEach((ratio, index) => {
+          if (ratio > maxRatio) {
+            maxRatio = ratio;
+            activeIndex = index;
+          }
+        });
+
+        this.setActiveNavByIndex(activeIndex);
+      },
+      {
+        root: null,
+        threshold: [0.2, 0.35, 0.5, 0.7]
+      }
+    );
+
+    this.sections.forEach((section) => {
+      if (section) observer.observe(section);
+    });
+
+    this.setActiveNavByIndex(0);
   },
 
   async loadDashboard() {
