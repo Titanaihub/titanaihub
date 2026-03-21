@@ -1,4 +1,4 @@
-const API_BASE = window.location.origin;
+const API_BASE = "https://titan-ai-api.onrender.com";
 
 let started = false;
 let refreshTimer = null;
