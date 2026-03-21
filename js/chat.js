@@ -53,7 +53,6 @@ window.TitanChat = {
   setStatus(text, tone = "neutral") {
     const status = this.el("chatStatus");
     if (!status) return;
-
     status.textContent = text;
     status.className = `chat-status ${tone}`;
   },
@@ -134,7 +133,6 @@ window.TitanChat = {
 
     try {
       this.setStatus("Checking login...", "warning");
-
       const result = await window.TitanApi.login(username, password);
 
       if (result?.ok || result?.success) {
