@@ -8,11 +8,6 @@
     return el ? String(el.textContent || "").trim() : "";
   }
 
-  function setText(id, value) {
-    const el = byId(id);
-    if (el) el.textContent = value;
-  }
-
   async function postJson(url, body) {
     const res = await fetch(url, {
       method: "POST",
@@ -144,7 +139,6 @@
       chatStatus.classList.toggle("locked", !isLoggedIn);
     }
   }
-
   async function loginOrLogout() {
     if (isLoggedIn) {
       isLoggedIn = false;
@@ -267,5 +261,7 @@
 
   window.appendChatMessage = appendChatMessage;
 
-  document.addEventListener("DOMContentLoaded", initChat);
+  document.addEventListener("DOMContentLoaded", function () {
+    initChat();
+  });
 })();
