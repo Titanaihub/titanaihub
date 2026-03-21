@@ -1,6 +1,5 @@
 window.TitanChat = {
   isLoggedIn: false,
-  username: "",
 
   el(id) {
     return document.getElementById(id);
@@ -19,16 +18,15 @@ window.TitanChat = {
 
   clearMessages() {
     const box = this.el("chatMessages");
-    if (!box) return;
-    box.innerHTML = "";
+    if (box) box.innerHTML = "";
   },
 
   setLoginUI(loggedIn) {
     const loginUser = this.el("loginUser");
     const loginPass = this.el("loginPass");
     const loginBtn = this.el("loginBtn");
-    const sendBtn = this.el("sendChatBtn");
     const chatInput = this.el("chatInput");
+    const sendBtn = this.el("sendChatBtn");
     const quickButtons = document.querySelectorAll(".chat-actions .quick-btn");
 
     if (loginUser) loginUser.disabled = loggedIn;
@@ -66,9 +64,9 @@ window.TitanChat = {
   async loginOrLogout() {
     if (this.isLoggedIn) {
       this.isLoggedIn = false;
-      this.username = "";
       this.setLoginUI(false);
-      this.addMessage("ai", "Logged out.");
+      this.clearMessages();
+      this.addMessage("ai", "AI chat ready. Login first.");
       return;
     }
 
@@ -85,10 +83,9 @@ window.TitanChat = {
 
       if (result?.ok || result?.success) {
         this.isLoggedIn = true;
-        this.username = username;
+        this.setLoginUI(true);
         this.clearMessages();
         this.addMessage("ai", `Login successful. Welcome, ${username}.`);
-        this.setLoginUI(true);
       } else {
         this.addMessage("ai", result?.message || "Login failed.");
       }
@@ -97,9 +94,9 @@ window.TitanChat = {
     }
   },
 
-  async sendQuestion(text) {
-    const question = String(text || "").trim();
-    if (!question) return;
+  async sendQuestion(question) {
+    const text = String(question || "").trim();
+    if (!text) return;
 
     if (!this.isLoggedIn) {
       this.addMessage("ai", "Login first.");
@@ -109,15 +106,15 @@ window.TitanChat = {
     const input = this.el("chatInput");
     if (input) input.value = "";
 
-    this.addMessage("user", question);
+    this.addMessage("user", text);
     this.addMessage("ai", "Thinking...");
 
     const box = this.el("chatMessages");
-    const pending = box?.lastElementChild || null;
+    const pending = box ? box.lastElementChild : null;
 
     try {
       const snapshot = this.buildSnapshot();
-      const result = await window.TitanApi.askChat(question, snapshot);
+      const result = await window.TitanApi.askChat(text, snapshot);
       const reply = result?.reply || "No reply received.";
 
       if (pending) {
