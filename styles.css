@@ -590,3 +590,31 @@ textarea:focus {
   border: 1px solid transparent;
   box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
 }
+.signal {
+  min-width: 88px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.signal.neutral {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.signal.long {
+  background: rgba(49, 213, 123, 0.18);
+  color: #7bf0ae;
+  border-color: rgba(49, 213, 123, 0.24);
+}
+
+.signal.short {
+  background: rgba(255, 109, 109, 0.18);
+  color: #ff9d9d;
+  border-color: rgba(255, 109, 109, 0.24);
+}
