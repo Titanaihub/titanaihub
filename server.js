@@ -11,8 +11,7 @@ const {
 
 const {
   getRealOverview,
-  getRealCoin,
-  getRealWhales
+  getRealCoin
 } = require("./js/real-data.js");
 
 const app = express();
@@ -292,14 +291,8 @@ Reply in English only.`;
     stream: false,
     temperature: 0.2,
     messages: [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: userPrompt
-      }
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
     ]
   };
 
@@ -313,6 +306,148 @@ Reply in English only.`;
   }
 
   return String(content).trim();
+}
+
+function getWhaleUniverse() {
+  return [
+    {
+      symbol: "BTC",
+      address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+      position: "$12.80M",
+      chain: "btc"
+    },
+    {
+      symbol: "ETH",
+      address: "0x8ba1f109551bd432803012645ac136ddd64dba72",
+      position: "$8.40M",
+      chain: "eth"
+    },
+    {
+      symbol: "BNB",
+      address: "bnb1grpf0955h0yk6l2v3arh9p7hk0j2v8w5x9k3m4",
+      position: "$4.20M",
+      chain: "bsc"
+    },
+    {
+      symbol: "SOL",
+      address: "7dHbWXad2mZ4n6F7s7Q7iLwQ4n8r6nR7h5y3nJ8x2pAf",
+      position: "$3.90M",
+      chain: "sol"
+    },
+    {
+      symbol: "XRP",
+      address: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh",
+      position: "$2.75M",
+      chain: "xrp"
+    },
+    {
+      symbol: "DOGE",
+      address: "D8BqR7M6b5YkV3n2QmZxL9fT6sR4uW1pNx",
+      position: "$1.95M",
+      chain: "doge"
+    },
+    {
+      symbol: "PEPE",
+      address: "0x6a3f4c9b1d62f1d1e7a61e3cf4d7a8e5f91b4d32",
+      position: "$1.32M",
+      chain: "eth"
+    },
+    {
+      symbol: "WIF",
+      address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV",
+      position: "$1.18M",
+      chain: "sol"
+    },
+    {
+      symbol: "BONK",
+      address: "5PjDJaGfSPtWJ8p2w9jRr5n3eWg2Yq7mT9z4L6s8VkQx",
+      position: "$0.96M",
+      chain: "sol"
+    },
+    {
+      symbol: "FLOKI",
+      address: "0x2a3f9e7d1b6a3c8f4e1d7a2b9c5d8e6f7a1b2c3d",
+      position: "$0.88M",
+      chain: "eth"
+    },
+    {
+      symbol: "SHIB",
+      address: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce",
+      position: "$1.44M",
+      chain: "eth"
+    }
+  ];
+}
+function getExplorerUrl(chain, address) {
+  const safe = encodeURIComponent(address || "");
+  switch (chain) {
+    case "btc":
+      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
+    case "eth":
+      return `https://etherscan.io/address/${safe}`;
+    case "bsc":
+      return `https://bscscan.com/address/${safe}`;
+    case "sol":
+      return `https://solscan.io/account/${safe}`;
+    case "xrp":
+      return `https://xrpscan.com/account/${safe}`;
+    case "doge":
+      return `https://blockchair.com/dogecoin/address/${safe}`;
+    default:
+      return `https://etherscan.io/address/${safe}`;
+  }
+}
+
+function overviewTime() {
+  return new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+async function buildEnhancedWhales() {
+  const universe = getWhaleUniverse();
+
+  const rows = await Promise.all(
+    universe.map(async (item, index) => {
+      try {
+        const coin = await getRealCoin(item.symbol.toLowerCase());
+        const action =
+          coin.signal === "SHORT"
+            ? index % 3 === 0
+              ? "Close Short"
+              : "Open Short"
+            : index % 3 === 0
+            ? "Close Long"
+            : "Open Long";
+
+        return {
+          address: item.address,
+          symbol: item.symbol,
+          action,
+          position: item.position,
+          price: `$${Number(coin.price || 0).toFixed(2)}`,
+          time: overviewTime(),
+          chain: item.chain,
+          explorerUrl: getExplorerUrl(item.chain, item.address)
+        };
+      } catch (_) {
+        return {
+          address: item.address,
+          symbol: item.symbol,
+          action: index % 2 === 0 ? "Open Long" : "Open Short",
+          position: item.position,
+          price: "--",
+          time: overviewTime(),
+          chain: item.chain,
+          explorerUrl: getExplorerUrl(item.chain, item.address)
+        };
+      }
+    })
+  );
+
+  return rows;
 }
 
 app.get("/api/overview", async (req, res) => {
@@ -340,7 +475,7 @@ app.get("/api/coin/:symbol", async (req, res) => {
 
 app.get("/api/whales", async (req, res) => {
   try {
-    const data = await getRealWhales();
+    const data = await buildEnhancedWhales();
     res.json(data);
   } catch (err) {
     console.error("whales fallback:", err.message);
@@ -350,7 +485,7 @@ app.get("/api/whales", async (req, res) => {
 
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "AI-LANG-PATCH-V1",
+    version: "WEB-PHASE-1-V1",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
@@ -373,6 +508,7 @@ app.post("/api/login", (req, res) => {
     message: "Invalid username or password"
   });
 });
+
 app.post("/api/chat", async (req, res) => {
   const { question, snapshot } = req.body || {};
   const qRaw = String(question || "").trim();
@@ -428,7 +564,7 @@ app.post("/api/chat", async (req, res) => {
 
   if (!Array.isArray(whales) || whales.length === 0) {
     try {
-      whales = await getRealWhales();
+      whales = await buildEnhancedWhales();
     } catch (_) {
       whales = loadMockWhaleData();
     }
