@@ -33,55 +33,87 @@
       </div>
     </header>
 
-    <section class="quick-bar">
-      <button class="quick-nav" onclick="document.getElementById('overviewSection').scrollIntoView({behavior:'smooth'})">Overview</button>
-      <button class="quick-nav" onclick="document.getElementById('coinsSection').scrollIntoView({behavior:'smooth'})">Coins</button>
-      <button class="quick-nav" onclick="document.getElementById('whalesSection').scrollIntoView({behavior:'smooth'})">Whales</button>
-      <button class="quick-nav" onclick="document.getElementById('rawSection').scrollIntoView({behavior:'smooth'})">Raw</button>
-      <button class="quick-nav" onclick="document.getElementById('chatSection').scrollIntoView({behavior:'smooth'})">AI Chat</button>
-    </section>
+    <nav class="quick-bar">
+      <button class="quick-nav" type="button">Overview</button>
+      <button class="quick-nav" type="button">Coins</button>
+      <button class="quick-nav" type="button">Whales</button>
+      <button class="quick-nav" type="button">Raw</button>
+      <button class="quick-nav" type="button">AI Chat</button>
+    </nav>
 
     <main class="dashboard-layout single-column">
       <section class="main-content">
         <section class="hero-grid" id="overviewSection">
           <div class="hero-card">
-            <div class="card-title">Market Overview</div>
-            <div class="section-subtitle">Core macro snapshot for current market conditions</div>
+            <div class="section-head">
+              <h2>Market Overview</h2>
+              <p>Core macro snapshot for current market conditions</p>
+            </div>
+
             <div class="overview-grid">
-              <div class="overview-item"><span>Total Market Cap</span><strong id="totalMarketCap">--</strong></div>
-              <div class="overview-item"><span>24H Volume</span><strong id="totalVolume24h">--</strong></div>
-              <div class="overview-item"><span>BTC Dominance</span><strong id="btcDominance">--</strong></div>
-              <div class="overview-item"><span>Fear & Greed</span><strong id="fearGreed">--</strong></div>
+              <div class="overview-item">
+                <span>Total Market Cap</span>
+                <strong id="totalMarketCap">--</strong>
+              </div>
+              <div class="overview-item">
+                <span>24H Volume</span>
+                <strong id="totalVolume24h">--</strong>
+              </div>
+              <div class="overview-item">
+                <span>BTC Dominance</span>
+                <strong id="btcDominance">--</strong>
+              </div>
+              <div class="overview-item">
+                <span>Fear &amp; Greed</span>
+                <strong id="fearGreed">--</strong>
+              </div>
             </div>
           </div>
 
           <div class="hero-card">
-            <div class="card-title">AI Summary</div>
-            <div class="section-subtitle">Current model output snapshot</div>
+            <div class="section-head">
+              <h2>AI Summary</h2>
+              <p>Current model output snapshot</p>
+            </div>
+
             <div class="ai-summary-box">
-              <div class="summary-line"><span>Top Setup</span><strong id="topSetup">--</strong></div>
-              <div class="summary-line"><span>Confidence</span><strong id="summaryConfidence">--</strong></div>
-              <div class="summary-line"><span>Risk Level</span><strong id="riskLevel">--</strong></div>
+              <div class="summary-line">
+                <span>Top Setup</span>
+                <strong id="topSetup">BTC / WAIT</strong>
+              </div>
+              <div class="summary-line">
+                <span>Confidence</span>
+                <strong id="summaryConfidence">64%</strong>
+              </div>
+              <div class="summary-line">
+                <span>Risk Level</span>
+                <strong id="riskLevel">Medium</strong>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="coin-section" id="coinsSection">
+        <section id="coinsSection">
           <div class="section-head">
             <h2>Coin Focus</h2>
             <p>Live multi-asset dashboard for BTC, ETH and BNB</p>
           </div>
 
           <div class="coin-grid">
-            <article class="coin-card compact" id="coin-btc">
-              <div class="coin-head"><h3>BTC</h3><span id="btcSignal" class="signal neutral">--</span></div>
+            <article class="coin-card">
+              <div class="coin-head">
+                <h3>BTC</h3>
+                <span class="signal neutral" id="btcSignal">WAIT</span>
+              </div>
               <div class="coin-price" id="btcPrice">--</div>
+
               <div class="coin-metrics">
                 <div><span>5m</span><strong id="btc5m">--</strong></div>
                 <div><span>15m</span><strong id="btc15m">--</strong></div>
                 <div><span>1h</span><strong id="btc1h">--</strong></div>
                 <div><span>4h</span><strong id="btc4h">--</strong></div>
               </div>
+
               <div class="coin-extra">
                 <div><span>Funding</span><strong id="btcFunding">--</strong></div>
                 <div><span>Open Interest</span><strong id="btcOI">--</strong></div>
@@ -92,15 +124,20 @@
               </div>
             </article>
 
-            <article class="coin-card compact" id="coin-eth">
-              <div class="coin-head"><h3>ETH</h3><span id="ethSignal" class="signal neutral">--</span></div>
+            <article class="coin-card">
+              <div class="coin-head">
+                <h3>ETH</h3>
+                <span class="signal neutral" id="ethSignal">WAIT</span>
+              </div>
               <div class="coin-price" id="ethPrice">--</div>
+
               <div class="coin-metrics">
                 <div><span>5m</span><strong id="eth5m">--</strong></div>
                 <div><span>15m</span><strong id="eth15m">--</strong></div>
                 <div><span>1h</span><strong id="eth1h">--</strong></div>
                 <div><span>4h</span><strong id="eth4h">--</strong></div>
               </div>
+
               <div class="coin-extra">
                 <div><span>Funding</span><strong id="ethFunding">--</strong></div>
                 <div><span>Open Interest</span><strong id="ethOI">--</strong></div>
@@ -111,15 +148,20 @@
               </div>
             </article>
 
-            <article class="coin-card compact" id="coin-bnb">
-              <div class="coin-head"><h3>BNB</h3><span id="bnbSignal" class="signal neutral">--</span></div>
+            <article class="coin-card">
+              <div class="coin-head">
+                <h3>BNB</h3>
+                <span class="signal neutral" id="bnbSignal">WAIT</span>
+              </div>
               <div class="coin-price" id="bnbPrice">--</div>
+
               <div class="coin-metrics">
                 <div><span>5m</span><strong id="bnb5m">--</strong></div>
                 <div><span>15m</span><strong id="bnb15m">--</strong></div>
                 <div><span>1h</span><strong id="bnb1h">--</strong></div>
                 <div><span>4h</span><strong id="bnb4h">--</strong></div>
               </div>
+
               <div class="coin-extra">
                 <div><span>Funding</span><strong id="bnbFunding">--</strong></div>
                 <div><span>Open Interest</span><strong id="bnbOI">--</strong></div>
@@ -138,28 +180,34 @@
               <h2>Whale Activity</h2>
               <p>Latest large-position flow and smart money movement</p>
             </div>
+
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Address</th><th>Symbol</th><th>Action</th><th>Position</th><th>Price</th><th>Time</th>
+                    <th>Address</th>
+                    <th>Symbol</th>
+                    <th>Action</th>
+                    <th>Position</th>
+                    <th>Price</th>
+                    <th>Time</th>
                   </tr>
                 </thead>
                 <tbody id="whaleTableBody">
-                  <tr><td colspan="6">Loading...</td></tr>
+                  <tr>
+                    <td colspan="6">Loading whale activity...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
           <div class="panel" id="rawSection">
-            <div class="section-row">
-              <div class="section-head">
-                <h2>Raw Market Snapshot</h2>
-                <p>Debug / validation view</p>
-              </div>
+            <div class="section-head">
+              <h2>Raw Market Snapshot</h2>
+              <p>Debug and validation view</p>
             </div>
-            <pre id="rawSnapshot" class="raw-box">Loading...</pre>
+            <pre class="raw-box" id="rawSnapshot">Loading...</pre>
           </div>
         </section>
 
@@ -170,24 +218,24 @@
           </div>
 
           <div class="login-box">
-            <input id="loginUser" type="text" placeholder="Username" />
-            <input id="loginPass" type="password" placeholder="Password" />
-            <button id="loginBtn">Login</button>
+            <input id="loginUser" type="text" placeholder="Username" value="admin" />
+            <input id="loginPass" type="password" placeholder="Password" value="1234" />
+            <button id="loginBtn" type="button">Login</button>
           </div>
 
-          <div id="chatMessages" class="chat-messages">
+          <div class="chat-messages" id="chatMessages">
             <div class="chat-message ai">AI chat ready. Login first.</div>
           </div>
 
           <div class="chat-actions">
-            <button class="quick-btn" data-question="Analyze BTC now">Analyze BTC</button>
-            <button class="quick-btn" data-question="Compare BTC ETH BNB">Compare Coins</button>
-            <button class="quick-btn" data-question="Show current market risk">Ask Risk</button>
+            <button class="quick-btn" type="button" data-question="Analyze BTC now">Analyze BTC</button>
+            <button class="quick-btn" type="button" data-question="Compare BTC ETH BNB">Compare Coins</button>
+            <button class="quick-btn" type="button" data-question="What is the current risk?">Ask Risk</button>
           </div>
 
           <div class="chat-input-wrap">
-            <textarea id="chatInput" placeholder="Ask AI about current data..."></textarea>
-            <button id="sendChatBtn">Send</button>
+            <textarea id="chatInput" placeholder="Login first to use AI chat..." disabled></textarea>
+            <button id="sendChatBtn" type="button" disabled>Send</button>
           </div>
         </section>
       </section>
@@ -195,7 +243,6 @@
   </div>
 
   <script src="./js/config.js"></script>
-  <script src="./js/helpers.js"></script>
   <script src="./js/mock-data.js"></script>
   <script src="./js/api-client.js"></script>
   <script src="./js/dashboard.js"></script>
