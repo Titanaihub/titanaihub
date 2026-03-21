@@ -59,19 +59,75 @@
     }
   }
 
+  function setStatusColor() {
+    const el = byId("systemStatus");
+    if (!el) return;
+
+    const value = String(el.textContent || "").trim().toUpperCase();
+    el.classList.remove("live-status", "error-status");
+
+    if (value === "LIVE") {
+      el.classList.add("live-status");
+    } else if (value === "ERROR") {
+      el.classList.add("error-status");
+    }
+  }
+
+  function setBiasColor(id, value) {
+    const el = byId(id);
+    if (!el) return;
+
+    const text = String(value || "").toLowerCase();
+    el.classList.remove("bullish-text", "bearish-text", "neutral-text");
+
+    if (text.includes("bullish") || text.includes("long")) {
+      el.classList.add("bullish-text");
+    } else if (text.includes("bearish") || text.includes("short")) {
+      el.classList.add("bearish-text");
+    } else {
+      el.classList.add("neutral-text");
+    }
+  }
+
+  function setLevelColor(id, label, value, signal) {
+    const el = byId(id);
+    if (!el) return;
+
+    const sig = String(signal || "").toUpperCase();
+    const lowerLabel = String(label || "").toLowerCase();
+
+    el.classList.remove("bullish-text", "bearish-text", "neutral-text");
+
+    if (lowerLabel.includes("tp")) {
+      if (sig.includes("LONG")) el.classList.add("bullish-text");
+      else if (sig.includes("SHORT")) el.classList.add("bearish-text");
+      else el.classList.add("neutral-text");
+    } else if (lowerLabel.includes("sl")) {
+      if (sig.includes("LONG")) el.classList.add("bearish-text");
+      else if (sig.includes("SHORT")) el.classList.add("bullish-text");
+      else el.classList.add("neutral-text");
+    } else {
+      const n = Number(value);
+      if (Number.isFinite(n)) {
+        el.classList.add("neutral-text");
+      }
+    }
+  }
+
   function renderOverview(data) {
     setText("systemStatus", data.status || "LIVE");
     setText("lastUpdated", data.lastUpdated || "--");
     setText("globalBias", data.marketBias || "--");
-
     setText("totalMarketCap", formatMoney(data.totalMarketCap));
     setText("totalVolume24h", formatMoney(data.totalVolume24h));
+
     setText(
       "btcDominance",
       Number.isFinite(Number(data.btcDominance))
         ? `${Number(data.btcDominance).toFixed(1)}%`
         : "--"
     );
+
     setText(
       "fearGreed",
       Number.isFinite(Number(data.fearGreed))
@@ -86,9 +142,14 @@
     if (data.marketBias === "Risk-Off") riskLevel = "High";
     if (data.marketBias === "Risk-On") riskLevel = "Low";
     setText("riskLevel", riskLevel);
+
+    setStatusColor();
+    setBiasColor("globalBias", data.marketBias || "--");
   }
 
   function renderCoin(prefix, coin) {
+    const signal = String(coin.signal || "WAIT").toUpperCase();
+
     setText(`${prefix}Price`, formatMoney(coin.price));
     setText(`${prefix}5m`, formatPercent(coin.change5m));
     setText(`${prefix}15m`, formatPercent(coin.change15m));
@@ -108,7 +169,10 @@
     setText(`${prefix}SL`, formatMoney(coin.sl));
     setText(`${prefix}TP`, formatMoney(coin.tp));
 
-    setSignal(prefix, coin.signal);
+    setSignal(prefix, signal);
+    setBiasColor(`${prefix}Bias`, coin.bias || "--");
+    setLevelColor(`${prefix}SL`, "sl", coin.sl, signal);
+    setLevelColor(`${prefix}TP`, "tp", coin.tp, signal);
   }
 
   function renderWhales(rows) {
@@ -130,10 +194,21 @@
           : "";
 
         const fullAddress = row.address || "--";
+        const displayAddress = shortAddress(fullAddress);
+        const href = row.explorerUrl || "#";
+        const safeHref = href === "#" ? "#" : href;
 
         return `
           <tr>
-            <td class="whale-address" title="${fullAddress}">${shortAddress(fullAddress)}</td>
+            <td class="whale-address-cell">
+              <a
+                class="whale-address-link"
+                href="${safeHref}"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="${fullAddress}"
+              >${displayAddress}</a>
+            </td>
             <td>${row.symbol || "--"}</td>
             <td class="${actionClass}">${action}</td>
             <td>${row.position || "--"}</td>
@@ -144,10 +219,12 @@
       })
       .join("");
   }
-  function renderRawSnapshot(data) {
-    const pre = byId("rawSnapshot");
-    if (!pre) return;
-    pre.textContent = JSON.stringify(data, null, 2);
+
+  function setRawPanelHidden() {
+    const rawPanel = byId("rawPanel");
+    if (rawPanel) {
+      rawPanel.style.display = "none";
+    }
   }
 
   function renderError(message) {
@@ -176,26 +253,46 @@
 
     const tbody = byId("whaleTableBody");
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="6">Load error</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6">Load error: ${message}</td></tr>`;
     }
 
-    const pre = byId("rawSnapshot");
-    if (pre) {
-      pre.textContent = `Dashboard load error: ${message}`;
-    }
+    setStatusColor();
+  }
+
+  function bindTopTabs() {
+    const buttons = document.querySelectorAll(".tab-btn");
+    const sectionMap = {
+      Overview: "overviewSection",
+      Coins: "coinsSection",
+      Whales: "whalesSection",
+      "AI Chat": "aiChatPanel"
+    };
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", function () {
+        buttons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        const label = String(btn.textContent || "").trim();
+        const targetId = sectionMap[label];
+        if (!targetId) return;
+
+        const target = byId(targetId);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
   }
 
   async function loadDashboard() {
-    const raw = byId("rawSnapshot");
-    if (raw) raw.textContent = "Loading...";
-
     try {
       const [overview, btc, eth, bnb, whales] = await Promise.all([
-        getJson(`${API_BASE}/api/overview?v=100`),
-        getJson(`${API_BASE}/api/coin/btc?v=100`),
-        getJson(`${API_BASE}/api/coin/eth?v=100`),
-        getJson(`${API_BASE}/api/coin/bnb?v=100`),
-        getJson(`${API_BASE}/api/whales?v=100`)
+        getJson(`${API_BASE}/api/overview?v=200`),
+        getJson(`${API_BASE}/api/coin/btc?v=200`),
+        getJson(`${API_BASE}/api/coin/eth?v=200`),
+        getJson(`${API_BASE}/api/coin/bnb?v=200`),
+        getJson(`${API_BASE}/api/whales?v=200`)
       ]);
 
       renderOverview(overview || {});
@@ -203,20 +300,16 @@
       renderCoin("eth", eth || {});
       renderCoin("bnb", bnb || {});
       renderWhales(Array.isArray(whales) ? whales : []);
-      renderRawSnapshot({
-        overview,
-        coins: { btc, eth, bnb },
-        whales
-      });
+      setRawPanelHidden();
     } catch (err) {
       console.error("dashboard load failed:", err);
       renderError(err.message || "Unknown error");
     }
   }
 
-  window.loadDashboard = loadDashboard;
-
   document.addEventListener("DOMContentLoaded", function () {
+    bindTopTabs();
     loadDashboard();
+    setInterval(loadDashboard, 60000);
   });
 })();
