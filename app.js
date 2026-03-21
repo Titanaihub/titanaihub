@@ -19,33 +19,34 @@ window.TitanApp = {
     ];
 
     this.navButtons.forEach((btn, index) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
         this.setActiveNavByIndex(index);
+
+        const target = this.sections[index];
+        if (target) {
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+          });
+        }
       });
     });
 
-    const visibleMap = new Map();
-
     const observer = new IntersectionObserver(
       (entries) => {
+        let bestIndex = 0;
+        let bestRatio = 0;
+
         entries.forEach((entry) => {
           const index = this.sections.indexOf(entry.target);
-          if (index >= 0) {
-            visibleMap.set(index, entry.isIntersecting ? entry.intersectionRatio : 0);
+          if (index >= 0 && entry.isIntersecting && entry.intersectionRatio >= bestRatio) {
+            bestRatio = entry.intersectionRatio;
+            bestIndex = index;
           }
         });
 
-        let activeIndex = 0;
-        let maxRatio = 0;
-
-        visibleMap.forEach((ratio, index) => {
-          if (ratio > maxRatio) {
-            maxRatio = ratio;
-            activeIndex = index;
-          }
-        });
-
-        this.setActiveNavByIndex(activeIndex);
+        this.setActiveNavByIndex(bestIndex);
       },
       {
         root: null,
@@ -66,25 +67,29 @@ window.TitanApp = {
     let whales = window.loadMockWhaleData();
 
     try {
-      overview = { ...overview, ...(await window.TitanApi.getOverview()) };
+      const apiOverview = await window.TitanApi.getOverview();
+      overview = { ...overview, ...apiOverview };
     } catch (err) {
       console.warn("Failed to load overview:", err);
     }
 
     try {
-      coins.btc = { ...coins.btc, ...(await window.TitanApi.getCoin("btc")) };
+      const btc = await window.TitanApi.getCoin("btc");
+      coins.btc = { ...coins.btc, ...btc };
     } catch (err) {
       console.warn("Failed to load BTC:", err);
     }
 
     try {
-      coins.eth = { ...coins.eth, ...(await window.TitanApi.getCoin("eth")) };
+      const eth = await window.TitanApi.getCoin("eth");
+      coins.eth = { ...coins.eth, ...eth };
     } catch (err) {
       console.warn("Failed to load ETH:", err);
     }
 
     try {
-      coins.bnb = { ...coins.bnb, ...(await window.TitanApi.getCoin("bnb")) };
+      const bnb = await window.TitanApi.getCoin("bnb");
+      coins.bnb = { ...coins.bnb, ...bnb };
     } catch (err) {
       console.warn("Failed to load BNB:", err);
     }
