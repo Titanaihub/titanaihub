@@ -2,20 +2,15 @@
   --bg: #0b0f17;
   --bg-soft: #101726;
   --panel: rgba(255, 255, 255, 0.04);
-  --panel-strong: rgba(255, 255, 255, 0.06);
   --border: rgba(255, 208, 120, 0.1);
-  --border-strong: rgba(255, 208, 120, 0.22);
   --text: #eaeef7;
   --muted: rgba(234, 238, 247, 0.68);
-  --muted-2: rgba(234, 238, 247, 0.5);
   --gold: #f0c978;
   --gold-deep: #c79646;
   --green: #7bf0ae;
   --red: #ff9d9d;
-  --blue: #9ec4ff;
   --shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   --radius: 20px;
-  --radius-sm: 14px;
 }
 
 * {
@@ -122,8 +117,8 @@ button {
 .quick-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 28px;
 }
 
 .quick-nav,
@@ -138,16 +133,26 @@ button {
 }
 
 .quick-nav {
+  min-width: 110px;
+  text-align: center;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   border: 1px solid rgba(255, 208, 120, 0.12);
 }
 
-.quick-nav:hover {
-  transform: translateY(-1px);
+.quick-nav:hover,
+.quick-nav.active:hover {
+  transform: translateY(-2px);
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 208, 120, 0.28);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.quick-nav.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color: #111;
+  border: 1px solid transparent;
+  box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
 }
 
 .quick-btn,
@@ -204,20 +209,7 @@ button {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px;
-}
-
-.card-title {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 6px;
-}
-
-.section-subtitle,
-.section-head p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
+  backdrop-filter: blur(10px);
 }
 
 .section-head {
@@ -228,6 +220,12 @@ button {
   margin: 0 0 6px;
   font-size: 24px;
   letter-spacing: -0.03em;
+}
+
+.section-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .overview-grid {
@@ -292,12 +290,13 @@ button {
 
 .coin-head h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .coin-price {
-  margin: 10px 0 16px;
-  font-size: 32px;
+  margin: 14px 0 18px;
+  font-size: 30px;
+  line-height: 1;
   font-weight: 800;
   color: var(--gold);
   letter-spacing: -0.03em;
@@ -320,6 +319,10 @@ button {
 
 .coin-metrics div,
 .coin-extra div {
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.025);
@@ -338,35 +341,40 @@ button {
 .coin-extra strong {
   font-size: 15px;
   color: #fff;
+  font-weight: 800;
   word-break: break-word;
 }
 
 .signal {
+  min-width: 88px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .signal.neutral {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f5f7fb;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .signal.long {
   background: rgba(49, 213, 123, 0.18);
   color: var(--green);
+  border-color: rgba(49, 213, 123, 0.24);
 }
 
 .signal.short {
   background: rgba(255, 109, 109, 0.18);
   color: var(--red);
+  border-color: rgba(255, 109, 109, 0.24);
 }
 
 .table-wrap {
@@ -374,6 +382,7 @@ button {
   overflow: hidden;
   border: 1px solid rgba(255, 208, 120, 0.08);
   background: rgba(255, 255, 255, 0.02);
+  box-shadow: var(--shadow);
 }
 
 table {
@@ -385,6 +394,7 @@ thead th {
   padding: 12px;
   text-align: left;
   font-size: 13px;
+  font-weight: 800;
   background: rgba(255, 255, 255, 0.04);
   color: var(--gold);
 }
@@ -440,7 +450,7 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--muted-2);
+  color: rgba(234, 238, 247, 0.5);
 }
 
 input:focus,
@@ -456,7 +466,7 @@ textarea:focus {
   min-height: 220px;
   max-height: 420px;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px;
   margin-bottom: 14px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.02);
@@ -469,22 +479,21 @@ textarea:focus {
   border-radius: 16px;
   line-height: 1.55;
   word-wrap: break-word;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
 }
 
 .chat-message.ai {
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
+  border-bottom-left-radius: 8px;
 }
 
 .chat-message.user {
   align-self: flex-end;
-  background: linear-gradient(
-    180deg,
-    rgba(240, 201, 120, 0.18),
-    rgba(199, 150, 70, 0.12)
-  );
+  background: linear-gradient(180deg, rgba(240, 201, 120, 0.18), rgba(199, 150, 70, 0.12));
   color: #fff5df;
+  border-bottom-right-radius: 8px;
 }
 
 .chat-actions {
@@ -506,13 +515,6 @@ textarea:focus {
 
 .full-width-chat {
   width: 100%;
-}
-
-.section-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 @media (max-width: 1180px) {
@@ -543,6 +545,7 @@ textarea:focus {
   #loginBtn,
   #sendChatBtn {
     width: 100%;
+    min-width: unset;
   }
 
   .overview-grid,
@@ -582,232 +585,5 @@ textarea:focus {
   tbody td {
     padding: 10px;
     font-size: 13px;
-  }
-}
-.quick-nav.active {
-  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
-  color: #111;
-  border: 1px solid transparent;
-  box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
-}
-.signal {
-  min-width: 88px;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.signal.neutral {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
-.signal.long {
-  background: rgba(49, 213, 123, 0.18);
-  color: #7bf0ae;
-  border-color: rgba(49, 213, 123, 0.24);
-}
-
-.signal.short {
-  background: rgba(255, 109, 109, 0.18);
-  color: #ff9d9d;
-  border-color: rgba(255, 109, 109, 0.24);
-}
-.quick-bar {
-  margin-bottom: 28px;
-}
-
-.quick-nav {
-  min-width: 110px;
-  text-align: center;
-}
-
-.quick-nav:hover {
-  transform: translateY(-2px);
-}
-
-.quick-nav.active:hover {
-  transform: translateY(-2px);
-}
-.quick-bar {
-  margin-bottom: 28px;
-  gap: 12px;
-}
-
-.quick-nav {
-  min-width: 110px;
-  text-align: center;
-}
-
-.quick-nav:hover,
-.quick-nav.active:hover {
-  transform: translateY(-2px);
-}
-
-.quick-nav.active {
-  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
-  color: #111;
-  border: 1px solid transparent;
-  box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
-}
-
-.signal {
-  min-width: 88px;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.signal.neutral {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-}
-
-.signal.long {
-  background: rgba(49, 213, 123, 0.18);
-  color: #7bf0ae;
-  border-color: rgba(49, 213, 123, 0.24);
-}
-
-.signal.short {
-  background: rgba(255, 109, 109, 0.18);
-  color: #ff9d9d;
-  border-color: rgba(255, 109, 109, 0.24);
-}
-
-.hero-card,
-.coin-card,
-.panel {
-  backdrop-filter: blur(10px);
-}
-
-.coin-card {
-  padding: 22px;
-}
-
-.coin-head h3 {
-  font-size: 20px;
-}
-
-.coin-price {
-  margin: 14px 0 18px;
-  font-size: 30px;
-  line-height: 1;
-}
-
-.coin-metrics div,
-.coin-extra div {
-  min-height: 76px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.coin-metrics strong,
-.coin-extra strong {
-  font-weight: 800;
-}
-
-.overview-item,
-.summary-line,
-.coin-metrics div,
-.coin-extra div {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.chat-messages {
-  padding: 14px;
-  scrollbar-width: thin;
-}
-
-.chat-message {
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-}
-
-.chat-message.user {
-  border-bottom-right-radius: 8px;
-}
-
-.chat-message.ai {
-  border-bottom-left-radius: 8px;
-}
-
-.login-box input,
-.chat-input-wrap textarea {
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-}
-
-.table-wrap {
-  box-shadow: var(--shadow);
-}
-
-thead th {
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-tbody td {
-  vertical-align: middle;
-}
-
-.raw-box {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.section-head h2,
-.card-title,
-.brand-text h1 {
-  text-wrap: balance;
-}
-
-@media (max-width: 900px) {
-  .quick-bar {
-    gap: 10px;
-  }
-
-  .coin-card {
-    padding: 18px;
-  }
-
-  .coin-price {
-    font-size: 26px;
-  }
-
-  .signal {
-    min-width: 82px;
-    height: 36px;
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 600px) {
-  .quick-nav,
-  .quick-btn,
-  #loginBtn,
-  #sendChatBtn {
-    width: 100%;
-    min-width: unset;
-  }
-
-  .coin-head {
-    align-items: flex-start;
-  }
-
-  .coin-price {
-    font-size: 24px;
-  }
-
-  .chat-messages {
-    padding: 12px;
   }
 }
