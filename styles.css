@@ -618,3 +618,19 @@ textarea:focus {
   color: #ff9d9d;
   border-color: rgba(255, 109, 109, 0.24);
 }
+.quick-bar {
+  margin-bottom: 28px;
+}
+
+.quick-nav {
+  min-width: 110px;
+  text-align: center;
+}
+
+.quick-nav:hover {
+  transform: translateY(-2px);
+}
+
+.quick-nav.active:hover {
+  transform: translateY(-2px);
+}
