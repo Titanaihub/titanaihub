@@ -50,7 +50,7 @@ window.TitanChat = {
     this.thinkingNode = this.addMessage("system", "AI is thinking...");
   },
 
-  setStatus(text, tone = "neutral") {
+  setStatus(text, tone = "muted") {
     const status = this.el("chatStatus");
     if (!status) return;
     status.textContent = text;
