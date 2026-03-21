@@ -1,1 +1,64 @@
+<section class="panel chat-panel" id="aiChatPanel">
+  <div class="section-head">
+    <div>
+      <h2>Private AI Chat</h2>
+      <p>Owner-only analysis and follow-up questions</p>
+    </div>
+  </div>
 
+  <div class="chat-login-row">
+    <input
+      id="username"
+      class="input"
+      type="text"
+      placeholder="Username"
+      value="admin"
+      autocomplete="username"
+    />
+    <input
+      id="password"
+      class="input"
+      type="password"
+      placeholder="Password"
+      autocomplete="current-password"
+    />
+    <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
+  </div>
+
+  <div class="chat-status-row">
+    <div id="loginState" class="chat-state-text">Owner-only analysis</div>
+    <div id="chatStatus" class="chat-status-badge locked">Locked</div>
+  </div>
+
+  <div id="chatMessages" class="chat-messages">
+    <div class="chat-row chat-row-ai">
+      <div class="chat-bubble chat-bubble-ai">AI chat ready. Login first.</div>
+    </div>
+  </div>
+
+  <div class="chat-quick-actions">
+    <button id="askAnalyzeBTC" class="btn btn-secondary" type="button">Analyze BTC</button>
+    <button id="askCompareCoins" class="btn btn-secondary" type="button">Compare Coins</button>
+    <button id="askRisk" class="btn btn-secondary" type="button">Ask Risk</button>
+  </div>
+
+  <div class="chat-input-wrap">
+    <textarea
+      id="chatInput"
+      class="input chat-textarea"
+      placeholder="Login first to use AI chat..."
+      rows="4"
+      disabled
+    ></textarea>
+    <button id="sendChatBtn" class="btn btn-primary chat-send-btn" type="button" disabled>
+      Send
+    </button>
+  </div>
+</section>
+<script src="./js/config.js?v=100"></script>
+<script src="./js/helpers.js?v=100"></script>
+<script src="./js/mock-data.js?v=100"></script>
+<script src="./js/api-client.js?v=100"></script>
+<script src="./js/dashboard.js?v=100"></script>
+<script src="./js/chat.js?v=100"></script>
+<script src="./app.js?v=100"></script>
