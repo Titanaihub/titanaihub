@@ -502,3 +502,74 @@ body {
     max-width: 100%;
   }
 }
+.live-status {
+  color: #22c55e !important;
+}
+
+.error-status {
+  color: #ef4444 !important;
+}
+
+.bullish-text {
+  color: #22c55e !important;
+}
+
+.bearish-text {
+  color: #ef4444 !important;
+}
+
+.neutral-text {
+  color: #e5e7eb !important;
+}
+
+.whale-address-cell {
+  white-space: nowrap;
+}
+
+.whale-address-link {
+  color: #f2d27a;
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.whale-address-link:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
+#systemStatus.live-status {
+  font-weight: 800;
+}
+
+#systemStatus.error-status {
+  font-weight: 800;
+}
+
+#btcBias.bullish-text,
+#ethBias.bullish-text,
+#bnbBias.bullish-text,
+#btcTP.bullish-text,
+#ethTP.bullish-text,
+#bnbTP.bullish-text {
+  font-weight: 800;
+}
+
+#btcBias.bearish-text,
+#ethBias.bearish-text,
+#bnbBias.bearish-text,
+#btcSL.bearish-text,
+#ethSL.bearish-text,
+#bnbSL.bearish-text {
+  font-weight: 800;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.metric-box strong.bullish-text,
+.metric-box strong.bearish-text,
+.metric-box strong.neutral-text {
+  font-weight: 800;
+}
