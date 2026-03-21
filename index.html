@@ -1,1 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>Titan AI Hub</title>
+  <link rel="stylesheet" href="./styles.css?v=100" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">T</div>
+        <div class="brand-text">
+          <h1>Titan AI Hub</h1>
+          <p>Institutional Crypto Intelligence Dashboard</p>
+        </div>
+      </div>
 
+      <div class="topbar-metrics">
+        <div class="mini-stat">
+          <span>Status</span>
+          <strong id="systemStatus">LIVE</strong>
+        </div>
+        <div class="mini-stat">
+          <span>Last Update</span>
+          <strong id="lastUpdated">--</strong>
+        </div>
+        <div class="mini-stat">
+          <span>Market Bias</span>
+          <strong id="globalBias">--</strong>
+        </div>
+      </div>
+    </header>
+
+    <nav class="top-tabs">
+      <button class="tab-btn active" type="button">Overview</button>
+      <button class="tab-btn" type="button">Coins</button>
+      <button class="tab-btn" type="button">Whales</button>
+      <button class="tab-btn" type="button">Raw</button>
+      <button class="tab-btn" type="button">AI Chat</button>
+    </nav>
+
+    <main class="main-grid">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Market Overview</h2>
+            <p>Core macro snapshot for current market conditions</p>
+          </div>
+        </div>
+
+        <div class="overview-grid">
+          <div class="stat-card">
+            <span>Total Market Cap</span>
+            <strong id="totalMarketCap">--</strong>
+          </div>
+          <div class="stat-card">
+            <span>24H Volume</span>
+            <strong id="totalVolume24h">--</strong>
+          </div>
+          <div class="stat-card">
+            <span>BTC Dominance</span>
+            <strong id="btcDominance">--</strong>
+          </div>
+          <div class="stat-card">
+            <span>Fear &amp; Greed</span>
+            <strong id="fearGreed">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>AI Summary</h2>
+            <p>Current model output snapshot</p>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-row">
+            <span>Top Setup</span>
+            <strong id="topSetup">--</strong>
+          </div>
+          <div class="summary-row">
+            <span>Confidence</span>
+            <strong id="summaryConfidence">--</strong>
+          </div>
+          <div class="summary-row">
+            <span>Risk Level</span>
+            <strong id="riskLevel">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Coin Focus</h2>
+            <p>Live multi-asset dashboard for BTC, ETH and BNB</p>
+          </div>
+        </div>
+
+        <div class="coin-grid">
+          <article class="coin-card">
+            <div class="coin-head">
+              <h3>BTC</h3>
+              <span id="btcSignal" class="signal-badge signal-wait">WAIT</span>
+            </div>
+            <div class="coin-price" id="btcPrice">--</div>
+
+            <div class="coin-metrics">
+              <div class="metric-box"><span>5m</span><strong id="btc5m">--</strong></div>
+              <div class="metric-box"><span>15m</span><strong id="btc15m">--</strong></div>
+              <div class="metric-box"><span>1h</span><strong id="btc1h">--</strong></div>
+              <div class="metric-box"><span>4h</span><strong id="btc4h">--</strong></div>
+              <div class="metric-box"><span>Funding</span><strong id="btcFunding">--</strong></div>
+              <div class="metric-box"><span>Open Interest</span><strong id="btcOI">--</strong></div>
+              <div class="metric-box"><span>Bias</span><strong id="btcBias">--</strong></div>
+              <div class="metric-box"><span>Entry</span><strong id="btcEntry">--</strong></div>
+              <div class="metric-box"><span>Stop Loss</span><strong id="btcSL">--</strong></div>
+              <div class="metric-box"><span>Take Profit</span><strong id="btcTP">--</strong></div>
+            </div>
+          </article>
+
+          <article class="coin-card">
+            <div class="coin-head">
+              <h3>ETH</h3>
+              <span id="ethSignal" class="signal-badge signal-wait">WAIT</span>
+            </div>
+            <div class="coin-price" id="ethPrice">--</div>
+
+            <div class="coin-metrics">
+              <div class="metric-box"><span>5m</span><strong id="eth5m">--</strong></div>
+              <div class="metric-box"><span>15m</span><strong id="eth15m">--</strong></div>
+              <div class="metric-box"><span>1h</span><strong id="eth1h">--</strong></div>
+              <div class="metric-box"><span>4h</span><strong id="eth4h">--</strong></div>
+              <div class="metric-box"><span>Funding</span><strong id="ethFunding">--</strong></div>
+              <div class="metric-box"><span>Open Interest</span><strong id="ethOI">--</strong></div>
+              <div class="metric-box"><span>Bias</span><strong id="ethBias">--</strong></div>
+              <div class="metric-box"><span>Entry</span><strong id="ethEntry">--</strong></div>
+              <div class="metric-box"><span>Stop Loss</span><strong id="ethSL">--</strong></div>
+              <div class="metric-box"><span>Take Profit</span><strong id="ethTP">--</strong></div>
+            </div>
+          </article>
+
+          <article class="coin-card">
+            <div class="coin-head">
+              <h3>BNB</h3>
+              <span id="bnbSignal" class="signal-badge signal-wait">WAIT</span>
+            </div>
+            <div class="coin-price" id="bnbPrice">--</div>
+
+            <div class="coin-metrics">
+              <div class="metric-box"><span>5m</span><strong id="bnb5m">--</strong></div>
+              <div class="metric-box"><span>15m</span><strong id="bnb15m">--</strong></div>
+              <div class="metric-box"><span>1h</span><strong id="bnb1h">--</strong></div>
+              <div class="metric-box"><span>4h</span><strong id="bnb4h">--</strong></div>
+              <div class="metric-box"><span>Funding</span><strong id="bnbFunding">--</strong></div>
+              <div class="metric-box"><span>Open Interest</span><strong id="bnbOI">--</strong></div>
+              <div class="metric-box"><span>Bias</span><strong id="bnbBias">--</strong></div>
+              <div class="metric-box"><span>Entry</span><strong id="bnbEntry">--</strong></div>
+              <div class="metric-box"><span>Stop Loss</span><strong id="bnbSL">--</strong></div>
+              <div class="metric-box"><span>Take Profit</span><strong id="bnbTP">--</strong></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Whale Activity</h2>
+            <p>Latest large-position flow and smart money movement</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Address</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Position</th>
+                <th>Price</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="whaleTableBody">
+              <tr>
+                <td colspan="6">Loading whale activity...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Raw Market Snapshot</h2>
+            <p>Debug and validation view</p>
+          </div>
+        </div>
+
+        <pre id="rawSnapshot" class="raw-box">Loading...</pre>
+      </section>
+
+      <section class="panel chat-panel panel-full" id="aiChatPanel">
+        <div class="section-head">
+          <div>
+            <h2>Private AI Chat</h2>
+            <p>Owner-only analysis and follow-up questions</p>
+          </div>
+        </div>
+
+        <div class="chat-login-row">
+          <input
+            id="username"
+            class="input"
+            type="text"
+            placeholder="Username"
+            value="admin"
+            autocomplete="username"
+          />
+          <input
+            id="password"
+            class="input"
+            type="password"
+            placeholder="Password"
+            autocomplete="current-password"
+          />
+          <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
+        </div>
+
+        <div class="chat-status-row">
+          <div id="loginState" class="chat-state-text">Owner-only analysis</div>
+          <div id="chatStatus" class="chat-status-badge locked">Locked</div>
+        </div>
+
+        <div id="chatMessages" class="chat-messages">
+          <div class="chat-row chat-row-ai">
+            <div class="chat-bubble chat-bubble-ai">AI chat ready. Login first.</div>
+          </div>
+        </div>
+
+        <div class="chat-quick-actions">
+          <button id="askAnalyzeBTC" class="btn btn-secondary" type="button">Analyze BTC</button>
+          <button id="askCompareCoins" class="btn btn-secondary" type="button">Compare Coins</button>
+          <button id="askRisk" class="btn btn-secondary" type="button">Ask Risk</button>
+        </div>
+
+        <div class="chat-input-wrap">
+          <textarea
+            id="chatInput"
+            class="input chat-textarea"
+            placeholder="Login first to use AI chat..."
+            rows="4"
+            disabled
+          ></textarea>
+          <button id="sendChatBtn" class="btn btn-primary chat-send-btn" type="button" disabled>
+            Send
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/config.js?v=101"></script>
+  <script src="./js/helpers.js?v=101"></script>
+  <script src="./js/mock-data.js?v=101"></script>
+  <script src="./js/api-client.js?v=101"></script>
+  <script src="./js/dashboard.js?v=101"></script>
+  <script src="./js/chat.js?v=101"></script>
+</body>
+</html>
