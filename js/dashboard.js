@@ -80,38 +80,21 @@ window.TitanDashboard = {
       "--";
 
     this.setText("systemStatus", overview.status || "LIVE");
-
-    // รองรับทั้ง 2 id เผื่อใน HTML ใช้ชื่อไม่เหมือนกัน
     this.setText("lastUpdated", lastUpdateValue);
-    this.setText("lastUpdate", lastUpdateValue);
-
     this.setText("globalBias", overview.marketBias || "--");
 
-    this.setText(
-      "totalMarketCap",
-      this.formatCompactCurrency(overview.totalMarketCap, 2)
-    );
-    this.setText(
-      "totalVolume24h",
-      this.formatCompactCurrency(overview.totalVolume24h, 2)
-    );
-    this.setText(
-      "btcDominance",
-      this.formatPlainPercent(overview.btcDominance, 1)
-    );
+    this.setText("totalMarketCap", this.formatCompactCurrency(overview.totalMarketCap, 2));
+    this.setText("totalVolume24h", this.formatCompactCurrency(overview.totalVolume24h, 2));
+    this.setText("btcDominance", this.formatPlainPercent(overview.btcDominance, 1));
     this.setText(
       "fearGreed",
-      Number.isFinite(Number(overview.fearGreed))
-        ? String(overview.fearGreed)
-        : "--"
+      Number.isFinite(Number(overview.fearGreed)) ? String(overview.fearGreed) : "--"
     );
 
     this.setText("topSetup", overview.topSetup || "BTC / WAIT");
     this.setText(
       "summaryConfidence",
-      overview.summaryConfidence
-        ? `${overview.summaryConfidence}%`
-        : "64%"
+      overview.summaryConfidence ? `${overview.summaryConfidence}%` : "64%"
     );
     this.setText("riskLevel", overview.riskLevel || "Medium");
   },
