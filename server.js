@@ -25,8 +25,12 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static("."));
 
-function isThaiText(text) {
+function hasThai(text) {
   return /[ก-๙]/.test(String(text || ""));
+}
+
+function detectReplyLanguage(text) {
+  return hasThai(text) ? "th" : "en";
 }
 
 function fmt(v) {
@@ -66,7 +70,6 @@ function coinTradeViewTH(symbol, coin) {
     coin.tp
   )}. Funding อยู่ที่ ${fmt(coin.funding)}% และ open interest อยู่ที่ ${fmt(coin.oi)}.`;
 }
-
 function compareReplyEN(btc, eth, bnb) {
   return (
     `Comparison now: ${coinBriefEN("BTC", btc)} ${coinBriefEN("ETH", eth)} ${coinBriefEN(
@@ -86,6 +89,7 @@ function compareReplyTH(btc, eth, bnb) {
     `BTC ยังเป็นเหรียญอ้างอิงหลักของตลาด, ETH เป็นตัวเลือกอันดับสอง, และ BNB เป็นเหรียญที่นิ่งกว่าเหมาะกับการเฝ้าดูเพิ่ม.`
   );
 }
+
 function riskReplyEN(overview) {
   return (
     `Current risk view: market bias is ${fmt(overview.marketBias)}. ` +
@@ -131,16 +135,8 @@ function entryMapTH(btc, eth, bnb) {
 function buildFallbackReply(question, overview, btc, eth, bnb) {
   const qRaw = String(question || "").trim();
   const q = qRaw.toLowerCase();
-  const isThai =
-    isThaiText(qRaw) ||
-    q.includes("เทียบ") ||
-    q.includes("เปรียบเทียบ") ||
-    q.includes("ความเสี่ยง") ||
-    q.includes("เสี่ยง") ||
-    q.includes("จุดเข้า") ||
-    q.includes("ตัดขาดทุน") ||
-    q.includes("ทำกำไร") ||
-    q.includes("วิเคราะห์");
+  const lang = detectReplyLanguage(qRaw);
+  const isThai = lang === "th";
 
   let reply = isThai
     ? `ภาพรวมตลาดตอนนี้เป็น ${fmt(overview.marketBias)}. BTC Dominance อยู่ที่ ${fmt(
@@ -179,7 +175,6 @@ function buildFallbackReply(question, overview, btc, eth, bnb) {
 
   return reply;
 }
-
 function postJson(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -224,34 +219,46 @@ function postJson(url, body, headers = {}) {
   });
 }
 
+function buildSystemPrompt(language) {
+  if (language === "th") {
+    return [
+      "คุณคือผู้ช่วยวิเคราะห์ตลาดคริปโตของ Titan AI Hub",
+      "ตอบเป็นภาษาไทยเท่านั้น",
+      "ห้ามตอบภาษาอังกฤษ ยกเว้นชื่อเหรียญ คำว่า LONG, SHORT, entry, stop loss, take profit",
+      "ถ้าผู้ใช้ถามเป็นภาษาไทย ต้องตอบไทยทั้งหมด",
+      "ตอบสั้น กระชับ อ่านง่าย",
+      "ใช้ข้อมูล snapshot ที่ให้มาเท่านั้น",
+      "ห้ามแต่งตัวเลขเพิ่ม",
+      "ถ้าผู้ใช้ถามเรื่องเทรด ให้สรุปเป็น:",
+      "1) มุมมอง",
+      "2) ความเสี่ยง",
+      "3) จุดเข้า/SL/TP ถ้ามี",
+      "ถ้าข้อมูลไม่พอให้พูดตรง ๆ"
+    ].join("\n");
+  }
+
+  return [
+    "You are Titan AI Hub crypto market assistant.",
+    "Reply in English only.",
+    "If the user asks in English, do not answer in Thai.",
+    "Be concise and easy to read.",
+    "Use only the snapshot data provided.",
+    "Do not invent numbers.",
+    "If the user asks for trading analysis, summarize:",
+    "1) bias",
+    "2) risk",
+    "3) entry/SL/TP if available",
+    "If data is insufficient, say so clearly."
+  ].join("\n");
+}
+
 async function callDeepSeekChat({ question, overview, btc, eth, bnb, whales }) {
   if (!DEEPSEEK_API_KEY) {
     throw new Error("Missing DEEPSEEK_API_KEY");
   }
 
-  const isThai = isThaiText(question);
-
-  const systemPrompt = isThai
-    ? `คุณคือผู้ช่วยวิเคราะห์ตลาดคริปโตของ Titan AI Hub
-ตอบเป็นภาษาไทยเท่านั้น
-ตอบสั้น กระชับ อ่านง่าย
-ใช้ข้อมูล snapshot ที่ให้มาเท่านั้น
-ห้ามแต่งตัวเลขเพิ่ม
-ถ้าผู้ใช้ถามเรื่องเทรด ให้สรุปเป็น:
-1) มุมมอง
-2) ความเสี่ยง
-3) จุดเข้า/SL/TP ถ้ามี
-ถ้าข้อมูลไม่พอให้พูดตรง ๆ`
-    : `You are Titan AI Hub crypto market assistant.
-Reply in English only.
-Be concise and easy to read.
-Use only the snapshot data provided.
-Do not invent numbers.
-If the user asks for trading analysis, summarize:
-1) bias
-2) risk
-3) entry/SL/TP if available
-If data is insufficient, say so clearly.`;
+  const language = detectReplyLanguage(question);
+  const systemPrompt = buildSystemPrompt(language);
 
   const snapshotText = JSON.stringify(
     {
@@ -263,10 +270,27 @@ If data is insufficient, say so clearly.`;
     2
   );
 
+  const userPrompt =
+    language === "th"
+      ? `คำถามผู้ใช้:
+${question}
+
+ข้อมูลตลาด:
+${snapshotText}
+
+กรุณาตอบเป็นภาษาไทยเท่านั้น`
+      : `User question:
+${question}
+
+Market snapshot:
+${snapshotText}
+
+Reply in English only.`;
+
   const payload = {
     model: DEEPSEEK_MODEL,
     stream: false,
-    temperature: 0.3,
+    temperature: 0.2,
     messages: [
       {
         role: "system",
@@ -274,10 +298,7 @@ If data is insufficient, say so clearly.`;
       },
       {
         role: "user",
-        content:
-          `User question:\n${question}\n\n` +
-          `Market snapshot:\n${snapshotText}\n\n` +
-          `Answer now.`
+        content: userPrompt
       }
     ]
   };
@@ -326,9 +347,10 @@ app.get("/api/whales", async (req, res) => {
     res.json(loadMockWhaleData());
   }
 });
+
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "FRONTEND-FINAL-PATCH-V1",
+    version: "AI-LANG-PATCH-V1",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
@@ -351,7 +373,6 @@ app.post("/api/login", (req, res) => {
     message: "Invalid username or password"
   });
 });
-
 app.post("/api/chat", async (req, res) => {
   const { question, snapshot } = req.body || {};
   const qRaw = String(question || "").trim();
@@ -426,6 +447,7 @@ app.post("/api/chat", async (req, res) => {
     return res.json({
       ok: true,
       source: "deepseek",
+      language: detectReplyLanguage(qRaw),
       reply
     });
   } catch (err) {
@@ -436,10 +458,12 @@ app.post("/api/chat", async (req, res) => {
     return res.json({
       ok: true,
       source: "fallback",
+      language: detectReplyLanguage(qRaw),
       reply
     });
   }
 });
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
