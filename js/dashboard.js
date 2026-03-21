@@ -1,5 +1,7 @@
 (function () {
   const API_BASE = window.location.origin;
+  let dashboardStarted = false;
+  let dashboardTimer = null;
 
   function byId(id) {
     return document.getElementById(id);
@@ -80,35 +82,47 @@
     const text = String(value || "").toLowerCase();
     el.classList.remove("bullish-text", "bearish-text", "neutral-text");
 
-    if (text.includes("bullish") || text.includes("long")) {
+    if (
+      text.includes("bullish") ||
+      text.includes("long") ||
+      text.includes("risk-on")
+    ) {
       el.classList.add("bullish-text");
-    } else if (text.includes("bearish") || text.includes("short")) {
+    } else if (
+      text.includes("bearish") ||
+      text.includes("short") ||
+      text.includes("risk-off")
+    ) {
       el.classList.add("bearish-text");
     } else {
       el.classList.add("neutral-text");
     }
   }
 
-  function setLevelColor(id, label, value, signal) {
+  function setLevelColor(id, kind, signal) {
     const el = byId(id);
     if (!el) return;
 
     const sig = String(signal || "").toUpperCase();
-    const lowerLabel = String(label || "").toLowerCase();
-
     el.classList.remove("bullish-text", "bearish-text", "neutral-text");
 
-    if (lowerLabel.includes("tp")) {
-      if (sig.includes("LONG")) el.classList.add("bullish-text");
-      else if (sig.includes("SHORT")) el.classList.add("bearish-text");
-      else el.classList.add("neutral-text");
-    } else if (lowerLabel.includes("sl")) {
-      if (sig.includes("LONG")) el.classList.add("bearish-text");
-      else if (sig.includes("SHORT")) el.classList.add("bullish-text");
-      else el.classList.add("neutral-text");
-    } else {
-      const n = Number(value);
-      if (Number.isFinite(n)) {
+    if (kind === "tp") {
+      if (sig.includes("LONG")) {
+        el.classList.add("bullish-text");
+      } else if (sig.includes("SHORT")) {
+        el.classList.add("bearish-text");
+      } else {
+        el.classList.add("neutral-text");
+      }
+      return;
+    }
+
+    if (kind === "sl") {
+      if (sig.includes("LONG")) {
+        el.classList.add("bearish-text");
+      } else if (sig.includes("SHORT")) {
+        el.classList.add("bullish-text");
+      } else {
         el.classList.add("neutral-text");
       }
     }
@@ -145,6 +159,7 @@
 
     setStatusColor();
     setBiasColor("globalBias", data.marketBias || "--");
+    setBiasColor("riskLevel", riskLevel);
   }
 
   function renderCoin(prefix, coin) {
@@ -171,8 +186,8 @@
 
     setSignal(prefix, signal);
     setBiasColor(`${prefix}Bias`, coin.bias || "--");
-    setLevelColor(`${prefix}SL`, "sl", coin.sl, signal);
-    setLevelColor(`${prefix}TP`, "tp", coin.tp, signal);
+    setLevelColor(`${prefix}SL`, "sl", signal);
+    setLevelColor(`${prefix}TP`, "tp", signal);
   }
 
   function renderWhales(rows) {
@@ -196,14 +211,13 @@
         const fullAddress = row.address || "--";
         const displayAddress = shortAddress(fullAddress);
         const href = row.explorerUrl || "#";
-        const safeHref = href === "#" ? "#" : href;
 
         return `
           <tr>
             <td class="whale-address-cell">
               <a
                 class="whale-address-link"
-                href="${safeHref}"
+                href="${href}"
                 target="_blank"
                 rel="noopener noreferrer"
                 title="${fullAddress}"
@@ -222,9 +236,15 @@
 
   function setRawPanelHidden() {
     const rawPanel = byId("rawPanel");
-    if (rawPanel) {
-      rawPanel.style.display = "none";
-    }
+    if (rawPanel) rawPanel.style.display = "none";
+
+    const buttons = document.querySelectorAll(".tab-btn");
+    buttons.forEach((btn) => {
+      const label = String(btn.textContent || "").trim().toLowerCase();
+      if (label === "raw") {
+        btn.style.display = "none";
+      }
+    });
   }
 
   function renderError(message) {
@@ -235,6 +255,9 @@
     setText("totalVolume24h", "--");
     setText("btcDominance", "--");
     setText("fearGreed", "--");
+    setText("topSetup", "--");
+    setText("summaryConfidence", "--");
+    setText("riskLevel", "--");
 
     ["btc", "eth", "bnb"].forEach((prefix) => {
       setText(`${prefix}Price`, "--");
@@ -262,10 +285,10 @@
   function bindTopTabs() {
     const buttons = document.querySelectorAll(".tab-btn");
     const sectionMap = {
-      Overview: "overviewSection",
-      Coins: "coinsSection",
-      Whales: "whalesSection",
-      "AI Chat": "aiChatPanel"
+      overview: "overviewSection",
+      coins: "coinsSection",
+      whales: "whalesSection",
+      "ai chat": "aiChatPanel"
     };
 
     buttons.forEach((btn) => {
@@ -273,7 +296,7 @@
         buttons.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
 
-        const label = String(btn.textContent || "").trim();
+        const label = String(btn.textContent || "").trim().toLowerCase();
         const targetId = sectionMap[label];
         if (!targetId) return;
 
@@ -286,30 +309,42 @@
   }
 
   async function loadDashboard() {
-    try {
-      const [overview, btc, eth, bnb, whales] = await Promise.all([
-        getJson(`${API_BASE}/api/overview?v=200`),
-        getJson(`${API_BASE}/api/coin/btc?v=200`),
-        getJson(`${API_BASE}/api/coin/eth?v=200`),
-        getJson(`${API_BASE}/api/coin/bnb?v=200`),
-        getJson(`${API_BASE}/api/whales?v=200`)
-      ]);
+    const [overview, btc, eth, bnb, whales] = await Promise.all([
+      getJson(`${API_BASE}/api/overview?v=201`),
+      getJson(`${API_BASE}/api/coin/btc?v=201`),
+      getJson(`${API_BASE}/api/coin/eth?v=201`),
+      getJson(`${API_BASE}/api/coin/bnb?v=201`),
+      getJson(`${API_BASE}/api/whales?v=201`)
+    ]);
 
-      renderOverview(overview || {});
-      renderCoin("btc", btc || {});
-      renderCoin("eth", eth || {});
-      renderCoin("bnb", bnb || {});
-      renderWhales(Array.isArray(whales) ? whales : []);
-      setRawPanelHidden();
+    renderOverview(overview || {});
+    renderCoin("btc", btc || {});
+    renderCoin("eth", eth || {});
+    renderCoin("bnb", bnb || {});
+    renderWhales(Array.isArray(whales) ? whales : []);
+    setRawPanelHidden();
+  }
+
+  async function startDashboard() {
+    if (dashboardStarted) return;
+    dashboardStarted = true;
+
+    try {
+      bindTopTabs();
+      await loadDashboard();
+
+      dashboardTimer = setInterval(async () => {
+        try {
+          await loadDashboard();
+        } catch (err) {
+          console.error("dashboard refresh failed:", err);
+        }
+      }, 60000);
     } catch (err) {
-      console.error("dashboard load failed:", err);
+      console.error("dashboard init failed:", err);
       renderError(err.message || "Unknown error");
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    bindTopTabs();
-    loadDashboard();
-    setInterval(loadDashboard, 60000);
-  });
-})();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLo
