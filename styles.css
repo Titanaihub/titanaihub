@@ -584,3 +584,9 @@ textarea:focus {
     font-size: 13px;
   }
 }
+.quick-nav.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+  color: #111;
+  border: 1px solid transparent;
+  box-shadow: 0 10px 22px rgba(199, 150, 70, 0.24);
+}
