@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Titan AI Hub</title>
-  <link rel="stylesheet" href="./styles.css?v=200" />
+  <link rel="stylesheet" href="./styles.css?v=600" />
 </head>
 <body>
   <div class="app-shell">
@@ -40,7 +40,6 @@
       <button class="tab-btn active" type="button">Overview</button>
       <button class="tab-btn" type="button">Coins</button>
       <button class="tab-btn" type="button">Whales</button>
-      <button class="tab-btn" type="button">Raw</button>
       <button class="tab-btn" type="button">AI Chat</button>
     </nav>
 
@@ -170,17 +169,48 @@
           </article>
         </div>
       </section>
-
-      <section class="panel" id="whalesSection">
+      <section class="panel panel-full" id="whalesSection">
         <div class="section-head">
           <div>
-            <h2>Whale Activity</h2>
-            <p>Latest large-position flow and smart money movement</p>
+            <h2>Whale Summary</h2>
+            <p>Direction, average levels and order concentration by asset</p>
+          </div>
+        </div>
+
+        <div id="whaleSummaryGrid" class="summary-cards-grid">
+          <div class="stat-card">
+            <span>Loading whale summary...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Stablecoin Flow</h2>
+            <p>Exchange inflow / outflow and future buy-side pressure</p>
+          </div>
+        </div>
+
+        <div id="stablecoinFlowGrid" class="summary-cards-grid">
+          <div class="stat-card">
+            <span>Loading stablecoin flow...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Whale Activity Detail</h2>
+            <p>Entry, exit, TP, SL and pending order levels by whale</p>
           </div>
         </div>
 
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table whale-detail-table">
             <thead>
               <tr>
                 <th>Address</th>
@@ -188,19 +218,26 @@
                 <th>Action</th>
                 <th>Position</th>
                 <th>Price</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>TP</th>
+                <th>SL</th>
+                <th>Status</th>
+                <th>Pending Type</th>
+                <th>Pending Price</th>
                 <th>Time</th>
               </tr>
             </thead>
             <tbody id="whaleTableBody">
               <tr>
-                <td colspan="6">Loading whale activity...</td>
+                <td colspan="13">Loading whale activity...</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section class="panel" id="rawPanel">
+      <section class="panel" id="rawPanel" style="display: none;">
         <div class="section-head">
           <div>
             <h2>Raw Market Snapshot</h2>
@@ -254,7 +291,6 @@
           <button id="askCompareCoins" class="btn btn-secondary" type="button">Compare Coins</button>
           <button id="askRisk" class="btn btn-secondary" type="button">Ask Risk</button>
         </div>
-
         <div class="chat-input-wrap">
           <textarea
             id="chatInput"
@@ -263,7 +299,12 @@
             rows="4"
             disabled
           ></textarea>
-          <button id="sendChatBtn" class="btn btn-primary chat-send-btn" type="button" disabled>
+          <button
+            id="sendChatBtn"
+            class="btn btn-primary chat-send-btn"
+            type="button"
+            disabled
+          >
             Send
           </button>
         </div>
@@ -271,11 +312,12 @@
     </main>
   </div>
 
-  <script src="./js/config.js?v=200"></script>
-  <script src="./js/helpers.js?v=200"></script>
-  <script src="./js/mock-data.js?v=200"></script>
-  <script src="./js/api-client.js?v=200"></script>
-  <script src="./js/dashboard.js?v=202"></script>
-  <script src="./js/chat.js?v=200"></script>
-</body>
+  <script src="./js/config.js?v=600"></script>
+  <script src="./js/helpers.js?v=600"></script>
+  <script src="./js/mock-data.js?v=600"></script>
+  <script src="./js/api-client.js?v=600"></script>
+  <script src="./js/dashboard.js?v=600"></script>
+  <script src="./js/chat.js?v=600"></script>
+  <script src="./app.js?v=600"></script>
+  </body>
 </html>
