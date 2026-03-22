@@ -1,54 +1,85 @@
 const { CACHE_TTL_MS, RUNTIME_CACHE } = require("../config/constants.js");
-const { buildCoinFocusPackage } = require("./coinfocus-service.js");
-const { buildWhalePackage } = require("./whale-service.js");
 const { isFresh, now } = require("../utils/helpers.js");
+const { buildDeepAnalysisPackage } = require("./analysis-service.js");
 
-function buildSmartMoneyAlerts(coinFocusList, stablecoinFlows, whaleSummary) {
+function buildRealOnlyAlerts(deepPkg) {
   const alerts = [];
+  const coins = Array.isArray(deepPkg?.coins) ? deepPkg.coins : [];
+  const marketState = deepPkg?.marketState || {};
+  const mode = deepPkg?.mode || "unknown";
 
-  const sortedCoins = [...coinFocusList].sort((a, b) => b.finalSetupScore - a.finalSetupScore);
-  const strongest = sortedCoins.slice(0, 4);
-  const weakest = [...sortedCoins]
-    .sort((a, b) => a.finalSetupScore - b.finalSetupScore)
-    .slice(0, 3);
+  const strongest = [...coins]
+    .sort(
+      (a, b) =>
+        Number(b?.setupScore?.convictionScore || 0) -
+        Number(a?.setupScore?.convictionScore || 0)
+    )
+    .slice(0, 4);
+
+  const riskiest = [...coins]
+    .sort(
+      (a, b) =>
+        Number(b?.setupScore?.riskScore || 0) -
+        Number(a?.setupScore?.riskScore || 0)
+    )
+    .slice(0, 4);
+
+  alerts.push({
+    type: "system",
+    symbol: "SYSTEM",
+    title: `Analysis mode: ${mode}`,
+    detail:
+      "Current alert engine uses real futures market data only. Whale flow and stablecoin exchange-flow are excluded until real providers are connected."
+  });
+
+  alerts.push({
+    type: "macro",
+    symbol: "MACRO",
+    title: `Market regime: ${marketState.regime || "Unknown"}`,
+    detail:
+      marketState.explanation ||
+      "Macro market regime unavailable."
+  });
 
   for (const coin of strongest) {
     alerts.push({
       type: "opportunity",
       symbol: coin.symbol,
-      title: `${coin.symbol} setup strength ${coin.finalSetupScore}`,
-      detail: `${coin.setupDirection} with ${coin.trendState}, whale bias ${coin.longShortContext}, liquidity signal ${coin.liquiditySignal}.`
+      title: `${coin.symbol} conviction ${coin.setupScore?.convictionScore ?? "--"}`,
+      detail:
+        `${coin.setupScore?.setupDirection || "Watchlist"} | ` +
+        `${coin.derivativesAnalysis?.momentumState?.state || "Balanced"} | ` +
+        `Execution mode: ${coin.setupScore?.executionMode || "Wait Confirmation"}`
     });
   }
 
-  for (const coin of weakest) {
+  for (const coin of riskiest) {
     alerts.push({
       type: "risk",
       symbol: coin.symbol,
-      title: `${coin.symbol} trap risk ${coin.liquidityRisk}`,
-      detail: `Market structure is ${coin.trendState}. Watch for failed breakout, stop hunt, or squeeze before continuation.`
+      title: `${coin.symbol} risk ${coin.setupScore?.riskScore ?? "--"}`,
+      detail:
+        `Trap risk: ${coin.derivativesAnalysis?.trapRisk || "Medium"} | ` +
+        `Funding: ${coin.derivativesAnalysis?.fundingState?.state || "Neutral"} | ` +
+        `OI/Price: ${coin.derivativesAnalysis?.oiPriceState?.oiState || "Mixed"}`
     });
   }
 
-  for (const flow of stablecoinFlows || []) {
-    alerts.push({
-      type: String(flow.netFlow || "").trim().startsWith("-") ? "risk" : "flow",
-      symbol: flow.symbol,
-      title: `${flow.symbol} net flow ${flow.netFlow}`,
-      detail: flow.interpretation
-    });
-  }
+  const squeezeCandidates = coins
+    .filter((coin) => {
+      const side = String(coin?.derivativesAnalysis?.oiPriceState?.squeezeSide || "");
+      return side && side !== "None" && side !== "Unknown" && side !== "Two-Way";
+    })
+    .slice(0, 4);
 
-  const whaleHot = (whaleSummary || []).filter(
-    (x) => x.netBias === "Long Dominant" || x.netBias === "Short Dominant"
-  );
-
-  for (const item of whaleHot.slice(0, 5)) {
+  for (const coin of squeezeCandidates) {
     alerts.push({
-      type: item.netBias === "Long Dominant" ? "flow" : "risk",
-      symbol: item.symbol,
-      title: `${item.symbol} ${item.netBias}`,
-      detail: `Open long ${item.openLongUsd}, open short ${item.openShortUsd}, pending orders ${item.pendingOrders}.`
+      type: "derivatives",
+      symbol: coin.symbol,
+      title: `${coin.symbol} ${coin.derivativesAnalysis?.oiPriceState?.squeezeSide || "Squeeze Risk"}`,
+      detail:
+        `Funding state: ${coin.derivativesAnalysis?.fundingState?.state || "Neutral"} | ` +
+        `Derivatives bias: ${coin.derivativesAnalysis?.oiPriceState?.derivativesBias || "Neutral"}`
     });
   }
 
@@ -60,14 +91,8 @@ async function buildAlertPackage() {
     return RUNTIME_CACHE.alerts.list;
   }
 
-  const coinFocusList = await buildCoinFocusPackage();
-  const whalePkg = await buildWhalePackage();
-
-  const alerts = buildSmartMoneyAlerts(
-    coinFocusList,
-    whalePkg.stablecoinFlows,
-    whalePkg.summary
-  );
+  const deepPkg = await buildDeepAnalysisPackage();
+  const alerts = buildRealOnlyAlerts(deepPkg);
 
   RUNTIME_CACHE.alerts.list = alerts;
   RUNTIME_CACHE.alerts.updatedAt = now();
@@ -76,6 +101,6 @@ async function buildAlertPackage() {
 }
 
 module.exports = {
-  buildSmartMoneyAlerts,
+  buildRealOnlyAlerts,
   buildAlertPackage
 };
