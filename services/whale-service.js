@@ -366,4 +366,264 @@ function expandWhaleBlueprint(baseBlueprints) {
           pendingPriceOffsetPct:
             typeof base.pendingPriceOffsetPct === "number"
               ? base.pendingPriceOffsetPct * (1 + i * 0.05)
-              : base.pending
+              : base.pendingPriceOffsetPct
+        });
+      }
+    }
+
+    return {
+      symbol: group.symbol,
+      chain: group.chain,
+      whales: expanded
+    };
+  });
+}
+
+function paginateRows(rows, page, limit) {
+  const total = rows.length;
+  const safeLimit = Math.min(Math.max(limit, 1), MAX_WHALE_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const start = (safePage - 1) * safeLimit;
+  const end = start + safeLimit;
+
+  return {
+    items: rows.slice(start, end),
+    page: safePage,
+    limit: safeLimit,
+    total,
+    totalPages,
+    hasNextPage: safePage < totalPages,
+    hasPrevPage: safePage > 1
+  };
+}
+
+function applyWhaleFilters(rows, query) {
+  let filtered = [...rows];
+
+  if (query.symbol) {
+    const symbol = String(query.symbol).toUpperCase();
+    filtered = filtered.filter((row) => String(row.symbol).toUpperCase() === symbol);
+  }
+
+  if (query.side) {
+    const side = String(query.side).toUpperCase();
+    filtered = filtered.filter((row) => String(row.side).toUpperCase() === side);
+  }
+
+  if (query.status) {
+    const status = String(query.status).toUpperCase();
+    filtered = filtered.filter((row) => String(row.status).toUpperCase() === status);
+  }
+
+  if (query.chain) {
+    const chain = String(query.chain).toLowerCase();
+    filtered = filtered.filter((row) => String(row.chain).toLowerCase() === chain);
+  }
+
+  return filtered;
+}
+
+function getLegacyWhaleRows(rows) {
+  return rows.map((r) => ({
+    address: r.address,
+    symbol: r.symbol,
+    action: r.action,
+    position: r.position,
+    price: r.price,
+    time: r.time,
+    chain: r.chain,
+    explorerUrl: r.explorerUrl,
+    entry: r.entry,
+    exit: r.exit,
+    tp: r.tp,
+    sl: r.sl,
+    status: r.status,
+    side: r.side,
+    pendingType: r.pendingType,
+    pendingPrice: r.pendingPrice
+  }));
+}
+
+async function buildWhalePackage() {
+  if (isFresh(RUNTIME_CACHE.whales.updatedAt, WHALES_TTL_MS) && RUNTIME_CACHE.whales.allRows) {
+    return {
+      allRows: RUNTIME_CACHE.whales.allRows,
+      summary: RUNTIME_CACHE.whales.summary,
+      stablecoinFlows: RUNTIME_CACHE.whales.stablecoinFlows,
+      mixedFeed: RUNTIME_CACHE.whales.mixedFeed
+    };
+  }
+
+  const liveCoins = await getAllStableCoins();
+  const priceMap = {};
+
+  for (const meta of COIN_UNIVERSE) {
+    priceMap[meta.symbol] = Number(liveCoins[meta.symbol]?.price || meta.fallbackPrice || 1);
+  }
+
+  const blueprints = expandWhaleBlueprint(getWhaleBlueprint());
+  const allRows = [];
+  const summary = [];
+
+  for (const group of blueprints) {
+    const basePrice = priceMap[group.symbol] || 1;
+
+    const localRows = group.whales.map((w, idx) => {
+      const sideRaw = String(w.side || "LONG").toUpperCase();
+      const cleanSide = sideRaw.includes("SHORT") ? "SHORT" : "LONG";
+      const status = String(w.status || "OPEN").toUpperCase();
+
+      const entry = basePrice * (1 + Number(w.entryOffsetPct || 0));
+      const exit =
+        status === "CLOSED"
+          ? basePrice * (1 + Number(w.exitOffsetPct || 0))
+          : null;
+
+      const tp =
+        cleanSide === "LONG"
+          ? entry * (1 + Math.abs(Number(w.tpOffsetPct || 0.015)))
+          : entry * (1 - Math.abs(Number(w.tpOffsetPct || -0.015)));
+
+      const sl =
+        cleanSide === "LONG"
+          ? entry * (1 - Math.abs(Number(w.slOffsetPct || 0.01)))
+          : entry * (1 + Math.abs(Number(w.slOffsetPct || 0.01)));
+
+      const pendingPrice = w.hasPending
+        ? entry * (1 + Number(w.pendingPriceOffsetPct || 0))
+        : null;
+
+      const action =
+        status === "CLOSED"
+          ? cleanSide === "LONG"
+            ? "Close Long"
+            : "Close Short"
+          : cleanSide === "LONG"
+          ? "Open Long"
+          : "Open Short";
+
+      return {
+        address: w.address,
+        symbol: group.symbol,
+        action,
+        side: cleanSide,
+        status,
+        position: formatUsd(w.sizeUsd),
+        sizeUsd: w.sizeUsd,
+        price: formatPrice(basePrice),
+        rawPrice: basePrice,
+        time: hhmmss(),
+        chain: group.chain,
+        explorerUrl: getExplorerUrl(group.chain, w.address),
+        entry: formatPrice(entry),
+        entryValue: Number(entry.toFixed(12)),
+        exit: exit ? formatPrice(exit) : "--",
+        exitValue: exit ? Number(exit.toFixed(12)) : null,
+        tp: formatPrice(tp),
+        tpValue: Number(tp.toFixed(12)),
+        sl: formatPrice(sl),
+        slValue: Number(sl.toFixed(12)),
+        pendingType: w.hasPending ? w.pendingType || "--" : "--",
+        pendingPrice: pendingPrice ? formatPrice(pendingPrice) : "--",
+        pendingPriceValue: pendingPrice ? Number(pendingPrice.toFixed(12)) : null,
+        whaleId: `${group.symbol}-${idx + 1}`
+      };
+    });
+
+    allRows.push(...localRows);
+
+    const longRows = localRows.filter((r) => r.side === "LONG" && r.status === "OPEN");
+    const shortRows = localRows.filter((r) => r.side === "SHORT" && r.status === "OPEN");
+
+    const longSize = sum(longRows.map((r) => r.sizeUsd));
+    const shortSize = sum(shortRows.map((r) => r.sizeUsd));
+
+    let netBias = "Mixed";
+    if (longSize > shortSize * 1.1) netBias = "Long Dominant";
+    else if (shortSize > longSize * 1.1) netBias = "Short Dominant";
+
+    summary.push({
+      symbol: group.symbol,
+      whaleCount: localRows.length,
+      openLongCount: longRows.length,
+      openShortCount: shortRows.length,
+      openLongUsd: formatUsd(longSize),
+      openShortUsd: formatUsd(shortSize),
+      avgLongEntry: longRows.length ? formatAveragePrice(longRows.map((r) => r.entryValue)) : "--",
+      avgShortEntry: shortRows.length ? formatAveragePrice(shortRows.map((r) => r.entryValue)) : "--",
+      avgTp: formatAveragePrice(localRows.map((r) => r.tpValue)),
+      avgSl: formatAveragePrice(localRows.map((r) => r.slValue)),
+      avgExit: formatAveragePrice(localRows.map((r) => r.exitValue)),
+      pendingOrders: localRows.filter((r) => r.pendingType !== "--").length,
+      netBias
+    });
+  }
+
+  const stablecoinFlows = [
+    {
+      symbol: "USDT",
+      exchangeInflow: "$148.00M",
+      exchangeOutflow: "$92.00M",
+      netFlow: "$56.00M",
+      interpretation: "More stablecoin on exchanges, supports future buy-side activity"
+    },
+    {
+      symbol: "USDC",
+      exchangeInflow: "$64.00M",
+      exchangeOutflow: "$71.00M",
+      netFlow: "-$7.00M",
+      interpretation: "Slightly defensive flow, some capital moving off exchange"
+    },
+    {
+      symbol: "DAI",
+      exchangeInflow: "$11.00M",
+      exchangeOutflow: "$8.00M",
+      netFlow: "$3.00M",
+      interpretation: "Neutral to mildly constructive"
+    }
+  ];
+
+  const mixedFeed = [];
+  const groupedBySymbol = {};
+
+  for (const row of allRows) {
+    if (!groupedBySymbol[row.symbol]) groupedBySymbol[row.symbol] = [];
+    groupedBySymbol[row.symbol].push(row);
+  }
+
+  for (const meta of COIN_UNIVERSE) {
+    const rows = groupedBySymbol[meta.symbol] || [];
+    const picked = rows
+      .filter((r) => r.status === "OPEN")
+      .sort((a, b) => Number(b.sizeUsd || 0) - Number(a.sizeUsd || 0))
+      .slice(0, 2);
+
+    mixedFeed.push(...picked);
+  }
+
+  mixedFeed.sort((a, b) => Number(b.sizeUsd || 0) - Number(a.sizeUsd || 0));
+
+  RUNTIME_CACHE.whales.allRows = allRows;
+  RUNTIME_CACHE.whales.summary = summary;
+  RUNTIME_CACHE.whales.stablecoinFlows = stablecoinFlows;
+  RUNTIME_CACHE.whales.mixedFeed = mixedFeed;
+  RUNTIME_CACHE.whales.updatedAt = now();
+
+  return {
+    allRows,
+    summary,
+    stablecoinFlows,
+    mixedFeed
+  };
+}
+
+module.exports = {
+  getExplorerUrl,
+  getWhaleBlueprint,
+  expandWhaleBlueprint,
+  paginateRows,
+  applyWhaleFilters,
+  getLegacyWhaleRows,
+  buildWhalePackage
+};
