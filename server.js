@@ -35,7 +35,9 @@ const runtimeCache = {
     bnb: { live: null, lastGood: null, updatedAt: 0 }
   },
   whales: {
-    live: null,
+    rows: null,
+    summary: null,
+    stablecoinFlows: null,
     updatedAt: 0
   }
 };
@@ -89,6 +91,55 @@ function isValidCoin(data) {
   );
 }
 
+function formatUsd(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
+  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
+  return `$${n.toFixed(2)}`;
+}
+
+function formatPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
+  return `$${n.toFixed(2)}`;
+}
+
+function average(nums) {
+  const clean = nums.filter((v) => Number.isFinite(Number(v))).map(Number);
+  if (clean.length === 0) return null;
+  return clean.reduce((a, b) => a + b, 0) / clean.length;
+}
+
+function getExplorerUrl(chain, address) {
+  const safe = encodeURIComponent(address || "");
+  switch (chain) {
+    case "btc":
+      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
+    case "eth":
+      return `https://etherscan.io/address/${safe}`;
+    case "bsc":
+      return `https://bscscan.com/address/${safe}`;
+    case "sol":
+      return `https://solscan.io/account/${safe}`;
+    case "xrp":
+      return `https://xrpscan.com/account/${safe}`;
+    case "doge":
+      return `https://blockchair.com/dogecoin/address/${safe}`;
+    default:
+      return `https://etherscan.io/address/${safe}`;
+  }
+}
+
+function hhmmss() {
+  return new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
 function coinBriefEN(symbol, coin) {
   return `${symbol}: signal ${fmt(coin.signal)}, bias ${fmt(coin.bias)}, entry ${fmt(
     coin.entry
@@ -122,6 +173,7 @@ function coinTradeViewTH(symbol, coin) {
     coin.tp
   )}. Funding อยู่ที่ ${fmt(coin.funding)}% และ open interest อยู่ที่ ${fmt(coin.oi)}.`;
 }
+
 function compareReplyEN(btc, eth, bnb) {
   return (
     `Comparison now: ${coinBriefEN("BTC", btc)} ${coinBriefEN("ETH", eth)} ${coinBriefEN(
@@ -227,50 +279,6 @@ function buildFallbackReply(question, overview, btc, eth, bnb) {
 
   return reply;
 }
-
-function getWhaleUniverse() {
-  return [
-    { symbol: "BTC", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", position: "$12.80M", chain: "btc" },
-    { symbol: "ETH", address: "0x8ba1f109551bd432803012645ac136ddd64dba72", position: "$8.40M", chain: "eth" },
-    { symbol: "BNB", address: "bnb1grpf0955h0yk6l2v3arh9p7hk0j2v8w5x9k3m4", position: "$4.20M", chain: "bsc" },
-    { symbol: "SOL", address: "7dHbWXad2mZ4n6F7s7Q7iLwQ4n8r6nR7h5y3nJ8x2pAf", position: "$3.90M", chain: "sol" },
-    { symbol: "XRP", address: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh", position: "$2.75M", chain: "xrp" },
-    { symbol: "DOGE", address: "D8BqR7M6b5YkV3n2QmZxL9fT6sR4uW1pNx", position: "$1.95M", chain: "doge" },
-    { symbol: "PEPE", address: "0x6a3f4c9b1d62f1d1e7a61e3cf4d7a8e5f91b4d32", position: "$1.32M", chain: "eth" },
-    { symbol: "WIF", address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV", position: "$1.18M", chain: "sol" },
-    { symbol: "BONK", address: "5PjDJaGfSPtWJ8p2w9jRr5n3eWg2Yq7mT9z4L6s8VkQx", position: "$0.96M", chain: "sol" },
-    { symbol: "FLOKI", address: "0x2a3f9e7d1b6a3c8f4e1d7a2b9c5d8e6f7a1b2c3d", position: "$0.88M", chain: "eth" },
-    { symbol: "SHIB", address: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce", position: "$1.44M", chain: "eth" }
-  ];
-}
-
-function getExplorerUrl(chain, address) {
-  const safe = encodeURIComponent(address || "");
-  switch (chain) {
-    case "btc":
-      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
-    case "eth":
-      return `https://etherscan.io/address/${safe}`;
-    case "bsc":
-      return `https://bscscan.com/address/${safe}`;
-    case "sol":
-      return `https://solscan.io/account/${safe}`;
-    case "xrp":
-      return `https://xrpscan.com/account/${safe}`;
-    case "doge":
-      return `https://blockchair.com/dogecoin/address/${safe}`;
-    default:
-      return `https://etherscan.io/address/${safe}`;
-  }
-}
-
-function overviewTime() {
-  return new Date().toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
-}
 async function getStableOverview() {
   if (isFresh(runtimeCache.overview.updatedAt, CACHE_TTL_MS) && runtimeCache.overview.live) {
     return runtimeCache.overview.live;
@@ -337,12 +345,104 @@ async function getStableCoin(symbol) {
   return mock;
 }
 
-async function buildEnhancedWhales() {
-  if (isFresh(runtimeCache.whales.updatedAt, WHALES_TTL_MS) && Array.isArray(runtimeCache.whales.live)) {
-    return runtimeCache.whales.live;
+function getWhaleBlueprint() {
+  return [
+    {
+      symbol: "BTC",
+      chain: "btc",
+      whales: [
+        { address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", side: "LONG", status: "OPEN", sizeUsd: 12800000, entryOffsetPct: 0.0020, tpOffsetPct: 0.0180, slOffsetPct: 0.0100, hasPending: true, pendingType: "Buy Limit", pendingPriceOffsetPct: -0.0040 },
+        { address: "bc1q8q9v4y9pyuv2g5n3yx0d7m0w8k3mz7n2s8aj7a", side: "LONG", status: "OPEN", sizeUsd: 8400000, entryOffsetPct: -0.0010, tpOffsetPct: 0.0220, slOffsetPct: 0.0120, hasPending: false },
+        { address: "bc1q6hjw6e8h4de0m4g3s8j3mggsntk7f5mdpkd6ep", side: "SHORT", status: "OPEN", sizeUsd: 3900000, entryOffsetPct: 0.0030, tpOffsetPct: -0.0160, slOffsetPct: 0.0090, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0060 },
+        { address: "bc1q7l0m4rf7r6u4k7xq2q9w0k9t8m3q0z2m5p9fkl", side: "LONG", status: "CLOSED", sizeUsd: 2100000, entryOffsetPct: -0.0040, exitOffsetPct: 0.0080, tpOffsetPct: 0.0150, slOffsetPct: 0.0100, hasPending: false }
+      ]
+    },
+    {
+      symbol: "ETH",
+      chain: "eth",
+      whales: [
+        { address: "0x8ba1f109551bd432803012645ac136ddd64dba72", side: "SHORT", status: "OPEN", sizeUsd: 8400000, entryOffsetPct: 0.0025, tpOffsetPct: -0.0250, slOffsetPct: 0.0120, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0050 },
+        { address: "0x53d284357ec70ce289d6d64134dfac8e511c8a3d", side: "SHORT", status: "OPEN", sizeUsd: 5100000, entryOffsetPct: 0.0010, tpOffsetPct: -0.0190, slOffsetPct: 0.0100, hasPending: false },
+        { address: "0xf977814e90da44bfa03b6295a0616a897441acec", side: "LONG", status: "OPEN", sizeUsd: 2700000, entryOffsetPct: -0.0030, tpOffsetPct: 0.0160, slOffsetPct: 0.0090, hasPending: true, pendingType: "Buy Limit", pendingPriceOffsetPct: -0.0060 },
+        { address: "0x267be1c1d684f78cb4f6a176c4911b741e4ffdc0", side: "CLOSED_LONG", status: "CLOSED", sizeUsd: 1900000, entryOffsetPct: -0.0050, exitOffsetPct: 0.0070, tpOffsetPct: 0.0140, slOffsetPct: 0.0110, hasPending: false }
+      ]
+    },
+    {
+      symbol: "BNB",
+      chain: "bsc",
+      whales: [
+        { address: "bnb1grpf0955h0yk6l2v3arh9p7hk0j2v8w5x9k3m4", side: "LONG", status: "OPEN", sizeUsd: 4200000, entryOffsetPct: -0.0015, tpOffsetPct: 0.0300, slOffsetPct: 0.0150, hasPending: true, pendingType: "Buy Limit", pendingPriceOffsetPct: -0.0050 },
+        { address: "bnb1vr0s9mjk6g0rf4d0n6x6ec7n0m58m7g8c6g5w3", side: "LONG", status: "OPEN", sizeUsd: 3100000, entryOffsetPct: -0.0025, tpOffsetPct: 0.0240, slOffsetPct: 0.0130, hasPending: false },
+        { address: "bnb1x4n2l5u4p8w7f6m0s9r8c7d2v3k1y7m0q2r6a1", side: "SHORT", status: "OPEN", sizeUsd: 1800000, entryOffsetPct: 0.0030, tpOffsetPct: -0.0180, slOffsetPct: 0.0100, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0060 }
+      ]
+    },
+    {
+      symbol: "SOL",
+      chain: "sol",
+      whales: [
+        { address: "7dHbWXad2mZ4n6F7s7Q7iLwQ4n8r6nR7h5y3nJ8x2pAf", side: "SHORT", status: "OPEN", sizeUsd: 3900000, entryOffsetPct: 0.0040, tpOffsetPct: -0.0200, slOffsetPct: 0.0110, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0070 },
+        { address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV", side: "LONG", status: "OPEN", sizeUsd: 2100000, entryOffsetPct: -0.0030, tpOffsetPct: 0.0170, slOffsetPct: 0.0100, hasPending: false }
+      ]
+    },
+    {
+      symbol: "XRP",
+      chain: "xrp",
+      whales: [
+        { address: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh", side: "LONG", status: "OPEN", sizeUsd: 2750000, entryOffsetPct: -0.0020, tpOffsetPct: 0.0180, slOffsetPct: 0.0100, hasPending: true, pendingType: "Buy Limit", pendingPriceOffsetPct: -0.0040 }
+      ]
+    },
+    {
+      symbol: "DOGE",
+      chain: "doge",
+      whales: [
+        { address: "D8BqR7M6b5YkV3n2QmZxL9fT6sR4uW1pNx", side: "SHORT", status: "OPEN", sizeUsd: 1950000, entryOffsetPct: 0.0050, tpOffsetPct: -0.0220, slOffsetPct: 0.0120, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0080 }
+      ]
+    },
+    {
+      symbol: "PEPE",
+      chain: "eth",
+      whales: [
+        { address: "0x6a3f4c9b1d62f1d1e7a61e3cf4d7a8e5f91b4d32", side: "LONG", status: "OPEN", sizeUsd: 1320000, entryOffsetPct: -0.0040, tpOffsetPct: 0.0250, slOffsetPct: 0.0130, hasPending: true, pendingType: "Scale Buy", pendingPriceOffsetPct: -0.0070 }
+      ]
+    },
+    {
+      symbol: "WIF",
+      chain: "sol",
+      whales: [
+        { address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV", side: "SHORT", status: "OPEN", sizeUsd: 1180000, entryOffsetPct: 0.0050, tpOffsetPct: -0.0230, slOffsetPct: 0.0120, hasPending: true, pendingType: "Sell Limit", pendingPriceOffsetPct: 0.0080 }
+      ]
+    },
+    {
+      symbol: "BONK",
+      chain: "sol",
+      whales: [
+        { address: "5PjDJaGfSPtWJ8p2w9jRr5n3eWg2Yq7mT9z4L6s8VkQx", side: "LONG", status: "OPEN", sizeUsd: 960000, entryOffsetPct: -0.0060, tpOffsetPct: 0.0280, slOffsetPct: 0.0140, hasPending: true, pendingType: "Scale Buy", pendingPriceOffsetPct: -0.0090 }
+      ]
+    },
+    {
+      symbol: "FLOKI",
+      chain: "eth",
+      whales: [
+        { address: "0x2a3f9e7d1b6a3c8f4e1d7a2b9c5d8e6f7a1b2c3d", side: "SHORT", status: "OPEN", sizeUsd: 880000, entryOffsetPct: 0.0040, tpOffsetPct: -0.0190, slOffsetPct: 0.0100, hasPending: false }
+      ]
+    },
+    {
+      symbol: "SHIB",
+      chain: "eth",
+      whales: [
+        { address: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce", side: "LONG", status: "OPEN", sizeUsd: 1440000, entryOffsetPct: -0.0050, tpOffsetPct: 0.0240, slOffsetPct: 0.0120, hasPending: true, pendingType: "Buy Limit", pendingPriceOffsetPct: -0.0080 }
+      ]
+    }
+  ];
+}
+async function buildWhalePackage() {
+  if (isFresh(runtimeCache.whales.updatedAt, WHALES_TTL_MS) && runtimeCache.whales.rows) {
+    return {
+      rows: runtimeCache.whales.rows,
+      summary: runtimeCache.whales.summary,
+      stablecoinFlows: runtimeCache.whales.stablecoinFlows
+    };
   }
-
-  const universe = getWhaleUniverse();
 
   const [btc, eth, bnb] = await Promise.all([
     getStableCoin("btc"),
@@ -350,45 +450,173 @@ async function buildEnhancedWhales() {
     getStableCoin("bnb")
   ]);
 
-  const quickMap = {
-    BTC: btc,
-    ETH: eth,
-    BNB: bnb
+  const priceMap = {
+    BTC: Number(btc.price) || 69100,
+    ETH: Number(eth.price) || 2110,
+    BNB: Number(bnb.price) || 633.5,
+    SOL: 139.8,
+    XRP: 0.61,
+    DOGE: 0.12,
+    PEPE: 0.000012,
+    WIF: 1.84,
+    BONK: 0.000028,
+    FLOKI: 0.00017,
+    SHIB: 0.000026
   };
 
-  const rows = universe.map((item, index) => {
-    const ref = quickMap[item.symbol] || null;
+  const blueprints = getWhaleBlueprint();
+  const rows = [];
+  const summary = [];
 
-    let action = index % 2 === 0 ? "Open Long" : "Open Short";
-    let price = "--";
+  for (const group of blueprints) {
+    const basePrice = priceMap[group.symbol] || 1;
+    const localRows = group.whales.map((w, idx) => {
+      const sideRaw = String(w.side || "LONG").toUpperCase();
+      const cleanSide = sideRaw.includes("SHORT") ? "SHORT" : "LONG";
+      const status = String(w.status || "OPEN").toUpperCase();
 
-    if (ref && isValidCoin(ref)) {
-      price = `$${Number(ref.price).toFixed(2)}`;
+      const entry = basePrice * (1 + Number(w.entryOffsetPct || 0));
+      const exit =
+        status === "CLOSED"
+          ? basePrice * (1 + Number(w.exitOffsetPct || 0))
+          : null;
 
-      if (String(ref.signal || "").toUpperCase() === "SHORT") {
-        action = index % 3 === 0 ? "Close Short" : "Open Short";
-      } else if (String(ref.signal || "").toUpperCase() === "LONG") {
-        action = index % 3 === 0 ? "Close Long" : "Open Long";
-      }
+      const tp =
+        cleanSide === "LONG"
+          ? entry * (1 + Math.abs(Number(w.tpOffsetPct || 0.015)))
+          : entry * (1 - Math.abs(Number(w.tpOffsetPct || -0.015)));
+
+      const sl =
+        cleanSide === "LONG"
+          ? entry * (1 - Math.abs(Number(w.slOffsetPct || 0.01)))
+          : entry * (1 + Math.abs(Number(w.slOffsetPct || 0.01)));
+
+      const pendingPrice = w.hasPending
+        ? entry * (1 + Number(w.pendingPriceOffsetPct || 0))
+        : null;
+
+      const action =
+        status === "CLOSED"
+          ? cleanSide === "LONG"
+            ? "Close Long"
+            : "Close Short"
+          : cleanSide === "LONG"
+          ? "Open Long"
+          : "Open Short";
+
+      return {
+        address: w.address,
+        symbol: group.symbol,
+        action,
+        side: cleanSide,
+        status,
+        position: formatUsd(w.sizeUsd),
+        sizeUsd: w.sizeUsd,
+        price: formatPrice(basePrice),
+        entry: formatPrice(entry),
+        entryValue: Number(entry.toFixed(8)),
+        exit: exit ? formatPrice(exit) : "--",
+        exitValue: exit ? Number(exit.toFixed(8)) : null,
+        tp: formatPrice(tp),
+        tpValue: Number(tp.toFixed(8)),
+        sl: formatPrice(sl),
+        slValue: Number(sl.toFixed(8)),
+        hasPending: Boolean(w.hasPending),
+        pendingType: w.pendingType || "--",
+        pendingPrice: pendingPrice ? formatPrice(pendingPrice) : "--",
+        pendingPriceValue: pendingPrice ? Number(pendingPrice.toFixed(8)) : null,
+        time: hhmmss(),
+        chain: group.chain,
+        explorerUrl: getExplorerUrl(group.chain, w.address),
+        whaleId: `${group.symbol}-${idx + 1}`
+      };
+    });
+
+    rows.push(...localRows);
+
+    const longRows = localRows.filter((r) => r.side === "LONG" && r.status === "OPEN");
+    const shortRows = localRows.filter((r) => r.side === "SHORT" && r.status === "OPEN");
+
+    const longSize = longRows.reduce((sum, r) => sum + Number(r.sizeUsd || 0), 0);
+    const shortSize = shortRows.reduce((sum, r) => sum + Number(r.sizeUsd || 0), 0);
+
+    let netBias = "Mixed";
+    if (longSize > shortSize * 1.1) netBias = "Long Dominant";
+    else if (shortSize > longSize * 1.1) netBias = "Short Dominant";
+
+    summary.push({
+      symbol: group.symbol,
+      whaleCount: localRows.length,
+      openLongCount: longRows.length,
+      openShortCount: shortRows.length,
+      openLongUsd: formatUsd(longSize),
+      openShortUsd: formatUsd(shortSize),
+      avgLongEntry: longRows.length ? formatPrice(average(longRows.map((r) => r.entryValue))) : "--",
+      avgShortEntry: shortRows.length ? formatPrice(average(shortRows.map((r) => r.entryValue))) : "--",
+      avgTp: formatPrice(average(localRows.map((r) => r.tpValue))),
+      avgSl: formatPrice(average(localRows.map((r) => r.slValue))),
+      avgExit: formatPrice(average(localRows.map((r) => r.exitValue))),
+      pendingOrders: localRows.filter((r) => r.hasPending).length,
+      netBias
+    });
+  }
+
+  const stablecoinFlows = [
+    {
+      symbol: "USDT",
+      exchangeInflow: "$148.00M",
+      exchangeOutflow: "$92.00M",
+      netFlow: "$56.00M",
+      interpretation: "More stablecoin on exchanges, supports future buy-side activity"
+    },
+    {
+      symbol: "USDC",
+      exchangeInflow: "$64.00M",
+      exchangeOutflow: "$71.00M",
+      netFlow: "-$7.00M",
+      interpretation: "Slightly defensive flow, some capital moving off exchange"
+    },
+    {
+      symbol: "DAI",
+      exchangeInflow: "$11.00M",
+      exchangeOutflow: "$8.00M",
+      netFlow: "$3.00M",
+      interpretation: "Neutral to mildly constructive"
     }
+  ];
 
-    return {
-      address: item.address,
-      symbol: item.symbol,
-      action,
-      position: item.position,
-      price,
-      time: overviewTime(),
-      chain: item.chain,
-      explorerUrl: getExplorerUrl(item.chain, item.address)
-    };
-  });
-
-  runtimeCache.whales.live = rows;
+  runtimeCache.whales.rows = rows;
+  runtimeCache.whales.summary = summary;
+  runtimeCache.whales.stablecoinFlows = stablecoinFlows;
   runtimeCache.whales.updatedAt = now();
-  return rows;
+
+  return {
+    rows,
+    summary,
+    stablecoinFlows
+  };
 }
 
+function getLegacyWhaleRows(rows) {
+  return rows.map((r) => ({
+    address: r.address,
+    symbol: r.symbol,
+    action: r.action,
+    position: r.position,
+    price: r.price,
+    time: r.time,
+    chain: r.chain,
+    explorerUrl: r.explorerUrl,
+    entry: r.entry,
+    exit: r.exit,
+    tp: r.tp,
+    sl: r.sl,
+    status: r.status,
+    side: r.side,
+    pendingType: r.pendingType,
+    pendingPrice: r.pendingPrice
+  }));
+}
 function postJson(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -465,6 +693,7 @@ function buildSystemPrompt(language) {
     "If data is insufficient, say so clearly."
   ].join("\n");
 }
+
 async function callDeepSeekChat({ question, overview, btc, eth, bnb, whales }) {
   if (!DEEPSEEK_API_KEY) {
     throw new Error("Missing DEEPSEEK_API_KEY");
@@ -547,27 +776,41 @@ app.get("/api/coin/:symbol", async (req, res) => {
 
 app.get("/api/whales", async (req, res) => {
   try {
-    const data = await buildEnhancedWhales();
-    return res.json(data);
+    const pkg = await buildWhalePackage();
+    return res.json(getLegacyWhaleRows(pkg.rows));
   } catch (err) {
     console.error("whales route fallback:", err.message);
-
-    if (Array.isArray(runtimeCache.whales.live) && runtimeCache.whales.live.length > 0) {
-      return res.json(runtimeCache.whales.live);
-    }
-
     return res.json(loadMockWhaleData());
+  }
+});
+
+app.get("/api/whales-summary", async (req, res) => {
+  try {
+    const pkg = await buildWhalePackage();
+    return res.json(pkg.summary);
+  } catch (err) {
+    console.error("whales-summary route fallback:", err.message);
+    return res.json([]);
+  }
+});
+
+app.get("/api/stablecoin-flows", async (req, res) => {
+  try {
+    const pkg = await buildWhalePackage();
+    return res.json(pkg.stablecoinFlows);
+  } catch (err) {
+    console.error("stablecoin-flows route fallback:", err.message);
+    return res.json([]);
   }
 });
 
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "WEB-STABLE-CACHE-V1",
+    version: "WEB-WHALE-SUMMARY-V1",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
 });
-
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body || {};
 
@@ -585,6 +828,7 @@ app.post("/api/login", (req, res) => {
     message: "Invalid username or password"
   });
 });
+
 app.post("/api/chat", async (req, res) => {
   const { question, snapshot } = req.body || {};
   const qRaw = String(question || "").trim();
@@ -613,7 +857,8 @@ app.post("/api/chat", async (req, res) => {
   if (!bnb) bnb = await getStableCoin("bnb");
 
   if (!Array.isArray(whales) || whales.length === 0) {
-    whales = await buildEnhancedWhales();
+    const pkg = await buildWhalePackage();
+    whales = pkg.rows;
   }
 
   try {
