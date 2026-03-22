@@ -1,20 +1,121 @@
-const API_BASE = "https://titan-ai-api.onrender.com";
+const API_BASE = "/api";
+const REFRESH_MS = 30000;
 
-let started = false;
-let refreshTimer = null;
-let lastGoodData = null;
-let isLoggedIn = false;
+const state = {
+  loggedIn: false,
+  snapshot: {
+    overview: null,
+    coins: {},
+    coinFocus: [],
+    whales: [],
+    whaleSummary: [],
+    stablecoinFlows: [],
+    alerts: [],
+    deepAnalysis: null
+  }
+};
 
-function el(id) {
-  return document.getElementById(id);
+const el = {
+  systemStatus: document.getElementById("systemStatus"),
+  lastUpdated: document.getElementById("lastUpdated"),
+  globalBias: document.getElementById("globalBias"),
+
+  totalMarketCap: document.getElementById("totalMarketCap"),
+  totalVolume24h: document.getElementById("totalVolume24h"),
+  btcDominance: document.getElementById("btcDominance"),
+  fearGreed: document.getElementById("fearGreed"),
+
+  topSetup: document.getElementById("topSetup"),
+  summaryConfidence: document.getElementById("summaryConfidence"),
+  riskLevel: document.getElementById("riskLevel"),
+
+  coinFocusGrid: document.getElementById("coinFocusGrid"),
+  whaleTableBody: document.getElementById("whaleTableBody"),
+  whaleSummaryGrid: document.getElementById("whaleSummaryGrid"),
+  stablecoinFlowGrid: document.getElementById("stablecoinFlowGrid"),
+  alertsGrid: document.getElementById("alertsGrid"),
+  rawSnapshot: document.getElementById("rawSnapshot"),
+
+  username: document.getElementById("username"),
+  password: document.getElementById("password"),
+  loginBtn: document.getElementById("loginBtn"),
+  loginState: document.getElementById("loginState"),
+  chatStatus: document.getElementById("chatStatus"),
+  chatMessages: document.getElementById("chatMessages"),
+  chatInput: document.getElementById("chatInput"),
+  sendChatBtn: document.getElementById("sendChatBtn"),
+
+  askAnalyzeBTC: document.getElementById("askAnalyzeBTC"),
+  askCompareCoins: document.getElementById("askCompareCoins"),
+  askRisk: document.getElementById("askRisk"),
+
+  btcPrice: document.getElementById("btcPrice"),
+  btcSignal: document.getElementById("btcSignal"),
+  btc5m: document.getElementById("btc5m"),
+  btc15m: document.getElementById("btc15m"),
+  btc1h: document.getElementById("btc1h"),
+  btc4h: document.getElementById("btc4h"),
+  btcFunding: document.getElementById("btcFunding"),
+  btcOI: document.getElementById("btcOI"),
+  btcBias: document.getElementById("btcBias"),
+  btcEntry: document.getElementById("btcEntry"),
+  btcSL: document.getElementById("btcSL"),
+  btcTP: document.getElementById("btcTP"),
+
+  ethPrice: document.getElementById("ethPrice"),
+  ethSignal: document.getElementById("ethSignal"),
+  eth5m: document.getElementById("eth5m"),
+  eth15m: document.getElementById("eth15m"),
+  eth1h: document.getElementById("eth1h"),
+  eth4h: document.getElementById("eth4h"),
+  ethFunding: document.getElementById("ethFunding"),
+  ethOI: document.getElementById("ethOI"),
+  ethBias: document.getElementById("ethBias"),
+  ethEntry: document.getElementById("ethEntry"),
+  ethSL: document.getElementById("ethSL"),
+  ethTP: document.getElementById("ethTP"),
+
+  bnbPrice: document.getElementById("bnbPrice"),
+  bnbSignal: document.getElementById("bnbSignal"),
+  bnb5m: document.getElementById("bnb5m"),
+  bnb15m: document.getElementById("bnb15m"),
+  bnb1h: document.getElementById("bnb1h"),
+  bnb4h: document.getElementById("bnb4h"),
+  bnbFunding: document.getElementById("bnbFunding"),
+  bnbOI: document.getElementById("bnbOI"),
+  bnbBias: document.getElementById("bnbBias"),
+  bnbEntry: document.getElementById("bnbEntry"),
+  bnbSL: document.getElementById("bnbSL"),
+  bnbTP: document.getElementById("bnbTP")
+};
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`GET ${path} failed: ${res.status}`);
+  }
+  return res.json();
 }
 
-function text(id, value) {
-  const node = el(id);
-  if (node) node.textContent = value;
+async function apiPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body || {})
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data?.message || `POST ${path} failed: ${res.status}`);
+  }
+
+  return data;
 }
 
-function money(value) {
+function formatUsdCompact(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "--";
   if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
@@ -24,317 +125,221 @@ function money(value) {
   return `$${n.toFixed(2)}`;
 }
 
-function pct(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "--";
-  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
-
-function shortAddr(addr) {
-  const s = String(addr || "");
-  if (!s) return "--";
-  if (s.length <= 18) return s;
-  return `${s.slice(0, 10)}...${s.slice(-6)}`;
+function formatMaybe(value, fallback = "--") {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
 }
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
-function clearColorClasses(node) {
-  if (!node) return;
-  node.classList.remove(
-    "bullish-text",
-    "bearish-text",
-    "neutral-text",
-    "live-status",
-    "error-status",
-    "signal-long",
-    "signal-short",
-    "signal-wait",
-    "alert-risk",
-    "alert-flow",
-    "alert-opportunity"
-  );
+function getSignalClass(signal) {
+  const s = String(signal || "").toUpperCase();
+  if (s.includes("LONG")) return "signal-long";
+  if (s.includes("SHORT")) return "signal-short";
+  return "signal-wait";
 }
 
-function setColor(id, mode) {
-  const node = el(id);
-  if (!node) return;
-  clearColorClasses(node);
-
-  if (mode === "bull") node.classList.add("bullish-text");
-  else if (mode === "bear") node.classList.add("bearish-text");
-  else if (mode === "live") node.classList.add("live-status");
-  else if (mode === "error") node.classList.add("error-status");
-  else node.classList.add("neutral-text");
+function getSignedClass(value) {
+  const text = String(value || "");
+  if (text.startsWith("+")) return "pos";
+  if (text.startsWith("-")) return "neg";
+  return "flat";
 }
+const API_BASE = "/api";
+const REFRESH_MS = 30000;
 
-function setSignedValue(id, value, formatter) {
-  const node = el(id);
-  if (!node) return;
-
-  const n = Number(value);
-  clearColorClasses(node);
-
-  if (!Number.isFinite(n)) {
-    node.textContent = "--";
-    node.classList.add("neutral-text");
-    return;
+const state = {
+  loggedIn: false,
+  snapshot: {
+    overview: null,
+    coins: {},
+    coinFocus: [],
+    whales: [],
+    whaleSummary: [],
+    stablecoinFlows: [],
+    alerts: [],
+    deepAnalysis: null
   }
+};
 
-  node.textContent = formatter(value);
+const el = {
+  systemStatus: document.getElementById("systemStatus"),
+  lastUpdated: document.getElementById("lastUpdated"),
+  globalBias: document.getElementById("globalBias"),
 
-  if (n > 0) node.classList.add("bullish-text");
-  else if (n < 0) node.classList.add("bearish-text");
-  else node.classList.add("neutral-text");
-}
+  totalMarketCap: document.getElementById("totalMarketCap"),
+  totalVolume24h: document.getElementById("totalVolume24h"),
+  btcDominance: document.getElementById("btcDominance"),
+  fearGreed: document.getElementById("fearGreed"),
 
-function setSignal(id, signal) {
-  const node = el(id);
-  if (!node) return;
+  topSetup: document.getElementById("topSetup"),
+  summaryConfidence: document.getElementById("summaryConfidence"),
+  riskLevel: document.getElementById("riskLevel"),
 
-  const s = String(signal || "WAIT").toUpperCase();
-  node.textContent = s;
-  clearColorClasses(node);
+  coinFocusGrid: document.getElementById("coinFocusGrid"),
+  whaleTableBody: document.getElementById("whaleTableBody"),
+  whaleSummaryGrid: document.getElementById("whaleSummaryGrid"),
+  stablecoinFlowGrid: document.getElementById("stablecoinFlowGrid"),
+  alertsGrid: document.getElementById("alertsGrid"),
+  rawSnapshot: document.getElementById("rawSnapshot"),
 
-  if (s.includes("LONG")) node.classList.add("signal-long");
-  else if (s.includes("SHORT")) node.classList.add("signal-short");
-  else node.classList.add("signal-wait");
-}
+  username: document.getElementById("username"),
+  password: document.getElementById("password"),
+  loginBtn: document.getElementById("loginBtn"),
+  loginState: document.getElementById("loginState"),
+  chatStatus: document.getElementById("chatStatus"),
+  chatMessages: document.getElementById("chatMessages"),
+  chatInput: document.getElementById("chatInput"),
+  sendChatBtn: document.getElementById("sendChatBtn"),
 
-async function getJson(url) {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  askAnalyzeBTC: document.getElementById("askAnalyzeBTC"),
+  askCompareCoins: document.getElementById("askCompareCoins"),
+  askRisk: document.getElementById("askRisk"),
+
+  btcPrice: document.getElementById("btcPrice"),
+  btcSignal: document.getElementById("btcSignal"),
+  btc5m: document.getElementById("btc5m"),
+  btc15m: document.getElementById("btc15m"),
+  btc1h: document.getElementById("btc1h"),
+  btc4h: document.getElementById("btc4h"),
+  btcFunding: document.getElementById("btcFunding"),
+  btcOI: document.getElementById("btcOI"),
+  btcBias: document.getElementById("btcBias"),
+  btcEntry: document.getElementById("btcEntry"),
+  btcSL: document.getElementById("btcSL"),
+  btcTP: document.getElementById("btcTP"),
+
+  ethPrice: document.getElementById("ethPrice"),
+  ethSignal: document.getElementById("ethSignal"),
+  eth5m: document.getElementById("eth5m"),
+  eth15m: document.getElementById("eth15m"),
+  eth1h: document.getElementById("eth1h"),
+  eth4h: document.getElementById("eth4h"),
+  ethFunding: document.getElementById("ethFunding"),
+  ethOI: document.getElementById("ethOI"),
+  ethBias: document.getElementById("ethBias"),
+  ethEntry: document.getElementById("ethEntry"),
+  ethSL: document.getElementById("ethSL"),
+  ethTP: document.getElementById("ethTP"),
+
+  bnbPrice: document.getElementById("bnbPrice"),
+  bnbSignal: document.getElementById("bnbSignal"),
+  bnb5m: document.getElementById("bnb5m"),
+  bnb15m: document.getElementById("bnb15m"),
+  bnb1h: document.getElementById("bnb1h"),
+  bnb4h: document.getElementById("bnb4h"),
+  bnbFunding: document.getElementById("bnbFunding"),
+  bnbOI: document.getElementById("bnbOI"),
+  bnbBias: document.getElementById("bnbBias"),
+  bnbEntry: document.getElementById("bnbEntry"),
+  bnbSL: document.getElementById("bnbSL"),
+  bnbTP: document.getElementById("bnbTP")
+};
+
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`GET ${path} failed: ${res.status}`);
+  }
   return res.json();
 }
 
-async function postJson(url, body) {
-  const res = await fetch(url, {
+async function apiPost(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body || {})
   });
 
   const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    throw new Error(data?.message || `HTTP ${res.status}`);
+    throw new Error(data?.message || `POST ${path} failed: ${res.status}`);
   }
+
   return data;
 }
 
-async function getJsonWithRetry(url, retries = 2, delayMs = 1200) {
-  let lastError = null;
-
-  for (let i = 0; i <= retries; i += 1) {
-    try {
-      return await getJson(url);
-    } catch (err) {
-      lastError = err;
-      if (i < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-  }
-
-  throw lastError;
-}
-function renderOverview(data) {
-  text("systemStatus", data.status || "LIVE");
-  text("lastUpdated", data.lastUpdated || "--");
-  text("globalBias", data.marketBias || "--");
-  text("totalMarketCap", money(data.totalMarketCap));
-  text("totalVolume24h", money(data.totalVolume24h));
-  text(
-    "btcDominance",
-    Number.isFinite(Number(data.btcDominance))
-      ? `${Number(data.btcDominance).toFixed(1)}%`
-      : "--"
-  );
-  text(
-    "fearGreed",
-    Number.isFinite(Number(data.fearGreed))
-      ? String(Math.round(Number(data.fearGreed)))
-      : "--"
-  );
-
-  setColor("systemStatus", "live");
-
-  const bias = String(data.marketBias || "").toLowerCase();
-  if (bias.includes("risk-off") || bias.includes("bear")) setColor("globalBias", "bear");
-  else if (bias.includes("risk-on") || bias.includes("bull")) setColor("globalBias", "bull");
-  else setColor("globalBias", "neutral");
+function formatUsdCompact(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
+  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
+  return `$${n.toFixed(2)}`;
 }
 
-function renderSummaryFromCoinFocus(list) {
-  const first = Array.isArray(list) && list.length ? list[0] : null;
-
-  text("topSetup", first ? `${first.symbol} / ${first.setupDirection}` : "--");
-  text(
-    "summaryConfidence",
-    first && Number.isFinite(Number(first.confidenceScore))
-      ? `${first.confidenceScore}%`
-      : "--"
-  );
-
-  let risk = "Medium";
-  if (first) {
-    if (Number(first.liquidityRisk) >= 70) risk = "High";
-    else if (Number(first.liquidityRisk) <= 40) risk = "Low";
-  }
-
-  text("riskLevel", risk);
-
-  if (risk === "High") setColor("riskLevel", "bear");
-  else if (risk === "Low") setColor("riskLevel", "bull");
-  else setColor("riskLevel", "neutral");
+function formatMaybe(value, fallback = "--") {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
 }
 
-function renderCoin(prefix, coin) {
-  const signal = String(coin.signal || "WAIT").toUpperCase();
-
-  text(`${prefix}Price`, money(coin.price));
-  setSignedValue(`${prefix}5m`, coin.change5m, pct);
-  setSignedValue(`${prefix}15m`, coin.change15m, pct);
-  setSignedValue(`${prefix}1h`, coin.change1h, pct);
-  setSignedValue(`${prefix}4h`, coin.change4h, pct);
-  setSignedValue(`${prefix}Funding`, coin.funding, (v) => `${Number(v).toFixed(3)}%`);
-
-  text(`${prefix}OI`, money(coin.oi));
-  text(`${prefix}Bias`, coin.bias || "--");
-  text(`${prefix}Entry`, money(coin.entry));
-  text(`${prefix}SL`, money(coin.sl));
-  text(`${prefix}TP`, money(coin.tp));
-
-  setSignal(`${prefix}Signal`, signal);
-
-  const biasText = String(coin.bias || "").toLowerCase();
-  if (biasText.includes("bull")) setColor(`${prefix}Bias`, "bull");
-  else if (biasText.includes("bear")) setColor(`${prefix}Bias`, "bear");
-  else setColor(`${prefix}Bias`, "neutral");
-
-  if (signal.includes("LONG")) {
-    setColor(`${prefix}TP`, "bull");
-    setColor(`${prefix}SL`, "bear");
-  } else if (signal.includes("SHORT")) {
-    setColor(`${prefix}TP`, "bear");
-    setColor(`${prefix}SL`, "bull");
-  } else {
-    setColor(`${prefix}TP`, "neutral");
-    setColor(`${prefix}SL`, "neutral");
-  }
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
-function renderCoinFocus(list) {
-  const wrap = el("coinFocusGrid");
-  if (!wrap) return;
+function getSignalClass(signal) {
+  const s = String(signal || "").toUpperCase();
+  if (s.includes("LONG")) return "signal-long";
+  if (s.includes("SHORT")) return "signal-short";
+  return "signal-wait";
+}
 
-  if (!Array.isArray(list) || list.length === 0) {
-    wrap.innerHTML = `
-      <div class="stat-card">
-        <span>No coin focus data</span>
-        <strong>--</strong>
-      </div>
-    `;
+function getSignedClass(value) {
+  const text = String(value || "");
+  if (text.startsWith("+")) return "pos";
+  if (text.startsWith("-")) return "neg";
+  return "flat";
+}
+function renderWhales() {
+  if (!el.whaleTableBody) return;
+
+  const rows = Array.isArray(state.snapshot.whales) ? state.snapshot.whales : [];
+
+  if (!rows.length) {
+    setHtml(
+      el.whaleTableBody,
+      `
+        <tr>
+          <td colspan="13">No whale feed data</td>
+        </tr>
+      `
+    );
     return;
   }
 
-  wrap.innerHTML = list
-    .map((coin) => {
-      const scoreClass =
-        Number(coin.finalSetupScore) >= 65
-          ? "bullish-text"
-          : Number(coin.finalSetupScore) <= 40
-          ? "bearish-text"
-          : "neutral-text";
-
-      const liquidityClass =
-        String(coin.liquiditySignal || "").toLowerCase().includes("clean")
-          ? "bullish-text"
-          : String(coin.liquiditySignal || "").toLowerCase().includes("risk")
-          ? "bearish-text"
-          : "neutral-text";
-
-      return `
-        <article class="coin-focus-card">
-          <div class="coin-focus-top">
-            <div>
-              <h3>${escapeHtml(coin.symbol || "--")}</h3>
-              <p>${escapeHtml(coin.setupDirection || "--")}</p>
-            </div>
-            <div class="coin-focus-price">${escapeHtml(coin.price || "--")}</div>
-          </div>
-
-          <div class="coin-focus-score-row">
-            <div class="metric-chip">
-              <span>Setup Score</span>
-              <strong class="${scoreClass}">${escapeHtml(String(coin.finalSetupScore ?? "--"))}</strong>
-            </div>
-            <div class="metric-chip">
-              <span>Confidence</span>
-              <strong>${escapeHtml(String(coin.confidenceScore ?? "--"))}%</strong>
-            </div>
-            <div class="metric-chip">
-              <span>Liquidity</span>
-              <strong class="${liquidityClass}">${escapeHtml(coin.liquiditySignal || "--")}</strong>
-            </div>
-          </div>
-
-          <div class="coin-focus-mini-grid">
-            <div><span>Trend</span><strong>${escapeHtml(coin.trendState || "--")}</strong></div>
-            <div><span>Bias</span><strong>${escapeHtml(coin.bias || "--")}</strong></div>
-            <div><span>Whales</span><strong>${escapeHtml(coin.longShortContext || "--")}</strong></div>
-            <div><span>Funding</span><strong>${escapeHtml(coin.funding || "--")}</strong></div>
-            <div><span>OI</span><strong>${escapeHtml(coin.oi || "--")}</strong></div>
-            <div><span>Pending</span><strong>${escapeHtml(String(coin.pendingOrders ?? "--"))}</strong></div>
-            <div><span>5m</span><strong>${escapeHtml(coin.change5m || "--")}</strong></div>
-            <div><span>1h</span><strong>${escapeHtml(coin.change1h || "--")}</strong></div>
-            <div><span>Entry</span><strong>${escapeHtml(coin.entry || "--")}</strong></div>
-            <div><span>SL</span><strong>${escapeHtml(coin.sl || "--")}</strong></div>
-            <div><span>TP</span><strong>${escapeHtml(coin.tp || "--")}</strong></div>
-            <div><span>Macro</span><strong>${escapeHtml(coin.macroSentiment || "--")}</strong></div>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function renderWhales(rows) {
-  const tbody = el("whaleTableBody");
-  if (!tbody) return;
-
-  if (!Array.isArray(rows) || rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13">No whale data</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows
+  const html = rows
     .map((row) => {
-      const action = String(row.action || "--");
-      const cls = action.toLowerCase().includes("long")
-        ? "whale-long"
-        : action.toLowerCase().includes("short")
-        ? "whale-short"
-        : "";
+      const actionClass = String(row.action || "").toLowerCase().includes("short")
+        ? "neg"
+        : String(row.action || "").toLowerCase().includes("long")
+        ? "pos"
+        : "flat";
 
       return `
         <tr>
-          <td class="whale-address-cell">
-            <a
-              class="whale-address-link"
-              href="${row.explorerUrl || "#"}"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="${escapeHtml(row.address || "--")}"
-            >${escapeHtml(shortAddr(row.address))}</a>
+          <td>
+            <a href="${escapeHtml(row.explorerUrl || "#")}" target="_blank" rel="noreferrer">
+              ${escapeHtml(row.address || "--")}
+            </a>
           </td>
           <td>${escapeHtml(row.symbol || "--")}</td>
-          <td class="${cls}">${escapeHtml(action)}</td>
+          <td class="${actionClass}">${escapeHtml(row.action || "--")}</td>
           <td>${escapeHtml(row.position || "--")}</td>
           <td>${escapeHtml(row.price || "--")}</td>
           <td>${escapeHtml(row.entry || "--")}</td>
@@ -349,355 +354,411 @@ function renderWhales(rows) {
       `;
     })
     .join("");
-}
-function renderWhaleSummary(list) {
-  const wrap = el("whaleSummaryGrid");
-  if (!wrap) return;
 
-  if (!Array.isArray(list) || list.length === 0) {
-    wrap.innerHTML = `
-      <div class="stat-card">
-        <span>No whale summary</span>
-        <strong>--</strong>
-      </div>
-    `;
+  setHtml(el.whaleTableBody, html);
+}
+
+function renderWhaleSummary() {
+  if (!el.whaleSummaryGrid) return;
+
+  const items = Array.isArray(state.snapshot.whaleSummary)
+    ? state.snapshot.whaleSummary
+    : [];
+
+  if (!items.length) {
+    setHtml(
+      el.whaleSummaryGrid,
+      `
+        <div class="stat-card">
+          <span>Whale summary unavailable</span>
+          <strong>--</strong>
+        </div>
+      `
+    );
     return;
   }
 
-  wrap.innerHTML = list
+  const html = items
     .map((item) => {
-      const bias = String(item.netBias || "Mixed");
       const biasClass =
-        bias === "Long Dominant"
-          ? "bullish-text"
-          : bias === "Short Dominant"
-          ? "bearish-text"
-          : "neutral-text";
+        String(item.netBias || "").toLowerCase().includes("long")
+          ? "pos"
+          : String(item.netBias || "").toLowerCase().includes("short")
+          ? "neg"
+          : "flat";
 
       return `
         <article class="summary-card">
-          <div class="summary-card-head">
+          <div class="summary-card-top">
             <h3>${escapeHtml(item.symbol || "--")}</h3>
-            <strong class="${biasClass}">${escapeHtml(bias)}</strong>
+            <strong class="${biasClass}">${escapeHtml(item.netBias || "--")}</strong>
           </div>
 
           <div class="summary-card-grid">
-            <div><span>Whales</span><strong>${escapeHtml(String(item.whaleCount ?? "--"))}</strong></div>
-            <div><span>Open Long</span><strong>${escapeHtml(item.openLongUsd || "--")}</strong></div>
-            <div><span>Open Short</span><strong>${escapeHtml(item.openShortUsd || "--")}</strong></div>
-            <div><span>Avg Long</span><strong>${escapeHtml(item.avgLongEntry || "--")}</strong></div>
-            <div><span>Avg Short</span><strong>${escapeHtml(item.avgShortEntry || "--")}</strong></div>
-            <div><span>Avg TP</span><strong>${escapeHtml(item.avgTp || "--")}</strong></div>
-            <div><span>Avg SL</span><strong>${escapeHtml(item.avgSl || "--")}</strong></div>
-            <div><span>Pending</span><strong>${escapeHtml(String(item.pendingOrders ?? "--"))}</strong></div>
+            ${buildMetricBox("Whales", item.whaleCount)}
+            ${buildMetricBox("Open Long", item.openLongUsd)}
+            ${buildMetricBox("Open Short", item.openShortUsd)}
+            ${buildMetricBox("Avg Long", item.avgLongEntry)}
+            ${buildMetricBox("Avg Short", item.avgShortEntry)}
+            ${buildMetricBox("Avg TP", item.avgTp)}
+            ${buildMetricBox("Avg SL", item.avgSl)}
+            ${buildMetricBox("Pending", item.pendingOrders)}
           </div>
         </article>
       `;
     })
     .join("");
+
+  setHtml(el.whaleSummaryGrid, html);
 }
 
-function renderStablecoinFlows(list) {
-  const wrap = el("stablecoinFlowGrid");
-  if (!wrap) return;
+function renderStablecoinFlows() {
+  if (!el.stablecoinFlowGrid) return;
 
-  if (!Array.isArray(list) || list.length === 0) {
-    wrap.innerHTML = `
-      <div class="stat-card">
-        <span>No stablecoin flow</span>
-        <strong>--</strong>
-      </div>
-    `;
+  const items = Array.isArray(state.snapshot.stablecoinFlows)
+    ? state.snapshot.stablecoinFlows
+    : [];
+
+  if (!items.length) {
+    setHtml(
+      el.stablecoinFlowGrid,
+      `
+        <div class="stat-card">
+          <span>Stablecoin flow unavailable</span>
+          <strong>Disabled until real provider</strong>
+        </div>
+      `
+    );
     return;
   }
 
-  wrap.innerHTML = list
+  const html = items
     .map((item) => {
-      const netText = String(item.netFlow || "--");
-      const netClass = netText.startsWith("-") ? "bearish-text" : "bullish-text";
+      const netClass = String(item.netFlow || "").startsWith("-") ? "neg" : "pos";
 
       return `
         <article class="summary-card">
-          <div class="summary-card-head">
+          <div class="summary-card-top">
             <h3>${escapeHtml(item.symbol || "--")}</h3>
-            <strong class="${netClass}">${escapeHtml(netText)}</strong>
+            <strong class="${netClass}">${escapeHtml(item.netFlow || "--")}</strong>
           </div>
 
           <div class="summary-card-grid">
-            <div><span>Inflow</span><strong>${escapeHtml(item.exchangeInflow || "--")}</strong></div>
-            <div><span>Outflow</span><strong>${escapeHtml(item.exchangeOutflow || "--")}</strong></div>
+            ${buildMetricBox("Inflow", item.exchangeInflow)}
+            ${buildMetricBox("Outflow", item.exchangeOutflow)}
           </div>
 
-          <p class="summary-card-note">${escapeHtml(item.interpretation || "--")}</p>
+          <p class="summary-card-note">${escapeHtml(item.interpretation || "")}</p>
         </article>
       `;
     })
     .join("");
+
+  setHtml(el.stablecoinFlowGrid, html);
 }
 
-function renderAlerts(list) {
-  const wrap = el("alertsGrid");
-  if (!wrap) return;
+function renderAlerts() {
+  if (!el.alertsGrid) return;
 
-  if (!Array.isArray(list) || list.length === 0) {
-    wrap.innerHTML = `
-      <div class="stat-card">
-        <span>No alerts</span>
-        <strong>--</strong>
-      </div>
-    `;
+  const items = Array.isArray(state.snapshot.alerts) ? state.snapshot.alerts : [];
+
+  if (!items.length) {
+    setHtml(
+      el.alertsGrid,
+      `
+        <div class="stat-card">
+          <span>No alerts</span>
+          <strong>--</strong>
+        </div>
+      `
+    );
     return;
   }
 
-  wrap.innerHTML = list
+  const html = items
     .map((item) => {
-      const type = String(item.type || "").toLowerCase();
-      const typeClass =
-        type === "opportunity"
-          ? "alert-opportunity"
-          : type === "flow"
-          ? "alert-flow"
-          : "alert-risk";
+      const type = String(item.type || "system").toLowerCase();
 
       return `
-        <article class="alert-card ${typeClass}">
+        <article class="alert-card alert-${escapeHtml(type)}">
           <div class="alert-card-top">
-            <span class="alert-type">${escapeHtml(item.type || "--")}</span>
+            <span class="alert-type">${escapeHtml(type.toUpperCase())}</span>
             <strong>${escapeHtml(item.symbol || "--")}</strong>
           </div>
           <h3>${escapeHtml(item.title || "--")}</h3>
-          <p>${escapeHtml(item.detail || "--")}</p>
+          <p>${escapeHtml(item.detail || "")}</p>
         </article>
       `;
     })
     .join("");
+
+  setHtml(el.alertsGrid, html);
 }
 
-function hideRawPanel() {
-  const rawPanel = el("rawPanel");
-  if (rawPanel) rawPanel.style.display = "none";
-}
+function renderRawSnapshot() {
+  if (!el.rawSnapshot) return;
 
-function bindTabs() {
-  const map = {
-    overview: "overviewSection",
-    "coin focus": "coinFocusSection",
-    whales: "whalesSection",
-    alerts: "alertsSection",
-    "ai chat": "aiChatPanel"
+  const payload = {
+    overview: state.snapshot.overview,
+    coins: state.snapshot.coins,
+    coinFocus: state.snapshot.coinFocus,
+    whales: state.snapshot.whales,
+    whaleSummary: state.snapshot.whaleSummary,
+    stablecoinFlows: state.snapshot.stablecoinFlows,
+    alerts: state.snapshot.alerts,
+    deepAnalysis: state.snapshot.deepAnalysis
   };
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.onclick = function () {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
+  el.rawSnapshot.textContent = JSON.stringify(payload, null, 2);
+}
+function addChatMessage(role, message) {
+  if (!el.chatMessages) return;
 
-      const key = String(btn.textContent || "").trim().toLowerCase();
-      const targetId = map[key];
-      if (!targetId) return;
+  const row = document.createElement("div");
+  row.className = `chat-row ${role === "user" ? "chat-row-user" : "chat-row-ai"}`;
 
-      const target = el(targetId);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
+  const bubble = document.createElement("div");
+  bubble.className = `chat-bubble ${role === "user" ? "chat-bubble-user" : "chat-bubble-ai"}`;
+  bubble.textContent = String(message || "");
+
+  row.appendChild(bubble);
+  el.chatMessages.appendChild(row);
+  el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
+}
+
+function updateChatUi() {
+  if (el.chatStatus) {
+    el.chatStatus.textContent = state.loggedIn ? "Unlocked" : "Locked";
+    el.chatStatus.classList.remove("locked", "unlocked");
+    el.chatStatus.classList.add(state.loggedIn ? "unlocked" : "locked");
+  }
+
+  if (el.loginState) {
+    el.loginState.textContent = state.loggedIn ? "Logged in" : "Owner-only analysis";
+  }
+
+  if (el.chatInput) {
+    el.chatInput.disabled = !state.loggedIn;
+    el.chatInput.placeholder = state.loggedIn
+      ? "Ask about BTC, ETH, BNB, risk, setup, execution..."
+      : "Login first to use AI chat...";
+  }
+
+  if (el.sendChatBtn) {
+    el.sendChatBtn.disabled = !state.loggedIn;
+  }
+}
+
+function buildChatSnapshot() {
+  return JSON.stringify({
+    overview: state.snapshot.overview,
+    coins: state.snapshot.coins,
+    coinFocus: state.snapshot.coinFocus,
+    whales: state.snapshot.whales,
+    alerts: state.snapshot.alerts
   });
 }
 
-function addChatMessage(role, content) {
-  const wrap = el("chatMessages");
-  if (!wrap) return;
-
-  const rowClass = role === "user" ? "chat-row-user" : "chat-row-ai";
-  const bubbleClass = role === "user" ? "chat-bubble-user" : "chat-bubble-ai";
-
-  const row = document.createElement("div");
-  row.className = `chat-row ${rowClass}`;
-  row.innerHTML = `<div class="chat-bubble ${bubbleClass}">${escapeHtml(content)}</div>`;
-
-  wrap.appendChild(row);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-function setChatLockedState(locked) {
-  const chatInput = el("chatInput");
-  const sendBtn = el("sendChatBtn");
-  const chatStatus = el("chatStatus");
-
-  if (chatInput) {
-    chatInput.disabled = locked;
-    chatInput.placeholder = locked
-      ? "Login first to use AI chat..."
-      : "Ask about BTC, ETH, BNB, risk, compare, entries...";
-  }
-
-  if (sendBtn) sendBtn.disabled = locked;
-
-  if (chatStatus) {
-    chatStatus.textContent = locked ? "Locked" : "Unlocked";
-    chatStatus.classList.toggle("locked", locked);
-    chatStatus.classList.toggle("unlocked", !locked);
-  }
-
-  text("loginState", locked ? "Owner-only analysis" : "Logged in");
-}
-
-function renderAll(data) {
-  renderOverview(data.overview);
-  renderSummaryFromCoinFocus(data.coinFocus);
-  renderCoin("btc", data.btc);
-  renderCoin("eth", data.eth);
-  renderCoin("bnb", data.bnb);
-  renderCoinFocus(data.coinFocus);
-  renderWhales(data.whales);
-  renderWhaleSummary(data.whaleSummary);
-  renderStablecoinFlows(data.stablecoinFlows);
-  renderAlerts(data.alerts);
-  hideRawPanel();
-}
-async function loadDashboard() {
-  const [overview, btc, eth, bnb, coinFocus, whales, whaleSummary, stablecoinFlows, alerts] =
-    await Promise.all([
-      getJsonWithRetry(`${API_BASE}/api/overview?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/coin/btc?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/coin/eth?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/coin/bnb?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/coin-focus?limit=12&v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/whales-mixed?limit=20&v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/whales-summary?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/stablecoin-flows?v=1000`),
-      getJsonWithRetry(`${API_BASE}/api/alerts?v=1000`)
-    ]);
-
-  const data = {
-    overview,
-    btc,
-    eth,
-    bnb,
-    coinFocus,
-    whales,
-    whaleSummary,
-    stablecoinFlows,
-    alerts
-  };
-
-  lastGoodData = data;
-  renderAll(data);
-}
-
-async function refreshDashboard() {
-  try {
-    await loadDashboard();
-  } catch (err) {
-    console.error("refresh error:", err);
-
-    if (lastGoodData) {
-      renderAll(lastGoodData);
-      text("systemStatus", "LIVE");
-      setColor("systemStatus", "live");
-    } else {
-      text("systemStatus", "ERROR");
-      setColor("systemStatus", "error");
-    }
-  }
-}
-
 async function handleLogin() {
-  const username = el("username")?.value || "";
-  const password = el("password")?.value || "";
-
   try {
-    await postJson(`${API_BASE}/api/login`, { username, password });
-    isLoggedIn = true;
-    setChatLockedState(false);
+    const username = el.username ? el.username.value : "";
+    const password = el.password ? el.password.value : "";
+
+    await apiPost("/login", { username, password });
+
+    state.loggedIn = true;
+    updateChatUi();
     addChatMessage("ai", "Login successful. AI chat unlocked.");
   } catch (err) {
-    isLoggedIn = false;
-    setChatLockedState(true);
-    addChatMessage("ai", `Login failed: ${err.message}`);
+    state.loggedIn = false;
+    updateChatUi();
+    addChatMessage("ai", err.message || "Login failed.");
   }
 }
 
-async function handleSendChat(customQuestion = "") {
-  if (!isLoggedIn) return;
+async function handleSendChat(prefilledQuestion = "") {
+  if (!state.loggedIn) return;
 
-  const chatInput = el("chatInput");
-  const question = String(customQuestion || chatInput?.value || "").trim();
+  const question = String(
+    prefilledQuestion || (el.chatInput ? el.chatInput.value : "")
+  ).trim();
+
   if (!question) return;
 
   addChatMessage("user", question);
-  if (chatInput && !customQuestion) chatInput.value = "";
+
+  if (el.chatInput && !prefilledQuestion) {
+    el.chatInput.value = "";
+  }
 
   try {
-    const payload = {
+    const data = await apiPost("/chat", {
       question,
-      snapshot: JSON.stringify({
-        overview: lastGoodData?.overview || null,
-        coins: {
-          btc: lastGoodData?.btc || null,
-          eth: lastGoodData?.eth || null,
-          bnb: lastGoodData?.bnb || null
-        },
-        whales: lastGoodData?.whales || [],
-        coinFocus: lastGoodData?.coinFocus || [],
-        alerts: lastGoodData?.alerts || []
-      })
-    };
+      snapshot: buildChatSnapshot()
+    });
 
-    const res = await postJson(`${API_BASE}/api/chat`, payload);
-    addChatMessage("ai", res?.reply || "No reply");
+    addChatMessage("ai", data?.reply || "No reply.");
   } catch (err) {
-    addChatMessage("ai", `Chat error: ${err.message}`);
+    addChatMessage("ai", err.message || "Chat request failed.");
   }
 }
 
-function bindChat() {
-  const loginBtn = el("loginBtn");
-  const sendBtn = el("sendChatBtn");
-  const askAnalyzeBTC = el("askAnalyzeBTC");
-  const askCompareCoins = el("askCompareCoins");
-  const askRisk = el("askRisk");
-  const chatInput = el("chatInput");
-
-  if (loginBtn) loginBtn.onclick = handleLogin;
-  if (sendBtn) sendBtn.onclick = () => handleSendChat();
-
-  if (askAnalyzeBTC) {
-    askAnalyzeBTC.onclick = () => handleSendChat("Analyze BTC setup now");
+function bindChatEvents() {
+  if (el.loginBtn) {
+    el.loginBtn.addEventListener("click", handleLogin);
   }
 
-  if (askCompareCoins) {
-    askCompareCoins.onclick = () => handleSendChat("Compare BTC ETH and BNB now");
+  if (el.sendChatBtn) {
+    el.sendChatBtn.addEventListener("click", () => handleSendChat());
   }
 
-  if (askRisk) {
-    askRisk.onclick = () => handleSendChat("What is the current market risk");
-  }
-
-  if (chatInput) {
-    chatInput.addEventListener("keydown", (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+  if (el.chatInput) {
+    el.chatInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
         handleSendChat();
       }
     });
   }
 
-  setChatLockedState(true);
+  if (el.askAnalyzeBTC) {
+    el.askAnalyzeBTC.addEventListener("click", () => {
+      handleSendChat("ช่วยวิเคราะห์ BTC แบบลึกจากข้อมูลจริงตอนนี้");
+    });
+  }
+
+  if (el.askCompareCoins) {
+    el.askCompareCoins.addEventListener("click", () => {
+      handleSendChat("ช่วยเปรียบเทียบ BTC ETH และ BNB ตอนนี้ เหรียญไหนน่าสนใจกว่า");
+    });
+  }
+
+  if (el.askRisk) {
+    el.askRisk.addEventListener("click", () => {
+      handleSendChat("ช่วยสรุประดับความเสี่ยงของตลาดตอนนี้");
+    });
+  }
+
+  updateChatUi();
 }
 
-async function startDashboard() {
-  if (started) return;
-  started = true;
+function bindTabs() {
+  const map = {
+    Overview: "overviewSection",
+    "Coin Focus": "coinFocusSection",
+    Whales: "whalesSection",
+    Alerts: "alertsSection",
+    "AI Chat": "aiChatPanel"
+  };
 
+  const buttons = document.querySelectorAll(".tab-btn");
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const label = String(btn.textContent || "").trim();
+      const targetId = map[label];
+      const target = targetId ? document.getElementById(targetId) : null;
+
+      if (target) {
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }
+    });
+  });
+}
+
+function renderAll() {
+  renderOverview();
+  renderSummary();
+  renderCoinSnapshots();
+  renderCoinFocus();
+  renderWhales();
+  renderWhaleSummary();
+  renderStablecoinFlows();
+  renderAlerts();
+  renderRawSnapshot();
+}
+async function loadOverview() {
+  state.snapshot.overview = await apiGet("/overview?v=1600");
+}
+
+async function loadCoins() {
+  const [btc, eth, bnb] = await Promise.all([
+    apiGet("/coin/btc?v=1600"),
+    apiGet("/coin/eth?v=1600"),
+    apiGet("/coin/bnb?v=1600")
+  ]);
+
+  state.snapshot.coins = { btc, eth, bnb };
+}
+
+async function loadCoinFocus() {
+  state.snapshot.coinFocus = await apiGet("/coin-focus?limit=12&v=1600");
+}
+
+async function loadWhaleBlocks() {
+  const [whales, whaleSummary, stablecoinFlows] = await Promise.all([
+    apiGet("/whales-mixed?limit=20&v=1600"),
+    apiGet("/whales-summary?v=1600"),
+    apiGet("/stablecoin-flows?v=1600")
+  ]);
+
+  state.snapshot.whales = Array.isArray(whales) ? whales : [];
+  state.snapshot.whaleSummary = Array.isArray(whaleSummary) ? whaleSummary : [];
+  state.snapshot.stablecoinFlows = Array.isArray(stablecoinFlows) ? stablecoinFlows : [];
+}
+
+async function loadAlerts() {
+  state.snapshot.alerts = await apiGet("/alerts?v=1600");
+}
+
+async function loadDeepAnalysis() {
+  state.snapshot.deepAnalysis = await apiGet("/analysis/deep?v=1600");
+}
+
+async function refreshDashboard() {
+  try {
+    await Promise.all([
+      loadOverview(),
+      loadCoins(),
+      loadCoinFocus(),
+      loadWhaleBlocks(),
+      loadAlerts(),
+      loadDeepAnalysis()
+    ]);
+
+    renderAll();
+
+    if (el.lastUpdated) {
+      el.lastUpdated.textContent = formatTimestamp(new Date());
+    }
+  } catch (err) {
+    console.error("refreshDashboard failed:", err);
+    addChatMessage("ai", `Dashboard refresh failed: ${err.message || err}`);
+  }
+}
+
+function startAutoRefresh() {
+  setInterval(() => {
+    refreshDashboard();
+  }, REFRESH_MS);
+}
+
+function initDashboard() {
   bindTabs();
-  bindChat();
-  hideRawPanel();
-
-  await refreshDashboard();
-
-  refreshTimer = setInterval(refreshDashboard, 30000);
+  bindChatEvents();
+  renderAll();
+  refreshDashboard();
+  startAutoRefresh();
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startDashboard, { once: true });
+  document.addEventListener("DOMContentLoaded", initDashboard);
 } else {
-  startDashboard();
+  initDashboard();
 }
