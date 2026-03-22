@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = "https://titan-ai-api.onrender.com/api";
 const REFRESH_MS = 30000;
 
 const state = {
