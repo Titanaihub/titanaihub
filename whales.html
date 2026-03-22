@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>Titan AI Hub - All Whales</title>
+  <link rel="stylesheet" href="./styles.css?v=800" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">T</div>
+        <div class="brand-text">
+          <h1>Whale Monitor</h1>
+          <p>Paginated whale activity and order flow explorer</p>
+        </div>
+      </div>
+
+      <div class="topbar-metrics">
+        <div class="mini-stat">
+          <span>Status</span>
+          <strong id="whalePageStatus">LIVE</strong>
+        </div>
+        <div class="mini-stat">
+          <span>Total Rows</span>
+          <strong id="totalRows">--</strong>
+        </div>
+        <div class="mini-stat">
+          <span>Current Page</span>
+          <strong id="currentPageText">--</strong>
+        </div>
+      </div>
+    </header>
+
+    <nav class="top-tabs">
+      <a class="tab-btn" href="./index.html?v=800">Overview</a>
+      <a class="tab-btn active" href="./whales.html?v=800">All Whales</a>
+    </nav>
+
+    <main class="main-grid">
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Whale Filters</h2>
+            <p>Filter all whale records across symbols, direction and status</p>
+          </div>
+        </div>
+
+        <div class="whale-filters-grid">
+          <div class="filter-box">
+            <label for="filterSymbol">Symbol</label>
+            <select id="filterSymbol" class="input">
+              <option value="">All Symbols</option>
+              <option value="BTC">BTC</option>
+              <option value="ETH">ETH</option>
+              <option value="BNB">BNB</option>
+              <option value="SOL">SOL</option>
+              <option value="XRP">XRP</option>
+              <option value="DOGE">DOGE</option>
+              <option value="PEPE">PEPE</option>
+              <option value="WIF">WIF</option>
+              <option value="BONK">BONK</option>
+              <option value="FLOKI">FLOKI</option>
+              <option value="SHIB">SHIB</option>
+            </select>
+          </div>
+
+          <div class="filter-box">
+            <label for="filterSide">Side</label>
+            <select id="filterSide" class="input">
+              <option value="">All Sides</option>
+              <option value="LONG">LONG</option>
+              <option value="SHORT">SHORT</option>
+            </select>
+          </div>
+
+          <div class="filter-box">
+            <label for="filterStatus">Status</label>
+            <select id="filterStatus" class="input">
+              <option value="">All Status</option>
+              <option value="OPEN">OPEN</option>
+              <option value="CLOSED">CLOSED</option>
+            </select>
+          </div>
+
+          <div class="filter-box">
+            <label for="filterChain">Chain</label>
+            <select id="filterChain" class="input">
+              <option value="">All Chains</option>
+              <option value="btc">btc</option>
+              <option value="eth">eth</option>
+              <option value="bsc">bsc</option>
+              <option value="sol">sol</option>
+              <option value="xrp">xrp</option>
+              <option value="doge">doge</option>
+            </select>
+          </div>
+
+          <div class="filter-box">
+            <label for="filterLimit">Rows per page</label>
+            <select id="filterLimit" class="input">
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-action-row">
+          <button id="applyFiltersBtn" class="btn btn-primary" type="button">Apply Filters</button>
+          <button id="clearFiltersBtn" class="btn btn-secondary" type="button">Clear</button>
+          <a class="btn btn-secondary" href="./index.html?v=800">Back to Dashboard</a>
+        </div>
+      </section>
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Pagination</h2>
+            <p>Browse all whale records page by page</p>
+          </div>
+        </div>
+
+        <div class="pagination-toolbar">
+          <button id="prevPageBtn" class="btn btn-secondary" type="button">Previous</button>
+          <div class="pagination-meta">
+            <strong id="pageIndicator">Page -- / --</strong>
+            <span id="pageDetails">Showing --</span>
+          </div>
+          <button id="nextPageBtn" class="btn btn-secondary" type="button">Next</button>
+        </div>
+      </section>
+
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>All Whale Records</h2>
+            <p>Full whale list with price, entry, exit, TP, SL and pending orders</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table whale-detail-table">
+            <thead>
+              <tr>
+                <th>Address</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Position</th>
+                <th>Price</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>TP</th>
+                <th>SL</th>
+                <th>Status</th>
+                <th>Side</th>
+                <th>Pending Type</th>
+                <th>Pending Price</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="allWhalesTableBody">
+              <tr>
+                <td colspan="14">Loading whales...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script>
+    (function () {
+      const API_BASE = window.location.origin;
+      let currentPage = 1;
+
+      function byId(id) {
+        return document.getElementById(id);
+      }
+
+      function getFilters() {
+        return {
+          symbol: byId("filterSymbol").value,
+          side: byId("filterSide").value,
+          status: byId("filterStatus").value,
+          chain: byId("filterChain").value,
+          limit: byId("filterLimit").value || "20"
+        };
+      }
+
+      function setText(id, value) {
+        const el = byId(id);
+        if (el) el.textContent = value;
+      }
+
+      function buildUrl(page) {
+        const filters = getFilters();
+        const params = new URLSearchParams();
+        params.set("meta", "1");
+        params.set("page", String(page));
+        params.set("limit", String(filters.limit));
+        params.set("v", "800");
+
+        if (filters.symbol) params.set("symbol", filters.symbol);
+        if (filters.side) params.set("side", filters.side);
+        if (filters.status) params.set("status", filters.status);
+        if (filters.chain) params.set("chain", filters.chain);
+
+        return `${API_BASE}/api/whales?${params.toString()}`;
+      }
+
+      async function getJson(url) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+      }
+
+      function renderRows(items) {
+        const tbody = byId("allWhalesTableBody");
+        if (!tbody) return;
+
+        if (!Array.isArray(items) || items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="14">No whale records found</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = items.map((row) => {
+          const action = String(row.action || "--");
+          const status = String(row.status || "--");
+          const side = String(row.side || "--");
+
+          const actionClass = action.toLowerCase().includes("long")
+            ? "whale-long"
+            : action.toLowerCase().includes("short")
+            ? "whale-short"
+            : "";
+
+          const statusClass = status === "OPEN"
+            ? "whale-long"
+            : status === "CLOSED"
+            ? "neutral-text"
+            : "";
+
+          const sideClass = side === "LONG"
+            ? "whale-long"
+            : side === "SHORT"
+            ? "whale-short"
+            : "";
+
+          return `
+            <tr>
+              <td>
+                <a
+                  class="whale-address-link"
+                  href="${row.explorerUrl || "#"}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="${row.address || "--"}"
+                >${row.address || "--"}</a>
+              </td>
+              <td>${row.symbol || "--"}</td>
+              <td class="${actionClass}">${action}</td>
+              <td>${row.position || "--"}</td>
+              <td>${row.price || "--"}</td>
+              <td>${row.entry || "--"}</td>
+              <td>${row.exit || "--"}</td>
+              <td>${row.tp || "--"}</td>
+              <td>${row.sl || "--"}</td>
+              <td class="${statusClass}">${status}</td>
+              <td class="${sideClass}">${side}</td>
+              <td>${row.pendingType || "--"}</td>
+              <td>${row.pendingPrice || "--"}</td>
+              <td>${row.time || "--"}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+      function renderMeta(data) {
+        const pagination = data.pagination || {};
+        const total = Number(pagination.total || 0);
+        const page = Number(pagination.page || 1);
+        const totalPages = Number(pagination.totalPages || 1);
+        const limit = Number(pagination.limit || 20);
+
+        currentPage = page;
+
+        setText("totalRows", total);
+        setText("currentPageText", `${page}/${totalPages}`);
+        setText("pageIndicator", `Page ${page} / ${totalPages}`);
+
+        const start = total === 0 ? 0 : (page - 1) * limit + 1;
+        const end = Math.min(page * limit, total);
+        setText("pageDetails", `Showing ${start}-${end} of ${total}`);
+
+        const prevBtn = byId("prevPageBtn");
+        const nextBtn = byId("nextPageBtn");
+
+        if (prevBtn) prevBtn.disabled = !pagination.hasPrevPage;
+        if (nextBtn) nextBtn.disabled = !pagination.hasNextPage;
+      }
+
+      async function loadPage(page) {
+        try {
+          const data = await getJson(buildUrl(page));
+          renderRows(data.items || []);
+          renderMeta(data);
+          setText("whalePageStatus", "LIVE");
+        } catch (err) {
+          console.error("load whales failed:", err);
+          setText("whalePageStatus", "ERROR");
+
+          const tbody = byId("allWhalesTableBody");
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="14">Load error</td></tr>`;
+          }
+        }
+      }
+
+      function applyFilters() {
+        currentPage = 1;
+        loadPage(1);
+      }
+
+      function clearFilters() {
+        byId("filterSymbol").value = "";
+        byId("filterSide").value = "";
+        byId("filterStatus").value = "";
+        byId("filterChain").value = "";
+        byId("filterLimit").value = "20";
+        currentPage = 1;
+        loadPage(1);
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        byId("applyFiltersBtn").addEventListener("click", applyFilters);
+        byId("clearFiltersBtn").addEventListener("click", clearFilters);
+
+        byId("prevPageBtn").addEventListener("click", function () {
+          if (currentPage > 1) loadPage(currentPage - 1);
+        });
+
+        byId("nextPageBtn").addEventListener("click", function () {
+          loadPage(currentPage + 1);
+        });
+
+        loadPage(1);
+      });
+    })();
+  </script>
+</body>
+</html>
