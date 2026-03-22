@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Titan AI Hub</title>
-  <link rel="stylesheet" href="./styles.css?v=600" />
+  <link rel="stylesheet" href="./styles.css?v=1000" />
 </head>
 <body>
   <div class="app-shell">
@@ -38,8 +38,9 @@
 
     <nav class="top-tabs">
       <button class="tab-btn active" type="button">Overview</button>
-      <button class="tab-btn" type="button">Coins</button>
+      <button class="tab-btn" type="button">Coin Focus</button>
       <button class="tab-btn" type="button">Whales</button>
+      <button class="tab-btn" type="button">Alerts</button>
       <button class="tab-btn" type="button">AI Chat</button>
     </nav>
 
@@ -96,11 +97,27 @@
         </div>
       </section>
 
+      <section class="panel panel-full" id="coinFocusSection">
+        <div class="section-head">
+          <div>
+            <h2>Coin Focus Pro</h2>
+            <p>Multi-asset setup ranking, structure, liquidity and confidence map</p>
+          </div>
+        </div>
+
+        <div id="coinFocusGrid" class="coin-focus-grid">
+          <div class="stat-card">
+            <span>Loading coin focus...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
       <section class="panel panel-full" id="coinsSection">
         <div class="section-head">
           <div>
-            <h2>Coin Focus</h2>
-            <p>Live multi-asset dashboard for BTC, ETH and BNB</p>
+            <h2>Coin Focus Snapshot</h2>
+            <p>Live dashboard for major market leaders</p>
           </div>
         </div>
 
@@ -172,40 +189,8 @@
       <section class="panel panel-full" id="whalesSection">
         <div class="section-head">
           <div>
-            <h2>Whale Summary</h2>
-            <p>Direction, average levels and order concentration by asset</p>
-          </div>
-        </div>
-
-        <div id="whaleSummaryGrid" class="summary-cards-grid">
-          <div class="stat-card">
-            <span>Loading whale summary...</span>
-            <strong>--</strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="section-head">
-          <div>
-            <h2>Stablecoin Flow</h2>
-            <p>Exchange inflow / outflow and future buy-side pressure</p>
-          </div>
-        </div>
-
-        <div id="stablecoinFlowGrid" class="summary-cards-grid">
-          <div class="stat-card">
-            <span>Loading stablecoin flow...</span>
-            <strong>--</strong>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel panel-full">
-        <div class="section-head">
-          <div>
-            <h2>Whale Activity Detail</h2>
-            <p>Entry, exit, TP, SL and pending order levels by whale</p>
+            <h2>Mixed Whale Feed</h2>
+            <p>Largest live whale positioning across multiple assets</p>
           </div>
         </div>
 
@@ -237,6 +222,54 @@
         </div>
       </section>
 
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Whale Summary</h2>
+            <p>Direction, average levels and order concentration by asset</p>
+          </div>
+        </div>
+
+        <div id="whaleSummaryGrid" class="summary-cards-grid">
+          <div class="stat-card">
+            <span>Loading whale summary...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Stablecoin Flow</h2>
+            <p>Exchange inflow / outflow and future buy-side pressure</p>
+          </div>
+        </div>
+
+        <div id="stablecoinFlowGrid" class="summary-cards-grid">
+          <div class="stat-card">
+            <span>Loading stablecoin flow...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-full" id="alertsSection">
+        <div class="section-head">
+          <div>
+            <h2>Smart Alerts</h2>
+            <p>Opportunity, flow, and trap-risk alerts from the engine</p>
+          </div>
+        </div>
+
+        <div id="alertsGrid" class="alerts-grid">
+          <div class="stat-card">
+            <span>Loading alerts...</span>
+            <strong>--</strong>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" id="rawPanel" style="display: none;">
         <div class="section-head">
           <div>
@@ -247,7 +280,6 @@
 
         <pre id="rawSnapshot" class="raw-box">Loading...</pre>
       </section>
-
       <section class="panel chat-panel panel-full" id="aiChatPanel">
         <div class="section-head">
           <div>
@@ -291,6 +323,7 @@
           <button id="askCompareCoins" class="btn btn-secondary" type="button">Compare Coins</button>
           <button id="askRisk" class="btn btn-secondary" type="button">Ask Risk</button>
         </div>
+
         <div class="chat-input-wrap">
           <textarea
             id="chatInput"
@@ -299,25 +332,11 @@
             rows="4"
             disabled
           ></textarea>
-          <button
-            id="sendChatBtn"
-            class="btn btn-primary chat-send-btn"
-            type="button"
-            disabled
-          >
-            Send
-          </button>
+          <button id="sendChatBtn" class="btn btn-primary" type="button" disabled>Send</button>
         </div>
       </section>
     </main>
   </div>
-
-  <script src="./js/config.js?v=600"></script>
-  <script src="./js/helpers.js?v=600"></script>
-  <script src="./js/mock-data.js?v=600"></script>
-  <script src="./js/api-client.js?v=600"></script>
-  <script src="./js/dashboard.js?v=600"></script>
-  <script src="./js/chat.js?v=600"></script>
-  <script src="./app.js?v=600"></script>
-  </body>
+  <script src="./js/dashboard.js?v=1000"></script>
+</body>
 </html>
