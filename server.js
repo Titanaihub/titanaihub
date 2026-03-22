@@ -20,9 +20,37 @@ const PORT = process.env.PORT || 3000;
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 
+const CACHE_TTL_MS = 30 * 1000;
+const WHALES_TTL_MS = 45 * 1000;
+
+const runtimeCache = {
+  overview: {
+    live: null,
+    lastGood: null,
+    updatedAt: 0
+  },
+  coins: {
+    btc: { live: null, lastGood: null, updatedAt: 0 },
+    eth: { live: null, lastGood: null, updatedAt: 0 },
+    bnb: { live: null, lastGood: null, updatedAt: 0 }
+  },
+  whales: {
+    live: null,
+    updatedAt: 0
+  }
+};
+
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static("."));
+
+function now() {
+  return Date.now();
+}
+
+function isFresh(timestamp, ttl) {
+  return Number(timestamp) > 0 && now() - Number(timestamp) < ttl;
+}
 
 function hasThai(text) {
   return /[ก-๙]/.test(String(text || ""));
@@ -34,6 +62,31 @@ function detectReplyLanguage(text) {
 
 function fmt(v) {
   return v ?? "--";
+}
+
+function isValidOverview(data) {
+  return Boolean(
+    data &&
+      Number(data.totalMarketCap) > 0 &&
+      Number(data.totalVolume24h) > 0 &&
+      Number(data.btcDominance) > 0 &&
+      Number(data.fearGreed) >= 0 &&
+      typeof data.marketBias === "string" &&
+      data.marketBias.length > 0
+  );
+}
+
+function isValidCoin(data) {
+  return Boolean(
+    data &&
+      Number(data.price) > 0 &&
+      typeof data.signal === "string" &&
+      data.signal.length > 0 &&
+      Number.isFinite(Number(data.entry)) &&
+      Number.isFinite(Number(data.sl)) &&
+      Number.isFinite(Number(data.tp)) &&
+      typeof data.bias === "string"
+  );
 }
 
 function coinBriefEN(symbol, coin) {
@@ -174,6 +227,168 @@ function buildFallbackReply(question, overview, btc, eth, bnb) {
 
   return reply;
 }
+
+function getWhaleUniverse() {
+  return [
+    { symbol: "BTC", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", position: "$12.80M", chain: "btc" },
+    { symbol: "ETH", address: "0x8ba1f109551bd432803012645ac136ddd64dba72", position: "$8.40M", chain: "eth" },
+    { symbol: "BNB", address: "bnb1grpf0955h0yk6l2v3arh9p7hk0j2v8w5x9k3m4", position: "$4.20M", chain: "bsc" },
+    { symbol: "SOL", address: "7dHbWXad2mZ4n6F7s7Q7iLwQ4n8r6nR7h5y3nJ8x2pAf", position: "$3.90M", chain: "sol" },
+    { symbol: "XRP", address: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh", position: "$2.75M", chain: "xrp" },
+    { symbol: "DOGE", address: "D8BqR7M6b5YkV3n2QmZxL9fT6sR4uW1pNx", position: "$1.95M", chain: "doge" },
+    { symbol: "PEPE", address: "0x6a3f4c9b1d62f1d1e7a61e3cf4d7a8e5f91b4d32", position: "$1.32M", chain: "eth" },
+    { symbol: "WIF", address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV", position: "$1.18M", chain: "sol" },
+    { symbol: "BONK", address: "5PjDJaGfSPtWJ8p2w9jRr5n3eWg2Yq7mT9z4L6s8VkQx", position: "$0.96M", chain: "sol" },
+    { symbol: "FLOKI", address: "0x2a3f9e7d1b6a3c8f4e1d7a2b9c5d8e6f7a1b2c3d", position: "$0.88M", chain: "eth" },
+    { symbol: "SHIB", address: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce", position: "$1.44M", chain: "eth" }
+  ];
+}
+
+function getExplorerUrl(chain, address) {
+  const safe = encodeURIComponent(address || "");
+  switch (chain) {
+    case "btc":
+      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
+    case "eth":
+      return `https://etherscan.io/address/${safe}`;
+    case "bsc":
+      return `https://bscscan.com/address/${safe}`;
+    case "sol":
+      return `https://solscan.io/account/${safe}`;
+    case "xrp":
+      return `https://xrpscan.com/account/${safe}`;
+    case "doge":
+      return `https://blockchair.com/dogecoin/address/${safe}`;
+    default:
+      return `https://etherscan.io/address/${safe}`;
+  }
+}
+
+function overviewTime() {
+  return new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+async function getStableOverview() {
+  if (isFresh(runtimeCache.overview.updatedAt, CACHE_TTL_MS) && runtimeCache.overview.live) {
+    return runtimeCache.overview.live;
+  }
+
+  try {
+    const data = await getRealOverview();
+
+    if (isValidOverview(data)) {
+      runtimeCache.overview.live = data;
+      runtimeCache.overview.lastGood = data;
+      runtimeCache.overview.updatedAt = now();
+      return data;
+    }
+  } catch (err) {
+    console.error("getStableOverview live failed:", err.message);
+  }
+
+  if (runtimeCache.overview.lastGood) {
+    return runtimeCache.overview.lastGood;
+  }
+
+  const mock = loadMockOverviewData();
+  runtimeCache.overview.live = mock;
+  runtimeCache.overview.lastGood = mock;
+  runtimeCache.overview.updatedAt = now();
+  return mock;
+}
+
+async function getStableCoin(symbol) {
+  const key = String(symbol || "").toLowerCase();
+  const mockCoins = loadMockCoinData();
+  const bucket = runtimeCache.coins[key];
+
+  if (!bucket) {
+    return mockCoins[key] || {};
+  }
+
+  if (isFresh(bucket.updatedAt, CACHE_TTL_MS) && bucket.live) {
+    return bucket.live;
+  }
+
+  try {
+    const data = await getRealCoin(key);
+
+    if (isValidCoin(data)) {
+      bucket.live = data;
+      bucket.lastGood = data;
+      bucket.updatedAt = now();
+      return data;
+    }
+  } catch (err) {
+    console.error(`getStableCoin live failed ${key}:`, err.message);
+  }
+
+  if (bucket.lastGood) {
+    return bucket.lastGood;
+  }
+
+  const mock = mockCoins[key] || {};
+  bucket.live = mock;
+  bucket.lastGood = mock;
+  bucket.updatedAt = now();
+  return mock;
+}
+
+async function buildEnhancedWhales() {
+  if (isFresh(runtimeCache.whales.updatedAt, WHALES_TTL_MS) && Array.isArray(runtimeCache.whales.live)) {
+    return runtimeCache.whales.live;
+  }
+
+  const universe = getWhaleUniverse();
+
+  const [btc, eth, bnb] = await Promise.all([
+    getStableCoin("btc"),
+    getStableCoin("eth"),
+    getStableCoin("bnb")
+  ]);
+
+  const quickMap = {
+    BTC: btc,
+    ETH: eth,
+    BNB: bnb
+  };
+
+  const rows = universe.map((item, index) => {
+    const ref = quickMap[item.symbol] || null;
+
+    let action = index % 2 === 0 ? "Open Long" : "Open Short";
+    let price = "--";
+
+    if (ref && isValidCoin(ref)) {
+      price = `$${Number(ref.price).toFixed(2)}`;
+
+      if (String(ref.signal || "").toUpperCase() === "SHORT") {
+        action = index % 3 === 0 ? "Close Short" : "Open Short";
+      } else if (String(ref.signal || "").toUpperCase() === "LONG") {
+        action = index % 3 === 0 ? "Close Long" : "Open Long";
+      }
+    }
+
+    return {
+      address: item.address,
+      symbol: item.symbol,
+      action,
+      position: item.position,
+      price,
+      time: overviewTime(),
+      chain: item.chain,
+      explorerUrl: getExplorerUrl(item.chain, item.address)
+    };
+  });
+
+  runtimeCache.whales.live = rows;
+  runtimeCache.whales.updatedAt = now();
+  return rows;
+}
+
 function postJson(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
@@ -250,7 +465,6 @@ function buildSystemPrompt(language) {
     "If data is insufficient, say so clearly."
   ].join("\n");
 }
-
 async function callDeepSeekChat({ question, overview, btc, eth, bnb, whales }) {
   if (!DEEPSEEK_API_KEY) {
     throw new Error("Missing DEEPSEEK_API_KEY");
@@ -308,184 +522,47 @@ Reply in English only.`;
   return String(content).trim();
 }
 
-function getWhaleUniverse() {
-  return [
-    {
-      symbol: "BTC",
-      address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-      position: "$12.80M",
-      chain: "btc"
-    },
-    {
-      symbol: "ETH",
-      address: "0x8ba1f109551bd432803012645ac136ddd64dba72",
-      position: "$8.40M",
-      chain: "eth"
-    },
-    {
-      symbol: "BNB",
-      address: "bnb1grpf0955h0yk6l2v3arh9p7hk0j2v8w5x9k3m4",
-      position: "$4.20M",
-      chain: "bsc"
-    },
-    {
-      symbol: "SOL",
-      address: "7dHbWXad2mZ4n6F7s7Q7iLwQ4n8r6nR7h5y3nJ8x2pAf",
-      position: "$3.90M",
-      chain: "sol"
-    },
-    {
-      symbol: "XRP",
-      address: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh",
-      position: "$2.75M",
-      chain: "xrp"
-    },
-    {
-      symbol: "DOGE",
-      address: "D8BqR7M6b5YkV3n2QmZxL9fT6sR4uW1pNx",
-      position: "$1.95M",
-      chain: "doge"
-    },
-    {
-      symbol: "PEPE",
-      address: "0x6a3f4c9b1d62f1d1e7a61e3cf4d7a8e5f91b4d32",
-      position: "$1.32M",
-      chain: "eth"
-    },
-    {
-      symbol: "WIF",
-      address: "9xQeWvG816bUx9EP8jHmaT23yvVMuFez7R8v2DqQYQwV",
-      position: "$1.18M",
-      chain: "sol"
-    },
-    {
-      symbol: "BONK",
-      address: "5PjDJaGfSPtWJ8p2w9jRr5n3eWg2Yq7mT9z4L6s8VkQx",
-      position: "$0.96M",
-      chain: "sol"
-    },
-    {
-      symbol: "FLOKI",
-      address: "0x2a3f9e7d1b6a3c8f4e1d7a2b9c5d8e6f7a1b2c3d",
-      position: "$0.88M",
-      chain: "eth"
-    },
-    {
-      symbol: "SHIB",
-      address: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce",
-      position: "$1.44M",
-      chain: "eth"
-    }
-  ];
-}
-function getExplorerUrl(chain, address) {
-  const safe = encodeURIComponent(address || "");
-  switch (chain) {
-    case "btc":
-      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
-    case "eth":
-      return `https://etherscan.io/address/${safe}`;
-    case "bsc":
-      return `https://bscscan.com/address/${safe}`;
-    case "sol":
-      return `https://solscan.io/account/${safe}`;
-    case "xrp":
-      return `https://xrpscan.com/account/${safe}`;
-    case "doge":
-      return `https://blockchair.com/dogecoin/address/${safe}`;
-    default:
-      return `https://etherscan.io/address/${safe}`;
-  }
-}
-
-function overviewTime() {
-  return new Date().toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
-}
-
-async function buildEnhancedWhales() {
-  const universe = getWhaleUniverse();
-
-  const rows = await Promise.all(
-    universe.map(async (item, index) => {
-      try {
-        const coin = await getRealCoin(item.symbol.toLowerCase());
-        const action =
-          coin.signal === "SHORT"
-            ? index % 3 === 0
-              ? "Close Short"
-              : "Open Short"
-            : index % 3 === 0
-            ? "Close Long"
-            : "Open Long";
-
-        return {
-          address: item.address,
-          symbol: item.symbol,
-          action,
-          position: item.position,
-          price: `$${Number(coin.price || 0).toFixed(2)}`,
-          time: overviewTime(),
-          chain: item.chain,
-          explorerUrl: getExplorerUrl(item.chain, item.address)
-        };
-      } catch (_) {
-        return {
-          address: item.address,
-          symbol: item.symbol,
-          action: index % 2 === 0 ? "Open Long" : "Open Short",
-          position: item.position,
-          price: "--",
-          time: overviewTime(),
-          chain: item.chain,
-          explorerUrl: getExplorerUrl(item.chain, item.address)
-        };
-      }
-    })
-  );
-
-  return rows;
-}
-
 app.get("/api/overview", async (req, res) => {
   try {
-    const data = await getRealOverview();
-    res.json(data);
+    const data = await getStableOverview();
+    return res.json(data);
   } catch (err) {
-    console.error("overview fallback:", err.message);
-    res.json(loadMockOverviewData());
+    console.error("overview route fallback:", err.message);
+    return res.json(loadMockOverviewData());
   }
 });
 
 app.get("/api/coin/:symbol", async (req, res) => {
-  const coins = loadMockCoinData();
   const symbol = String(req.params.symbol || "").toLowerCase();
 
   try {
-    const data = await getRealCoin(symbol);
-    res.json(data);
+    const data = await getStableCoin(symbol);
+    return res.json(data);
   } catch (err) {
-    console.error(`coin fallback ${symbol}:`, err.message);
-    res.json(coins[symbol] || {});
+    console.error(`coin route fallback ${symbol}:`, err.message);
+    const mockCoins = loadMockCoinData();
+    return res.json(mockCoins[symbol] || {});
   }
 });
 
 app.get("/api/whales", async (req, res) => {
   try {
     const data = await buildEnhancedWhales();
-    res.json(data);
+    return res.json(data);
   } catch (err) {
-    console.error("whales fallback:", err.message);
-    res.json(loadMockWhaleData());
+    console.error("whales route fallback:", err.message);
+
+    if (Array.isArray(runtimeCache.whales.live) && runtimeCache.whales.live.length > 0) {
+      return res.json(runtimeCache.whales.live);
+    }
+
+    return res.json(loadMockWhaleData());
   }
 });
 
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "WEB-PHASE-1-V1",
+    version: "WEB-STABLE-CACHE-V1",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
@@ -508,7 +585,6 @@ app.post("/api/login", (req, res) => {
     message: "Invalid username or password"
   });
 });
-
 app.post("/api/chat", async (req, res) => {
   const { question, snapshot } = req.body || {};
   const qRaw = String(question || "").trim();
@@ -525,49 +601,19 @@ app.post("/api/chat", async (req, res) => {
   let whales = parsed?.whales || [];
 
   if (!overview) {
-    try {
-      overview = await getRealOverview();
-    } catch (_) {
-      overview = loadMockOverviewData();
-    }
+    overview = await getStableOverview();
   }
-
-  const mockCoins = loadMockCoinData();
 
   let btc = coins.btc || null;
   let eth = coins.eth || null;
   let bnb = coins.bnb || null;
 
-  if (!btc) {
-    try {
-      btc = await getRealCoin("btc");
-    } catch (_) {
-      btc = mockCoins.btc || {};
-    }
-  }
-
-  if (!eth) {
-    try {
-      eth = await getRealCoin("eth");
-    } catch (_) {
-      eth = mockCoins.eth || {};
-    }
-  }
-
-  if (!bnb) {
-    try {
-      bnb = await getRealCoin("bnb");
-    } catch (_) {
-      bnb = mockCoins.bnb || {};
-    }
-  }
+  if (!btc) btc = await getStableCoin("btc");
+  if (!eth) eth = await getStableCoin("eth");
+  if (!bnb) bnb = await getStableCoin("bnb");
 
   if (!Array.isArray(whales) || whales.length === 0) {
-    try {
-      whales = await buildEnhancedWhales();
-    } catch (_) {
-      whales = loadMockWhaleData();
-    }
+    whales = await buildEnhancedWhales();
   }
 
   try {
