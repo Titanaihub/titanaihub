@@ -22,6 +22,8 @@ const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 
 const CACHE_TTL_MS = 30 * 1000;
 const WHALES_TTL_MS = 45 * 1000;
+const DEFAULT_WHALE_PAGE_SIZE = 20;
+const MAX_WHALE_PAGE_SIZE = 200;
 
 const runtimeCache = {
   overview: {
@@ -35,7 +37,7 @@ const runtimeCache = {
     bnb: { live: null, lastGood: null, updatedAt: 0 }
   },
   whales: {
-    rows: null,
+    allRows: null,
     summary: null,
     stablecoinFlows: null,
     updatedAt: 0
@@ -156,144 +158,165 @@ function hhmmss() {
     second: "2-digit"
   });
 }
-function coinBriefEN(symbol, coin) {
-  return `${symbol}: signal ${fmt(coin.signal)}, bias ${fmt(coin.bias)}, entry ${fmt(
-    coin.entry
-  )}, stop loss ${fmt(coin.sl)}, take profit ${fmt(coin.tp)}.`;
-}
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const https = require("https");
 
-function coinBriefTH(symbol, coin) {
-  return `${symbol}: สัญญาณ ${fmt(coin.signal)}, มุมมอง ${fmt(coin.bias)}, จุดเข้า ${fmt(
-    coin.entry
-  )}, stop loss ${fmt(coin.sl)}, take profit ${fmt(coin.tp)}.`;
-}
+const {
+  loadMockOverviewData,
+  loadMockCoinData,
+  loadMockWhaleData
+} = require("./js/mock-data.js");
 
-function coinTradeViewEN(symbol, coin) {
-  return `${symbol} looks ${String(coin.bias || "neutral").toLowerCase()}. Current signal is ${fmt(
-    coin.signal
-  )}. Suggested structure: entry near ${fmt(coin.entry)}, stop loss near ${fmt(
-    coin.sl
-  )}, and take profit near ${fmt(coin.tp)}. Funding is ${fmt(
-    coin.funding
-  )}% and open interest is ${fmt(coin.oi)}.`;
-}
+const {
+  getRealOverview,
+  getRealCoin
+} = require("./js/real-data.js");
 
-function coinTradeViewTH(symbol, coin) {
-  return `${symbol} ตอนนี้มีมุมมองแบบ ${fmt(
-    coin.bias
-  )}. สัญญาณปัจจุบันคือ ${fmt(
-    coin.signal
-  )}. โครงสร้างเทรดที่แนะนำคือ เข้าใกล้ ${fmt(
-    coin.entry
-  )}, ตั้ง stop loss แถว ${fmt(coin.sl)}, และ take profit แถว ${fmt(
-    coin.tp
-  )}. Funding อยู่ที่ ${fmt(coin.funding)}% และ open interest อยู่ที่ ${fmt(coin.oi)}.`;
-}
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-function compareReplyEN(btc, eth, bnb) {
-  return (
-    `Comparison now: ${coinBriefEN("BTC", btc)} ${coinBriefEN("ETH", eth)} ${coinBriefEN(
-      "BNB",
-      bnb
-    )} ` +
-    `BTC remains the main reference asset, ETH is the secondary setup, and BNB is the calmer watchlist asset.`
-  );
-}
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 
-function compareReplyTH(btc, eth, bnb) {
-  return (
-    `สรุปเปรียบเทียบตอนนี้: ${coinBriefTH("BTC", btc)} ${coinBriefTH("ETH", eth)} ${coinBriefTH(
-      "BNB",
-      bnb
-    )} ` +
-    `BTC ยังเป็นเหรียญอ้างอิงหลักของตลาด, ETH เป็นตัวเลือกอันดับสอง, และ BNB เป็นเหรียญที่นิ่งกว่าเหมาะกับการเฝ้าดูเพิ่ม.`
-  );
-}
+const CACHE_TTL_MS = 30 * 1000;
+const WHALES_TTL_MS = 45 * 1000;
+const DEFAULT_WHALE_PAGE_SIZE = 20;
+const MAX_WHALE_PAGE_SIZE = 200;
 
-function riskReplyEN(overview) {
-  return (
-    `Current risk view: market bias is ${fmt(overview.marketBias)}. ` +
-    `BTC dominance is ${fmt(overview.btcDominance)}% and fear & greed is ${fmt(
-      overview.fearGreed
-    )}. ` +
-    `That means chasing is not ideal right now. Use smaller size, respect stop loss strictly, and avoid overtrading while the market stays ${String(
-      overview.marketBias || "mixed"
-    ).toLowerCase()}.`
-  );
-}
-
-function riskReplyTH(overview) {
-  return (
-    `มุมมองความเสี่ยงตอนนี้: ภาพรวมตลาดเป็น ${fmt(overview.marketBias)}. ` +
-    `BTC Dominance อยู่ที่ ${fmt(overview.btcDominance)}% และ Fear & Greed อยู่ที่ ${fmt(
-      overview.fearGreed
-    )}. ` +
-    `แปลว่าไม่ควรไล่ราคาแรงในตอนนี้ ควรลดขนาดไม้ ใช้ stop loss ให้ชัด และหลีกเลี่ยงการเข้าเทรดถี่เกินไปในช่วงที่ตลาดยัง ${fmt(
-      overview.marketBias
-    )}.`
-  );
-}
-
-function entryMapEN(btc, eth, bnb) {
-  return (
-    `Current trade map: ` +
-    `BTC entry ${fmt(btc.entry)}, SL ${fmt(btc.sl)}, TP ${fmt(btc.tp)}; ` +
-    `ETH entry ${fmt(eth.entry)}, SL ${fmt(eth.sl)}, TP ${fmt(eth.tp)}; ` +
-    `BNB entry ${fmt(bnb.entry)}, SL ${fmt(bnb.sl)}, TP ${fmt(bnb.tp)}.`
-  );
-}
-
-function entryMapTH(btc, eth, bnb) {
-  return (
-    `แผนจุดเข้า ณ ตอนนี้: ` +
-    `BTC เข้า ${fmt(btc.entry)}, SL ${fmt(btc.sl)}, TP ${fmt(btc.tp)}; ` +
-    `ETH เข้า ${fmt(eth.entry)}, SL ${fmt(eth.sl)}, TP ${fmt(eth.tp)}; ` +
-    `BNB เข้า ${fmt(bnb.entry)}, SL ${fmt(bnb.sl)}, TP ${fmt(bnb.tp)}.`
-  );
-}
-
-function buildFallbackReply(question, overview, btc, eth, bnb) {
-  const qRaw = String(question || "").trim();
-  const q = qRaw.toLowerCase();
-  const lang = detectReplyLanguage(qRaw);
-  const isThai = lang === "th";
-
-  let reply = isThai
-    ? `ภาพรวมตลาดตอนนี้เป็น ${fmt(overview.marketBias)}. BTC Dominance อยู่ที่ ${fmt(
-        overview.btcDominance
-      )}% และ Fear & Greed อยู่ที่ ${fmt(
-        overview.fearGreed
-      )}. ควรบริหารความเสี่ยงและรอจังหวะที่ชัดขึ้น.`
-    : `Market is ${String(overview.marketBias || "mixed").toLowerCase()}. BTC dominance is ${fmt(
-        overview.btcDominance
-      )}% and fear & greed is ${fmt(
-        overview.fearGreed
-      )}. Best approach is controlled risk until cleaner confirmation appears.`;
-
-  if (q.includes("compare") || q.includes("เทียบ") || q.includes("เปรียบเทียบ")) {
-    reply = isThai ? compareReplyTH(btc, eth, bnb) : compareReplyEN(btc, eth, bnb);
-  } else if (q.includes("risk") || q.includes("ความเสี่ยง") || q.includes("เสี่ยง")) {
-    reply = isThai ? riskReplyTH(overview) : riskReplyEN(overview);
-  } else if (
-    q.includes("entry") ||
-    q.includes("sl") ||
-    q.includes("tp") ||
-    q.includes("stop") ||
-    q.includes("take profit") ||
-    q.includes("จุดเข้า") ||
-    q.includes("ตัดขาดทุน") ||
-    q.includes("ทำกำไร")
-  ) {
-    reply = isThai ? entryMapTH(btc, eth, bnb) : entryMapEN(btc, eth, bnb);
-  } else if (q.includes("btc")) {
-    reply = isThai ? coinTradeViewTH("BTC", btc) : coinTradeViewEN("BTC", btc);
-  } else if (q.includes("eth")) {
-    reply = isThai ? coinTradeViewTH("ETH", eth) : coinTradeViewEN("ETH", eth);
-  } else if (q.includes("bnb")) {
-    reply = isThai ? coinTradeViewTH("BNB", bnb) : coinTradeViewEN("BNB", bnb);
+const runtimeCache = {
+  overview: {
+    live: null,
+    lastGood: null,
+    updatedAt: 0
+  },
+  coins: {
+    btc: { live: null, lastGood: null, updatedAt: 0 },
+    eth: { live: null, lastGood: null, updatedAt: 0 },
+    bnb: { live: null, lastGood: null, updatedAt: 0 }
+  },
+  whales: {
+    allRows: null,
+    summary: null,
+    stablecoinFlows: null,
+    updatedAt: 0
   }
+};
 
-  return reply;
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+app.use(express.static("."));
+
+function now() {
+  return Date.now();
+}
+
+function isFresh(timestamp, ttl) {
+  return Number(timestamp) > 0 && now() - Number(timestamp) < ttl;
+}
+
+function hasThai(text) {
+  return /[ก-๙]/.test(String(text || ""));
+}
+
+function detectReplyLanguage(text) {
+  return hasThai(text) ? "th" : "en";
+}
+
+function fmt(v) {
+  return v ?? "--";
+}
+
+function isValidOverview(data) {
+  return Boolean(
+    data &&
+      Number(data.totalMarketCap) > 0 &&
+      Number(data.totalVolume24h) > 0 &&
+      Number(data.btcDominance) > 0 &&
+      Number(data.fearGreed) >= 0 &&
+      typeof data.marketBias === "string" &&
+      data.marketBias.length > 0
+  );
+}
+
+function isValidCoin(data) {
+  return Boolean(
+    data &&
+      Number(data.price) > 0 &&
+      typeof data.signal === "string" &&
+      data.signal.length > 0 &&
+      Number.isFinite(Number(data.entry)) &&
+      Number.isFinite(Number(data.sl)) &&
+      Number.isFinite(Number(data.tp)) &&
+      typeof data.bias === "string"
+  );
+}
+
+function formatUsd(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
+  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
+  return `$${n.toFixed(2)}`;
+}
+
+function formatPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
+
+  const abs = Math.abs(n);
+
+  if (abs >= 1000) return `$${n.toFixed(2)}`;
+  if (abs >= 1) return `$${n.toFixed(2)}`;
+  if (abs >= 0.1) return `$${n.toFixed(4)}`;
+  if (abs >= 0.01) return `$${n.toFixed(5)}`;
+  if (abs >= 0.001) return `$${n.toFixed(6)}`;
+  if (abs >= 0.0001) return `$${n.toFixed(7)}`;
+  if (abs >= 0.00001) return `$${n.toFixed(8)}`;
+  return `$${n.toExponential(4)}`;
+}
+
+function average(nums) {
+  const clean = nums.filter((v) => Number.isFinite(Number(v))).map(Number);
+  if (clean.length === 0) return null;
+  return clean.reduce((a, b) => a + b, 0) / clean.length;
+}
+
+function formatAveragePrice(values) {
+  const avg = average(values);
+  if (!Number.isFinite(Number(avg))) return "--";
+  return formatPrice(avg);
+}
+
+function getExplorerUrl(chain, address) {
+  const safe = encodeURIComponent(address || "");
+  switch (chain) {
+    case "btc":
+      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
+    case "eth":
+      return `https://etherscan.io/address/${safe}`;
+    case "bsc":
+      return `https://bscscan.com/address/${safe}`;
+    case "sol":
+      return `https://solscan.io/account/${safe}`;
+    case "xrp":
+      return `https://xrpscan.com/account/${safe}`;
+    case "doge":
+      return `https://blockchair.com/dogecoin/address/${safe}`;
+    default:
+      return `https://etherscan.io/address/${safe}`;
+  }
+}
+
+function hhmmss() {
+  return new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 async function getStableOverview() {
   if (isFresh(runtimeCache.overview.updatedAt, CACHE_TTL_MS) && runtimeCache.overview.live) {
@@ -451,10 +474,124 @@ function getWhaleBlueprint() {
     }
   ];
 }
-async function buildWhalePackage() {
-  if (isFresh(runtimeCache.whales.updatedAt, WHALES_TTL_MS) && runtimeCache.whales.rows) {
+function mutateAddress(address, chain, seed) {
+  const s = String(seed);
+  if (chain === "btc") return `${address}${s}`.slice(0, 42);
+  if (chain === "bsc") return `${address}${s}`.slice(0, 42);
+  if (chain === "sol") return `${address}${s}`.slice(0, 44);
+  if (chain === "xrp") return `${address}${s}`.slice(0, 34);
+  if (chain === "doge") return `${address}${s}`.slice(0, 34);
+  return `${address}${s}`.slice(0, 42);
+}
+
+function expandWhaleBlueprint(baseBlueprints) {
+  const multiplierMap = {
+    BTC: 6,
+    ETH: 6,
+    BNB: 5,
+    SOL: 5,
+    XRP: 4,
+    DOGE: 4,
+    PEPE: 5,
+    WIF: 4,
+    BONK: 4,
+    FLOKI: 4,
+    SHIB: 4
+  };
+
+  return baseBlueprints.map((group) => {
+    const multiplier = multiplierMap[group.symbol] || 3;
+    const expanded = [];
+
+    for (let i = 0; i < multiplier; i += 1) {
+      for (let j = 0; j < group.whales.length; j += 1) {
+        const base = group.whales[j];
+        const factor = 1 + i * 0.08 + j * 0.015;
+        const entryShift = (i % 2 === 0 ? -1 : 1) * 0.0006 * (j + 1);
+        const tpShift = 1 + i * 0.03;
+        const slShift = 1 + i * 0.02;
+
+        expanded.push({
+          address: mutateAddress(base.address, group.chain, `${i}${j}`),
+          side: base.side,
+          status: base.status,
+          sizeUsd: Math.round(base.sizeUsd * factor),
+          entryOffsetPct: Number(base.entryOffsetPct || 0) + entryShift,
+          exitOffsetPct: base.exitOffsetPct,
+          tpOffsetPct: Number(base.tpOffsetPct || 0) * tpShift,
+          slOffsetPct: Number(base.slOffsetPct || 0) * slShift,
+          hasPending: base.hasPending,
+          pendingType: base.pendingType,
+          pendingPriceOffsetPct:
+            typeof base.pendingPriceOffsetPct === "number"
+              ? base.pendingPriceOffsetPct * (1 + i * 0.05)
+              : base.pendingPriceOffsetPct
+        });
+      }
+    }
+
     return {
-      rows: runtimeCache.whales.rows,
+      symbol: group.symbol,
+      chain: group.chain,
+      whales: expanded
+    };
+  });
+}
+
+function sanitizeInt(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
+function paginateRows(rows, page, limit) {
+  const total = rows.length;
+  const safeLimit = Math.min(Math.max(limit, 1), MAX_WHALE_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const start = (safePage - 1) * safeLimit;
+  const end = start + safeLimit;
+
+  return {
+    items: rows.slice(start, end),
+    page: safePage,
+    limit: safeLimit,
+    total,
+    totalPages,
+    hasNextPage: safePage < totalPages,
+    hasPrevPage: safePage > 1
+  };
+}
+
+function applyWhaleFilters(rows, query) {
+  let filtered = [...rows];
+
+  if (query.symbol) {
+    const symbol = String(query.symbol).toUpperCase();
+    filtered = filtered.filter((row) => String(row.symbol).toUpperCase() === symbol);
+  }
+
+  if (query.side) {
+    const side = String(query.side).toUpperCase();
+    filtered = filtered.filter((row) => String(row.side).toUpperCase() === side);
+  }
+
+  if (query.status) {
+    const status = String(query.status).toUpperCase();
+    filtered = filtered.filter((row) => String(row.status).toUpperCase() === status);
+  }
+
+  if (query.chain) {
+    const chain = String(query.chain).toLowerCase();
+    filtered = filtered.filter((row) => String(row.chain).toLowerCase() === chain);
+  }
+
+  return filtered;
+}
+async function buildWhalePackage() {
+  if (isFresh(runtimeCache.whales.updatedAt, WHALES_TTL_MS) && runtimeCache.whales.allRows) {
+    return {
+      allRows: runtimeCache.whales.allRows,
       summary: runtimeCache.whales.summary,
       stablecoinFlows: runtimeCache.whales.stablecoinFlows
     };
@@ -480,8 +617,8 @@ async function buildWhalePackage() {
     SHIB: 0.0000264
   };
 
-  const blueprints = getWhaleBlueprint();
-  const rows = [];
+  const blueprints = expandWhaleBlueprint(getWhaleBlueprint());
+  const allRows = [];
   const summary = [];
 
   for (const group of blueprints) {
@@ -530,6 +667,9 @@ async function buildWhalePackage() {
         position: formatUsd(w.sizeUsd),
         sizeUsd: w.sizeUsd,
         price: formatPrice(basePrice),
+        time: hhmmss(),
+        chain: group.chain,
+        explorerUrl: getExplorerUrl(group.chain, w.address),
         entry: formatPrice(entry),
         entryValue: Number(entry.toFixed(12)),
         exit: exit ? formatPrice(exit) : "--",
@@ -538,18 +678,14 @@ async function buildWhalePackage() {
         tpValue: Number(tp.toFixed(12)),
         sl: formatPrice(sl),
         slValue: Number(sl.toFixed(12)),
-        hasPending: Boolean(w.hasPending),
-        pendingType: w.pendingType || "--",
+        pendingType: w.hasPending ? w.pendingType || "--" : "--",
         pendingPrice: pendingPrice ? formatPrice(pendingPrice) : "--",
         pendingPriceValue: pendingPrice ? Number(pendingPrice.toFixed(12)) : null,
-        time: hhmmss(),
-        chain: group.chain,
-        explorerUrl: getExplorerUrl(group.chain, w.address),
         whaleId: `${group.symbol}-${idx + 1}`
       };
     });
 
-    rows.push(...localRows);
+    allRows.push(...localRows);
 
     const longRows = localRows.filter((r) => r.side === "LONG" && r.status === "OPEN");
     const shortRows = localRows.filter((r) => r.side === "SHORT" && r.status === "OPEN");
@@ -573,7 +709,7 @@ async function buildWhalePackage() {
       avgTp: formatAveragePrice(localRows.map((r) => r.tpValue)),
       avgSl: formatAveragePrice(localRows.map((r) => r.slValue)),
       avgExit: formatAveragePrice(localRows.map((r) => r.exitValue)),
-      pendingOrders: localRows.filter((r) => r.hasPending).length,
+      pendingOrders: localRows.filter((r) => r.pendingType !== "--").length,
       netBias
     });
   }
@@ -602,13 +738,13 @@ async function buildWhalePackage() {
     }
   ];
 
-  runtimeCache.whales.rows = rows;
+  runtimeCache.whales.allRows = allRows;
   runtimeCache.whales.summary = summary;
   runtimeCache.whales.stablecoinFlows = stablecoinFlows;
   runtimeCache.whales.updatedAt = now();
 
   return {
-    rows,
+    allRows,
     summary,
     stablecoinFlows
   };
@@ -793,7 +929,43 @@ app.get("/api/coin/:symbol", async (req, res) => {
 app.get("/api/whales", async (req, res) => {
   try {
     const pkg = await buildWhalePackage();
-    return res.json(getLegacyWhaleRows(pkg.rows));
+    const wantsPaged =
+      req.query.meta === "1" ||
+      req.query.paged === "1" ||
+      req.query.page ||
+      req.query.limit ||
+      req.query.symbol ||
+      req.query.side ||
+      req.query.status ||
+      req.query.chain;
+
+    const filteredRows = applyWhaleFilters(pkg.allRows, req.query);
+
+    if (!wantsPaged) {
+      return res.json(getLegacyWhaleRows(filteredRows));
+    }
+
+    const page = sanitizeInt(req.query.page, 1);
+    const limit = sanitizeInt(req.query.limit, DEFAULT_WHALE_PAGE_SIZE);
+    const paged = paginateRows(filteredRows, page, limit);
+
+    return res.json({
+      items: getLegacyWhaleRows(paged.items),
+      pagination: {
+        page: paged.page,
+        limit: paged.limit,
+        total: paged.total,
+        totalPages: paged.totalPages,
+        hasNextPage: paged.hasNextPage,
+        hasPrevPage: paged.hasPrevPage
+      },
+      filters: {
+        symbol: req.query.symbol || "",
+        side: req.query.side || "",
+        status: req.query.status || "",
+        chain: req.query.chain || ""
+      }
+    });
   } catch (err) {
     console.error("whales route fallback:", err.message);
     return res.json(loadMockWhaleData());
@@ -822,7 +994,7 @@ app.get("/api/stablecoin-flows", async (req, res) => {
 
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "WEB-WHALE-SUMMARY-V2",
+    version: "WEB-WHALE-PAGED-V1",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
@@ -875,7 +1047,7 @@ app.post("/api/chat", async (req, res) => {
 
   if (!Array.isArray(whales) || whales.length === 0) {
     const pkg = await buildWhalePackage();
-    whales = pkg.rows;
+    whales = pkg.allRows.slice(0, 60);
   }
 
   try {
