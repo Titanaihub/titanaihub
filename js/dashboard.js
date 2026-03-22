@@ -3,6 +3,7 @@ const API_BASE = "https://titan-ai-api.onrender.com";
 let started = false;
 let refreshTimer = null;
 let lastGoodData = null;
+let isLoggedIn = false;
 
 function el(id) {
   return document.getElementById(id);
@@ -16,10 +17,10 @@ function text(id, value) {
 function money(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "--";
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
+  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
   return `$${n.toFixed(2)}`;
 }
 
@@ -36,6 +37,14 @@ function shortAddr(addr) {
   return `${s.slice(0, 10)}...${s.slice(-6)}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function clearColorClasses(node) {
   if (!node) return;
   node.classList.remove(
@@ -47,8 +56,9 @@ function clearColorClasses(node) {
     "signal-long",
     "signal-short",
     "signal-wait",
-    "whale-long",
-    "whale-short"
+    "alert-risk",
+    "alert-flow",
+    "alert-opportunity"
   );
 }
 
@@ -103,6 +113,20 @@ async function getJson(url) {
   return res.json();
 }
 
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
 async function getJsonWithRetry(url, retries = 2, delayMs = 1200) {
   let lastError = null;
 
@@ -138,21 +162,32 @@ function renderOverview(data) {
       : "--"
   );
 
-  text("topSetup", "BTC / LIVE");
-  text("summaryConfidence", "72%");
-
-  let risk = "Medium";
-  if (data.marketBias === "Risk-Off") risk = "High";
-  if (data.marketBias === "Risk-On") risk = "Low";
-  if (String(data.marketBias || "").toLowerCase().includes("side")) risk = "Medium";
-  text("riskLevel", risk);
-
   setColor("systemStatus", "live");
 
   const bias = String(data.marketBias || "").toLowerCase();
   if (bias.includes("risk-off") || bias.includes("bear")) setColor("globalBias", "bear");
   else if (bias.includes("risk-on") || bias.includes("bull")) setColor("globalBias", "bull");
   else setColor("globalBias", "neutral");
+}
+
+function renderSummaryFromCoinFocus(list) {
+  const first = Array.isArray(list) && list.length ? list[0] : null;
+
+  text("topSetup", first ? `${first.symbol} / ${first.setupDirection}` : "--");
+  text(
+    "summaryConfidence",
+    first && Number.isFinite(Number(first.confidenceScore))
+      ? `${first.confidenceScore}%`
+      : "--"
+  );
+
+  let risk = "Medium";
+  if (first) {
+    if (Number(first.liquidityRisk) >= 70) risk = "High";
+    else if (Number(first.liquidityRisk) <= 40) risk = "Low";
+  }
+
+  text("riskLevel", risk);
 
   if (risk === "High") setColor("riskLevel", "bear");
   else if (risk === "Low") setColor("riskLevel", "bull");
@@ -194,40 +229,74 @@ function renderCoin(prefix, coin) {
   }
 }
 
-function renderWhaleSummary(items) {
-  const grid = el("whaleSummaryGrid");
-  if (!grid) return;
+function renderCoinFocus(list) {
+  const wrap = el("coinFocusGrid");
+  if (!wrap) return;
 
-  if (!Array.isArray(items) || items.length === 0) {
-    grid.innerHTML = `
+  if (!Array.isArray(list) || list.length === 0) {
+    wrap.innerHTML = `
       <div class="stat-card">
-        <span>No whale summary</span>
+        <span>No coin focus data</span>
         <strong>--</strong>
       </div>
     `;
     return;
   }
 
-  grid.innerHTML = items
-    .map((item) => {
-      const netBias = String(item.netBias || "--");
-      let biasClass = "neutral-text";
-      if (netBias.toLowerCase().includes("long")) biasClass = "bullish-text";
-      else if (netBias.toLowerCase().includes("short")) biasClass = "bearish-text";
+  wrap.innerHTML = list
+    .map((coin) => {
+      const scoreClass =
+        Number(coin.finalSetupScore) >= 65
+          ? "bullish-text"
+          : Number(coin.finalSetupScore) <= 40
+          ? "bearish-text"
+          : "neutral-text";
+
+      const liquidityClass =
+        String(coin.liquiditySignal || "").toLowerCase().includes("clean")
+          ? "bullish-text"
+          : String(coin.liquiditySignal || "").toLowerCase().includes("risk")
+          ? "bearish-text"
+          : "neutral-text";
 
       return `
-        <article class="stat-card">
-          <span>${item.symbol || "--"} · whales ${item.whaleCount ?? "--"}</span>
-          <strong class="${biasClass}">${netBias}</strong>
-          <div class="summary-mini-grid">
-            <div><small>Open Long</small><div>${item.openLongCount ?? "--"} / ${item.openLongUsd || "--"}</div></div>
-            <div><small>Open Short</small><div>${item.openShortCount ?? "--"} / ${item.openShortUsd || "--"}</div></div>
-            <div><small>Avg Long Entry</small><div>${item.avgLongEntry || "--"}</div></div>
-            <div><small>Avg Short Entry</small><div>${item.avgShortEntry || "--"}</div></div>
-            <div><small>Avg TP</small><div>${item.avgTp || "--"}</div></div>
-            <div><small>Avg SL</small><div>${item.avgSl || "--"}</div></div>
-            <div><small>Avg Exit</small><div>${item.avgExit || "--"}</div></div>
-            <div><small>Pending Orders</small><div>${item.pendingOrders ?? "--"}</div></div>
+        <article class="coin-focus-card">
+          <div class="coin-focus-top">
+            <div>
+              <h3>${escapeHtml(coin.symbol || "--")}</h3>
+              <p>${escapeHtml(coin.setupDirection || "--")}</p>
+            </div>
+            <div class="coin-focus-price">${escapeHtml(coin.price || "--")}</div>
+          </div>
+
+          <div class="coin-focus-score-row">
+            <div class="metric-chip">
+              <span>Setup Score</span>
+              <strong class="${scoreClass}">${escapeHtml(String(coin.finalSetupScore ?? "--"))}</strong>
+            </div>
+            <div class="metric-chip">
+              <span>Confidence</span>
+              <strong>${escapeHtml(String(coin.confidenceScore ?? "--"))}%</strong>
+            </div>
+            <div class="metric-chip">
+              <span>Liquidity</span>
+              <strong class="${liquidityClass}">${escapeHtml(coin.liquiditySignal || "--")}</strong>
+            </div>
+          </div>
+
+          <div class="coin-focus-mini-grid">
+            <div><span>Trend</span><strong>${escapeHtml(coin.trendState || "--")}</strong></div>
+            <div><span>Bias</span><strong>${escapeHtml(coin.bias || "--")}</strong></div>
+            <div><span>Whales</span><strong>${escapeHtml(coin.longShortContext || "--")}</strong></div>
+            <div><span>Funding</span><strong>${escapeHtml(coin.funding || "--")}</strong></div>
+            <div><span>OI</span><strong>${escapeHtml(coin.oi || "--")}</strong></div>
+            <div><span>Pending</span><strong>${escapeHtml(String(coin.pendingOrders ?? "--"))}</strong></div>
+            <div><span>5m</span><strong>${escapeHtml(coin.change5m || "--")}</strong></div>
+            <div><span>1h</span><strong>${escapeHtml(coin.change1h || "--")}</strong></div>
+            <div><span>Entry</span><strong>${escapeHtml(coin.entry || "--")}</strong></div>
+            <div><span>SL</span><strong>${escapeHtml(coin.sl || "--")}</strong></div>
+            <div><span>TP</span><strong>${escapeHtml(coin.tp || "--")}</strong></div>
+            <div><span>Macro</span><strong>${escapeHtml(coin.macroSentiment || "--")}</strong></div>
           </div>
         </article>
       `;
@@ -235,50 +304,9 @@ function renderWhaleSummary(items) {
     .join("");
 }
 
-function renderStablecoinFlows(items) {
-  const grid = el("stablecoinFlowGrid");
-  if (!grid) return;
-
-  if (!Array.isArray(items) || items.length === 0) {
-    grid.innerHTML = `
-      <div class="stat-card">
-        <span>No stablecoin flow</span>
-        <strong>--</strong>
-      </div>
-    `;
-    return;
-  }
-
-  grid.innerHTML = items
-    .map((item) => {
-      const netFlow = String(item.netFlow || "--");
-      let netClass = "neutral-text";
-      if (netFlow.trim().startsWith("-")) netClass = "bearish-text";
-      else if (netFlow !== "--") netClass = "bullish-text";
-
-      return `
-        <article class="stat-card">
-          <span>${item.symbol || "--"}</span>
-          <strong class="${netClass}">${item.netFlow || "--"}</strong>
-          <div class="summary-mini-grid">
-            <div><small>Inflow</small><div>${item.exchangeInflow || "--"}</div></div>
-            <div><small>Outflow</small><div>${item.exchangeOutflow || "--"}</div></div>
-          </div>
-          <div class="summary-note">${item.interpretation || "--"}</div>
-        </article>
-      `;
-    })
-    .join("");
-}
-function renderWhales(payload) {
+function renderWhales(rows) {
   const tbody = el("whaleTableBody");
   if (!tbody) return;
-
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.items)
-    ? payload.items
-    : [];
 
   if (!Array.isArray(rows) || rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="13">No whale data</td></tr>`;
@@ -288,20 +316,11 @@ function renderWhales(payload) {
   tbody.innerHTML = rows
     .map((row) => {
       const action = String(row.action || "--");
-      const status = String(row.status || "--");
-      const pendingType = String(row.pendingType || "--");
-      const actionClass = action.toLowerCase().includes("long")
+      const cls = action.toLowerCase().includes("long")
         ? "whale-long"
         : action.toLowerCase().includes("short")
         ? "whale-short"
         : "";
-
-      const statusClass =
-        status === "OPEN"
-          ? "bullish-text"
-          : status === "CLOSED"
-          ? "neutral-text"
-          : "";
 
       return `
         <tr>
@@ -311,22 +330,144 @@ function renderWhales(payload) {
               href="${row.explorerUrl || "#"}"
               target="_blank"
               rel="noopener noreferrer"
-              title="${row.address || "--"}"
-            >${shortAddr(row.address)}</a>
+              title="${escapeHtml(row.address || "--")}"
+            >${escapeHtml(shortAddr(row.address))}</a>
           </td>
-          <td>${row.symbol || "--"}</td>
-          <td class="${actionClass}">${action}</td>
-          <td>${row.position || "--"}</td>
-          <td>${row.price || "--"}</td>
-          <td>${row.entry || "--"}</td>
-          <td>${row.exit || "--"}</td>
-          <td>${row.tp || "--"}</td>
-          <td>${row.sl || "--"}</td>
-          <td class="${statusClass}">${status}</td>
-          <td>${pendingType}</td>
-          <td>${row.pendingPrice || "--"}</td>
-          <td>${row.time || "--"}</td>
+          <td>${escapeHtml(row.symbol || "--")}</td>
+          <td class="${cls}">${escapeHtml(action)}</td>
+          <td>${escapeHtml(row.position || "--")}</td>
+          <td>${escapeHtml(row.price || "--")}</td>
+          <td>${escapeHtml(row.entry || "--")}</td>
+          <td>${escapeHtml(row.exit || "--")}</td>
+          <td>${escapeHtml(row.tp || "--")}</td>
+          <td>${escapeHtml(row.sl || "--")}</td>
+          <td>${escapeHtml(row.status || "--")}</td>
+          <td>${escapeHtml(row.pendingType || "--")}</td>
+          <td>${escapeHtml(row.pendingPrice || "--")}</td>
+          <td>${escapeHtml(row.time || "--")}</td>
         </tr>
+      `;
+    })
+    .join("");
+}
+function renderWhaleSummary(list) {
+  const wrap = el("whaleSummaryGrid");
+  if (!wrap) return;
+
+  if (!Array.isArray(list) || list.length === 0) {
+    wrap.innerHTML = `
+      <div class="stat-card">
+        <span>No whale summary</span>
+        <strong>--</strong>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = list
+    .map((item) => {
+      const bias = String(item.netBias || "Mixed");
+      const biasClass =
+        bias === "Long Dominant"
+          ? "bullish-text"
+          : bias === "Short Dominant"
+          ? "bearish-text"
+          : "neutral-text";
+
+      return `
+        <article class="summary-card">
+          <div class="summary-card-head">
+            <h3>${escapeHtml(item.symbol || "--")}</h3>
+            <strong class="${biasClass}">${escapeHtml(bias)}</strong>
+          </div>
+
+          <div class="summary-card-grid">
+            <div><span>Whales</span><strong>${escapeHtml(String(item.whaleCount ?? "--"))}</strong></div>
+            <div><span>Open Long</span><strong>${escapeHtml(item.openLongUsd || "--")}</strong></div>
+            <div><span>Open Short</span><strong>${escapeHtml(item.openShortUsd || "--")}</strong></div>
+            <div><span>Avg Long</span><strong>${escapeHtml(item.avgLongEntry || "--")}</strong></div>
+            <div><span>Avg Short</span><strong>${escapeHtml(item.avgShortEntry || "--")}</strong></div>
+            <div><span>Avg TP</span><strong>${escapeHtml(item.avgTp || "--")}</strong></div>
+            <div><span>Avg SL</span><strong>${escapeHtml(item.avgSl || "--")}</strong></div>
+            <div><span>Pending</span><strong>${escapeHtml(String(item.pendingOrders ?? "--"))}</strong></div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderStablecoinFlows(list) {
+  const wrap = el("stablecoinFlowGrid");
+  if (!wrap) return;
+
+  if (!Array.isArray(list) || list.length === 0) {
+    wrap.innerHTML = `
+      <div class="stat-card">
+        <span>No stablecoin flow</span>
+        <strong>--</strong>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = list
+    .map((item) => {
+      const netText = String(item.netFlow || "--");
+      const netClass = netText.startsWith("-") ? "bearish-text" : "bullish-text";
+
+      return `
+        <article class="summary-card">
+          <div class="summary-card-head">
+            <h3>${escapeHtml(item.symbol || "--")}</h3>
+            <strong class="${netClass}">${escapeHtml(netText)}</strong>
+          </div>
+
+          <div class="summary-card-grid">
+            <div><span>Inflow</span><strong>${escapeHtml(item.exchangeInflow || "--")}</strong></div>
+            <div><span>Outflow</span><strong>${escapeHtml(item.exchangeOutflow || "--")}</strong></div>
+          </div>
+
+          <p class="summary-card-note">${escapeHtml(item.interpretation || "--")}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderAlerts(list) {
+  const wrap = el("alertsGrid");
+  if (!wrap) return;
+
+  if (!Array.isArray(list) || list.length === 0) {
+    wrap.innerHTML = `
+      <div class="stat-card">
+        <span>No alerts</span>
+        <strong>--</strong>
+      </div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = list
+    .map((item) => {
+      const type = String(item.type || "").toLowerCase();
+      const typeClass =
+        type === "opportunity"
+          ? "alert-opportunity"
+          : type === "flow"
+          ? "alert-flow"
+          : "alert-risk";
+
+      return `
+        <article class="alert-card ${typeClass}">
+          <div class="alert-card-top">
+            <span class="alert-type">${escapeHtml(item.type || "--")}</span>
+            <strong>${escapeHtml(item.symbol || "--")}</strong>
+          </div>
+          <h3>${escapeHtml(item.title || "--")}</h3>
+          <p>${escapeHtml(item.detail || "--")}</p>
+        </article>
       `;
     })
     .join("");
@@ -340,15 +481,13 @@ function hideRawPanel() {
 function bindTabs() {
   const map = {
     overview: "overviewSection",
-    coins: "coinsSection",
+    "coin focus": "coinFocusSection",
     whales: "whalesSection",
+    alerts: "alertsSection",
     "ai chat": "aiChatPanel"
   };
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
-    const tag = String(btn.tagName || "").toLowerCase();
-    if (tag === "a") return;
-
     btn.onclick = function () {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
@@ -363,26 +502,69 @@ function bindTabs() {
   });
 }
 
+function addChatMessage(role, content) {
+  const wrap = el("chatMessages");
+  if (!wrap) return;
+
+  const rowClass = role === "user" ? "chat-row-user" : "chat-row-ai";
+  const bubbleClass = role === "user" ? "chat-bubble-user" : "chat-bubble-ai";
+
+  const row = document.createElement("div");
+  row.className = `chat-row ${rowClass}`;
+  row.innerHTML = `<div class="chat-bubble ${bubbleClass}">${escapeHtml(content)}</div>`;
+
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function setChatLockedState(locked) {
+  const chatInput = el("chatInput");
+  const sendBtn = el("sendChatBtn");
+  const chatStatus = el("chatStatus");
+
+  if (chatInput) {
+    chatInput.disabled = locked;
+    chatInput.placeholder = locked
+      ? "Login first to use AI chat..."
+      : "Ask about BTC, ETH, BNB, risk, compare, entries...";
+  }
+
+  if (sendBtn) sendBtn.disabled = locked;
+
+  if (chatStatus) {
+    chatStatus.textContent = locked ? "Locked" : "Unlocked";
+    chatStatus.classList.toggle("locked", locked);
+    chatStatus.classList.toggle("unlocked", !locked);
+  }
+
+  text("loginState", locked ? "Owner-only analysis" : "Logged in");
+}
+
 function renderAll(data) {
-  renderOverview(data.overview || {});
-  renderCoin("btc", data.btc || {});
-  renderCoin("eth", data.eth || {});
-  renderCoin("bnb", data.bnb || {});
-  renderWhaleSummary(data.whaleSummary || []);
-  renderStablecoinFlows(data.stablecoinFlows || []);
-  renderWhales(data.whales || []);
+  renderOverview(data.overview);
+  renderSummaryFromCoinFocus(data.coinFocus);
+  renderCoin("btc", data.btc);
+  renderCoin("eth", data.eth);
+  renderCoin("bnb", data.bnb);
+  renderCoinFocus(data.coinFocus);
+  renderWhales(data.whales);
+  renderWhaleSummary(data.whaleSummary);
+  renderStablecoinFlows(data.stablecoinFlows);
+  renderAlerts(data.alerts);
   hideRawPanel();
 }
 async function loadDashboard() {
-  const [overview, btc, eth, bnb, whaleSummary, stablecoinFlows, whales] =
+  const [overview, btc, eth, bnb, coinFocus, whales, whaleSummary, stablecoinFlows, alerts] =
     await Promise.all([
-      getJsonWithRetry(`${API_BASE}/api/overview?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/coin/btc?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/coin/eth?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/coin/bnb?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/whales-summary?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/stablecoin-flows?v=800`),
-      getJsonWithRetry(`${API_BASE}/api/whales?meta=1&page=1&limit=20&v=800`)
+      getJsonWithRetry(`${API_BASE}/api/overview?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/coin/btc?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/coin/eth?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/coin/bnb?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/coin-focus?limit=12&v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/whales-mixed?limit=20&v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/whales-summary?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/stablecoin-flows?v=1000`),
+      getJsonWithRetry(`${API_BASE}/api/alerts?v=1000`)
     ]);
 
   const data = {
@@ -390,9 +572,11 @@ async function loadDashboard() {
     btc,
     eth,
     bnb,
+    coinFocus,
+    whales,
     whaleSummary,
     stablecoinFlows,
-    whales
+    alerts
   };
 
   lastGoodData = data;
@@ -416,11 +600,95 @@ async function refreshDashboard() {
   }
 }
 
+async function handleLogin() {
+  const username = el("username")?.value || "";
+  const password = el("password")?.value || "";
+
+  try {
+    await postJson(`${API_BASE}/api/login`, { username, password });
+    isLoggedIn = true;
+    setChatLockedState(false);
+    addChatMessage("ai", "Login successful. AI chat unlocked.");
+  } catch (err) {
+    isLoggedIn = false;
+    setChatLockedState(true);
+    addChatMessage("ai", `Login failed: ${err.message}`);
+  }
+}
+
+async function handleSendChat(customQuestion = "") {
+  if (!isLoggedIn) return;
+
+  const chatInput = el("chatInput");
+  const question = String(customQuestion || chatInput?.value || "").trim();
+  if (!question) return;
+
+  addChatMessage("user", question);
+  if (chatInput && !customQuestion) chatInput.value = "";
+
+  try {
+    const payload = {
+      question,
+      snapshot: JSON.stringify({
+        overview: lastGoodData?.overview || null,
+        coins: {
+          btc: lastGoodData?.btc || null,
+          eth: lastGoodData?.eth || null,
+          bnb: lastGoodData?.bnb || null
+        },
+        whales: lastGoodData?.whales || [],
+        coinFocus: lastGoodData?.coinFocus || [],
+        alerts: lastGoodData?.alerts || []
+      })
+    };
+
+    const res = await postJson(`${API_BASE}/api/chat`, payload);
+    addChatMessage("ai", res?.reply || "No reply");
+  } catch (err) {
+    addChatMessage("ai", `Chat error: ${err.message}`);
+  }
+}
+
+function bindChat() {
+  const loginBtn = el("loginBtn");
+  const sendBtn = el("sendChatBtn");
+  const askAnalyzeBTC = el("askAnalyzeBTC");
+  const askCompareCoins = el("askCompareCoins");
+  const askRisk = el("askRisk");
+  const chatInput = el("chatInput");
+
+  if (loginBtn) loginBtn.onclick = handleLogin;
+  if (sendBtn) sendBtn.onclick = () => handleSendChat();
+
+  if (askAnalyzeBTC) {
+    askAnalyzeBTC.onclick = () => handleSendChat("Analyze BTC setup now");
+  }
+
+  if (askCompareCoins) {
+    askCompareCoins.onclick = () => handleSendChat("Compare BTC ETH and BNB now");
+  }
+
+  if (askRisk) {
+    askRisk.onclick = () => handleSendChat("What is the current market risk");
+  }
+
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        handleSendChat();
+      }
+    });
+  }
+
+  setChatLockedState(true);
+}
+
 async function startDashboard() {
   if (started) return;
   started = true;
 
   bindTabs();
+  bindChat();
   hideRawPanel();
 
   await refreshDashboard();
