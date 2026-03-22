@@ -158,165 +158,144 @@ function hhmmss() {
     second: "2-digit"
   });
 }
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const https = require("https");
-
-const {
-  loadMockOverviewData,
-  loadMockCoinData,
-  loadMockWhaleData
-} = require("./js/mock-data.js");
-
-const {
-  getRealOverview,
-  getRealCoin
-} = require("./js/real-data.js");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || "";
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
-
-const CACHE_TTL_MS = 30 * 1000;
-const WHALES_TTL_MS = 45 * 1000;
-const DEFAULT_WHALE_PAGE_SIZE = 20;
-const MAX_WHALE_PAGE_SIZE = 200;
-
-const runtimeCache = {
-  overview: {
-    live: null,
-    lastGood: null,
-    updatedAt: 0
-  },
-  coins: {
-    btc: { live: null, lastGood: null, updatedAt: 0 },
-    eth: { live: null, lastGood: null, updatedAt: 0 },
-    bnb: { live: null, lastGood: null, updatedAt: 0 }
-  },
-  whales: {
-    allRows: null,
-    summary: null,
-    stablecoinFlows: null,
-    updatedAt: 0
-  }
-};
-
-app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-app.use(express.static("."));
-
-function now() {
-  return Date.now();
+function coinBriefEN(symbol, coin) {
+  return `${symbol}: signal ${fmt(coin.signal)}, bias ${fmt(coin.bias)}, entry ${fmt(
+    coin.entry
+  )}, stop loss ${fmt(coin.sl)}, take profit ${fmt(coin.tp)}.`;
 }
 
-function isFresh(timestamp, ttl) {
-  return Number(timestamp) > 0 && now() - Number(timestamp) < ttl;
+function coinBriefTH(symbol, coin) {
+  return `${symbol}: สัญญาณ ${fmt(coin.signal)}, มุมมอง ${fmt(coin.bias)}, จุดเข้า ${fmt(
+    coin.entry
+  )}, stop loss ${fmt(coin.sl)}, take profit ${fmt(coin.tp)}.`;
 }
 
-function hasThai(text) {
-  return /[ก-๙]/.test(String(text || ""));
+function coinTradeViewEN(symbol, coin) {
+  return `${symbol} looks ${String(coin.bias || "neutral").toLowerCase()}. Current signal is ${fmt(
+    coin.signal
+  )}. Suggested structure: entry near ${fmt(coin.entry)}, stop loss near ${fmt(
+    coin.sl
+  )}, and take profit near ${fmt(coin.tp)}. Funding is ${fmt(
+    coin.funding
+  )}% and open interest is ${fmt(coin.oi)}.`;
 }
 
-function detectReplyLanguage(text) {
-  return hasThai(text) ? "th" : "en";
+function coinTradeViewTH(symbol, coin) {
+  return `${symbol} ตอนนี้มีมุมมองแบบ ${fmt(
+    coin.bias
+  )}. สัญญาณปัจจุบันคือ ${fmt(
+    coin.signal
+  )}. โครงสร้างเทรดที่แนะนำคือ เข้าใกล้ ${fmt(
+    coin.entry
+  )}, ตั้ง stop loss แถว ${fmt(coin.sl)}, และ take profit แถว ${fmt(
+    coin.tp
+  )}. Funding อยู่ที่ ${fmt(coin.funding)}% และ open interest อยู่ที่ ${fmt(coin.oi)}.`;
 }
 
-function fmt(v) {
-  return v ?? "--";
-}
-
-function isValidOverview(data) {
-  return Boolean(
-    data &&
-      Number(data.totalMarketCap) > 0 &&
-      Number(data.totalVolume24h) > 0 &&
-      Number(data.btcDominance) > 0 &&
-      Number(data.fearGreed) >= 0 &&
-      typeof data.marketBias === "string" &&
-      data.marketBias.length > 0
+function compareReplyEN(btc, eth, bnb) {
+  return (
+    `Comparison now: ${coinBriefEN("BTC", btc)} ${coinBriefEN("ETH", eth)} ${coinBriefEN(
+      "BNB",
+      bnb
+    )} ` +
+    `BTC remains the main reference asset, ETH is the secondary setup, and BNB is the calmer watchlist asset.`
   );
 }
 
-function isValidCoin(data) {
-  return Boolean(
-    data &&
-      Number(data.price) > 0 &&
-      typeof data.signal === "string" &&
-      data.signal.length > 0 &&
-      Number.isFinite(Number(data.entry)) &&
-      Number.isFinite(Number(data.sl)) &&
-      Number.isFinite(Number(data.tp)) &&
-      typeof data.bias === "string"
+function compareReplyTH(btc, eth, bnb) {
+  return (
+    `สรุปเปรียบเทียบตอนนี้: ${coinBriefTH("BTC", btc)} ${coinBriefTH("ETH", eth)} ${coinBriefTH(
+      "BNB",
+      bnb
+    )} ` +
+    `BTC ยังเป็นเหรียญอ้างอิงหลักของตลาด, ETH เป็นตัวเลือกอันดับสอง, และ BNB เป็นเหรียญที่นิ่งกว่าเหมาะกับการเฝ้าดูเพิ่ม.`
   );
 }
 
-function formatUsd(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "--";
-  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
-  return `$${n.toFixed(2)}`;
+function riskReplyEN(overview) {
+  return (
+    `Current risk view: market bias is ${fmt(overview.marketBias)}. ` +
+    `BTC dominance is ${fmt(overview.btcDominance)}% and fear & greed is ${fmt(
+      overview.fearGreed
+    )}. ` +
+    `That means chasing is not ideal right now. Use smaller size, respect stop loss strictly, and avoid overtrading while the market stays ${String(
+      overview.marketBias || "mixed"
+    ).toLowerCase()}.`
+  );
 }
 
-function formatPrice(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "--";
-
-  const abs = Math.abs(n);
-
-  if (abs >= 1000) return `$${n.toFixed(2)}`;
-  if (abs >= 1) return `$${n.toFixed(2)}`;
-  if (abs >= 0.1) return `$${n.toFixed(4)}`;
-  if (abs >= 0.01) return `$${n.toFixed(5)}`;
-  if (abs >= 0.001) return `$${n.toFixed(6)}`;
-  if (abs >= 0.0001) return `$${n.toFixed(7)}`;
-  if (abs >= 0.00001) return `$${n.toFixed(8)}`;
-  return `$${n.toExponential(4)}`;
+function riskReplyTH(overview) {
+  return (
+    `มุมมองความเสี่ยงตอนนี้: ภาพรวมตลาดเป็น ${fmt(overview.marketBias)}. ` +
+    `BTC Dominance อยู่ที่ ${fmt(overview.btcDominance)}% และ Fear & Greed อยู่ที่ ${fmt(
+      overview.fearGreed
+    )}. ` +
+    `แปลว่าไม่ควรไล่ราคาแรงในตอนนี้ ควรลดขนาดไม้ ใช้ stop loss ให้ชัด และหลีกเลี่ยงการเข้าเทรดถี่เกินไปในช่วงที่ตลาดยัง ${fmt(
+      overview.marketBias
+    )}.`
+  );
 }
 
-function average(nums) {
-  const clean = nums.filter((v) => Number.isFinite(Number(v))).map(Number);
-  if (clean.length === 0) return null;
-  return clean.reduce((a, b) => a + b, 0) / clean.length;
+function entryMapEN(btc, eth, bnb) {
+  return (
+    `Current trade map: ` +
+    `BTC entry ${fmt(btc.entry)}, SL ${fmt(btc.sl)}, TP ${fmt(btc.tp)}; ` +
+    `ETH entry ${fmt(eth.entry)}, SL ${fmt(eth.sl)}, TP ${fmt(eth.tp)}; ` +
+    `BNB entry ${fmt(bnb.entry)}, SL ${fmt(bnb.sl)}, TP ${fmt(bnb.tp)}.`
+  );
 }
 
-function formatAveragePrice(values) {
-  const avg = average(values);
-  if (!Number.isFinite(Number(avg))) return "--";
-  return formatPrice(avg);
+function entryMapTH(btc, eth, bnb) {
+  return (
+    `แผนจุดเข้า ณ ตอนนี้: ` +
+    `BTC เข้า ${fmt(btc.entry)}, SL ${fmt(btc.sl)}, TP ${fmt(btc.tp)}; ` +
+    `ETH เข้า ${fmt(eth.entry)}, SL ${fmt(eth.sl)}, TP ${fmt(eth.tp)}; ` +
+    `BNB เข้า ${fmt(bnb.entry)}, SL ${fmt(bnb.sl)}, TP ${fmt(bnb.tp)}.`
+  );
 }
 
-function getExplorerUrl(chain, address) {
-  const safe = encodeURIComponent(address || "");
-  switch (chain) {
-    case "btc":
-      return `https://www.blockchain.com/explorer/addresses/btc/${safe}`;
-    case "eth":
-      return `https://etherscan.io/address/${safe}`;
-    case "bsc":
-      return `https://bscscan.com/address/${safe}`;
-    case "sol":
-      return `https://solscan.io/account/${safe}`;
-    case "xrp":
-      return `https://xrpscan.com/account/${safe}`;
-    case "doge":
-      return `https://blockchair.com/dogecoin/address/${safe}`;
-    default:
-      return `https://etherscan.io/address/${safe}`;
+function buildFallbackReply(question, overview, btc, eth, bnb) {
+  const qRaw = String(question || "").trim();
+  const q = qRaw.toLowerCase();
+  const lang = detectReplyLanguage(qRaw);
+  const isThai = lang === "th";
+
+  let reply = isThai
+    ? `ภาพรวมตลาดตอนนี้เป็น ${fmt(overview.marketBias)}. BTC Dominance อยู่ที่ ${fmt(
+        overview.btcDominance
+      )}% และ Fear & Greed อยู่ที่ ${fmt(
+        overview.fearGreed
+      )}. ควรบริหารความเสี่ยงและรอจังหวะที่ชัดขึ้น.`
+    : `Market is ${String(overview.marketBias || "mixed").toLowerCase()}. BTC dominance is ${fmt(
+        overview.btcDominance
+      )}% and fear & greed is ${fmt(
+        overview.fearGreed
+      )}. Best approach is controlled risk until cleaner confirmation appears.`;
+
+  if (q.includes("compare") || q.includes("เทียบ") || q.includes("เปรียบเทียบ")) {
+    reply = isThai ? compareReplyTH(btc, eth, bnb) : compareReplyEN(btc, eth, bnb);
+  } else if (q.includes("risk") || q.includes("ความเสี่ยง") || q.includes("เสี่ยง")) {
+    reply = isThai ? riskReplyTH(overview) : riskReplyEN(overview);
+  } else if (
+    q.includes("entry") ||
+    q.includes("sl") ||
+    q.includes("tp") ||
+    q.includes("stop") ||
+    q.includes("take profit") ||
+    q.includes("จุดเข้า") ||
+    q.includes("ตัดขาดทุน") ||
+    q.includes("ทำกำไร")
+  ) {
+    reply = isThai ? entryMapTH(btc, eth, bnb) : entryMapEN(btc, eth, bnb);
+  } else if (q.includes("btc")) {
+    reply = isThai ? coinTradeViewTH("BTC", btc) : coinTradeViewEN("BTC", btc);
+  } else if (q.includes("eth")) {
+    reply = isThai ? coinTradeViewTH("ETH", eth) : coinTradeViewEN("ETH", eth);
+  } else if (q.includes("bnb")) {
+    reply = isThai ? coinTradeViewTH("BNB", bnb) : coinTradeViewEN("BNB", bnb);
   }
-}
 
-function hhmmss() {
-  return new Date().toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+  return reply;
 }
 async function getStableOverview() {
   if (isFresh(runtimeCache.overview.updatedAt, CACHE_TTL_MS) && runtimeCache.overview.live) {
