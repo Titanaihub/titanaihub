@@ -104,13 +104,29 @@ function formatUsd(value) {
 function formatPrice(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "--";
-  return `$${n.toFixed(2)}`;
+
+  const abs = Math.abs(n);
+
+  if (abs >= 1000) return `$${n.toFixed(2)}`;
+  if (abs >= 1) return `$${n.toFixed(2)}`;
+  if (abs >= 0.1) return `$${n.toFixed(4)}`;
+  if (abs >= 0.01) return `$${n.toFixed(5)}`;
+  if (abs >= 0.001) return `$${n.toFixed(6)}`;
+  if (abs >= 0.0001) return `$${n.toFixed(7)}`;
+  if (abs >= 0.00001) return `$${n.toFixed(8)}`;
+  return `$${n.toExponential(4)}`;
 }
 
 function average(nums) {
   const clean = nums.filter((v) => Number.isFinite(Number(v))).map(Number);
   if (clean.length === 0) return null;
   return clean.reduce((a, b) => a + b, 0) / clean.length;
+}
+
+function formatAveragePrice(values) {
+  const avg = average(values);
+  if (!Number.isFinite(Number(avg))) return "--";
+  return formatPrice(avg);
 }
 
 function getExplorerUrl(chain, address) {
@@ -457,11 +473,11 @@ async function buildWhalePackage() {
     SOL: 139.8,
     XRP: 0.61,
     DOGE: 0.12,
-    PEPE: 0.000012,
+    PEPE: 0.0000124,
     WIF: 1.84,
-    BONK: 0.000028,
-    FLOKI: 0.00017,
-    SHIB: 0.000026
+    BONK: 0.0000286,
+    FLOKI: 0.0001732,
+    SHIB: 0.0000264
   };
 
   const blueprints = getWhaleBlueprint();
@@ -470,6 +486,7 @@ async function buildWhalePackage() {
 
   for (const group of blueprints) {
     const basePrice = priceMap[group.symbol] || 1;
+
     const localRows = group.whales.map((w, idx) => {
       const sideRaw = String(w.side || "LONG").toUpperCase();
       const cleanSide = sideRaw.includes("SHORT") ? "SHORT" : "LONG";
@@ -514,17 +531,17 @@ async function buildWhalePackage() {
         sizeUsd: w.sizeUsd,
         price: formatPrice(basePrice),
         entry: formatPrice(entry),
-        entryValue: Number(entry.toFixed(8)),
+        entryValue: Number(entry.toFixed(12)),
         exit: exit ? formatPrice(exit) : "--",
-        exitValue: exit ? Number(exit.toFixed(8)) : null,
+        exitValue: exit ? Number(exit.toFixed(12)) : null,
         tp: formatPrice(tp),
-        tpValue: Number(tp.toFixed(8)),
+        tpValue: Number(tp.toFixed(12)),
         sl: formatPrice(sl),
-        slValue: Number(sl.toFixed(8)),
+        slValue: Number(sl.toFixed(12)),
         hasPending: Boolean(w.hasPending),
         pendingType: w.pendingType || "--",
         pendingPrice: pendingPrice ? formatPrice(pendingPrice) : "--",
-        pendingPriceValue: pendingPrice ? Number(pendingPrice.toFixed(8)) : null,
+        pendingPriceValue: pendingPrice ? Number(pendingPrice.toFixed(12)) : null,
         time: hhmmss(),
         chain: group.chain,
         explorerUrl: getExplorerUrl(group.chain, w.address),
@@ -551,11 +568,11 @@ async function buildWhalePackage() {
       openShortCount: shortRows.length,
       openLongUsd: formatUsd(longSize),
       openShortUsd: formatUsd(shortSize),
-      avgLongEntry: longRows.length ? formatPrice(average(longRows.map((r) => r.entryValue))) : "--",
-      avgShortEntry: shortRows.length ? formatPrice(average(shortRows.map((r) => r.entryValue))) : "--",
-      avgTp: formatPrice(average(localRows.map((r) => r.tpValue))),
-      avgSl: formatPrice(average(localRows.map((r) => r.slValue))),
-      avgExit: formatPrice(average(localRows.map((r) => r.exitValue))),
+      avgLongEntry: longRows.length ? formatAveragePrice(longRows.map((r) => r.entryValue)) : "--",
+      avgShortEntry: shortRows.length ? formatAveragePrice(shortRows.map((r) => r.entryValue)) : "--",
+      avgTp: formatAveragePrice(localRows.map((r) => r.tpValue)),
+      avgSl: formatAveragePrice(localRows.map((r) => r.slValue)),
+      avgExit: formatAveragePrice(localRows.map((r) => r.exitValue)),
       pendingOrders: localRows.filter((r) => r.hasPending).length,
       netBias
     });
@@ -750,7 +767,6 @@ Reply in English only.`;
 
   return String(content).trim();
 }
-
 app.get("/api/overview", async (req, res) => {
   try {
     const data = await getStableOverview();
@@ -806,11 +822,12 @@ app.get("/api/stablecoin-flows", async (req, res) => {
 
 app.get("/api/debug-version", (req, res) => {
   res.json({
-    version: "WEB-WHALE-SUMMARY-V1",
+    version: "WEB-WHALE-SUMMARY-V2",
     model: DEEPSEEK_MODEL || "--",
     deepseekEnabled: Boolean(DEEPSEEK_API_KEY)
   });
 });
+
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body || {};
 
