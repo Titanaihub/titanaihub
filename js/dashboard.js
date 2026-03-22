@@ -46,7 +46,9 @@ function clearColorClasses(node) {
     "error-status",
     "signal-long",
     "signal-short",
-    "signal-wait"
+    "signal-wait",
+    "whale-long",
+    "whale-short"
   );
 }
 
@@ -117,7 +119,6 @@ async function getJsonWithRetry(url, retries = 2, delayMs = 1200) {
 
   throw lastError;
 }
-
 function renderOverview(data) {
   text("systemStatus", data.status || "LIVE");
   text("lastUpdated", data.lastUpdated || "--");
@@ -143,6 +144,7 @@ function renderOverview(data) {
   let risk = "Medium";
   if (data.marketBias === "Risk-Off") risk = "High";
   if (data.marketBias === "Risk-On") risk = "Low";
+  if (String(data.marketBias || "").toLowerCase().includes("side")) risk = "Medium";
   text("riskLevel", risk);
 
   setColor("systemStatus", "live");
@@ -192,23 +194,114 @@ function renderCoin(prefix, coin) {
   }
 }
 
-function renderWhales(rows) {
+function renderWhaleSummary(items) {
+  const grid = el("whaleSummaryGrid");
+  if (!grid) return;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    grid.innerHTML = `
+      <div class="stat-card">
+        <span>No whale summary</span>
+        <strong>--</strong>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = items
+    .map((item) => {
+      const netBias = String(item.netBias || "--");
+      let biasClass = "neutral-text";
+      if (netBias.toLowerCase().includes("long")) biasClass = "bullish-text";
+      else if (netBias.toLowerCase().includes("short")) biasClass = "bearish-text";
+
+      return `
+        <article class="stat-card">
+          <span>${item.symbol || "--"} · whales ${item.whaleCount ?? "--"}</span>
+          <strong class="${biasClass}">${netBias}</strong>
+          <div class="summary-mini-grid">
+            <div><small>Open Long</small><div>${item.openLongCount ?? "--"} / ${item.openLongUsd || "--"}</div></div>
+            <div><small>Open Short</small><div>${item.openShortCount ?? "--"} / ${item.openShortUsd || "--"}</div></div>
+            <div><small>Avg Long Entry</small><div>${item.avgLongEntry || "--"}</div></div>
+            <div><small>Avg Short Entry</small><div>${item.avgShortEntry || "--"}</div></div>
+            <div><small>Avg TP</small><div>${item.avgTp || "--"}</div></div>
+            <div><small>Avg SL</small><div>${item.avgSl || "--"}</div></div>
+            <div><small>Avg Exit</small><div>${item.avgExit || "--"}</div></div>
+            <div><small>Pending Orders</small><div>${item.pendingOrders ?? "--"}</div></div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderStablecoinFlows(items) {
+  const grid = el("stablecoinFlowGrid");
+  if (!grid) return;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    grid.innerHTML = `
+      <div class="stat-card">
+        <span>No stablecoin flow</span>
+        <strong>--</strong>
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = items
+    .map((item) => {
+      const netFlow = String(item.netFlow || "--");
+      let netClass = "neutral-text";
+      if (netFlow.trim().startsWith("-")) netClass = "bearish-text";
+      else if (netFlow !== "--") netClass = "bullish-text";
+
+      return `
+        <article class="stat-card">
+          <span>${item.symbol || "--"}</span>
+          <strong class="${netClass}">${item.netFlow || "--"}</strong>
+          <div class="summary-mini-grid">
+            <div><small>Inflow</small><div>${item.exchangeInflow || "--"}</div></div>
+            <div><small>Outflow</small><div>${item.exchangeOutflow || "--"}</div></div>
+          </div>
+          <div class="summary-note">${item.interpretation || "--"}</div>
+        </article>
+      `;
+    })
+    .join("");
+}
+function renderWhales(payload) {
   const tbody = el("whaleTableBody");
   if (!tbody) return;
 
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+    ? payload.items
+    : [];
+
   if (!Array.isArray(rows) || rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No whale data</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13">No whale data</td></tr>`;
     return;
   }
 
   tbody.innerHTML = rows
     .map((row) => {
       const action = String(row.action || "--");
-      const cls = action.toLowerCase().includes("long")
+      const status = String(row.status || "--");
+      const pendingType = String(row.pendingType || "--");
+      const actionClass = action.toLowerCase().includes("long")
         ? "whale-long"
         : action.toLowerCase().includes("short")
         ? "whale-short"
         : "";
+
+      const statusClass =
+        status === "OPEN"
+          ? "bullish-text"
+          : status === "CLOSED"
+          ? "neutral-text"
+          : "";
 
       return `
         <tr>
@@ -222,9 +315,16 @@ function renderWhales(rows) {
             >${shortAddr(row.address)}</a>
           </td>
           <td>${row.symbol || "--"}</td>
-          <td class="${cls}">${action}</td>
+          <td class="${actionClass}">${action}</td>
           <td>${row.position || "--"}</td>
           <td>${row.price || "--"}</td>
+          <td>${row.entry || "--"}</td>
+          <td>${row.exit || "--"}</td>
+          <td>${row.tp || "--"}</td>
+          <td>${row.sl || "--"}</td>
+          <td class="${statusClass}">${status}</td>
+          <td>${pendingType}</td>
+          <td>${row.pendingPrice || "--"}</td>
           <td>${row.time || "--"}</td>
         </tr>
       `;
@@ -235,12 +335,6 @@ function renderWhales(rows) {
 function hideRawPanel() {
   const rawPanel = el("rawPanel");
   if (rawPanel) rawPanel.style.display = "none";
-
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    if (String(btn.textContent || "").trim().toLowerCase() === "raw") {
-      btn.style.display = "none";
-    }
-  });
 }
 
 function bindTabs() {
@@ -252,6 +346,9 @@ function bindTabs() {
   };
 
   document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const tag = String(btn.tagName || "").toLowerCase();
+    if (tag === "a") return;
+
     btn.onclick = function () {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
@@ -267,24 +364,37 @@ function bindTabs() {
 }
 
 function renderAll(data) {
-  renderOverview(data.overview);
-  renderCoin("btc", data.btc);
-  renderCoin("eth", data.eth);
-  renderCoin("bnb", data.bnb);
-  renderWhales(data.whales);
+  renderOverview(data.overview || {});
+  renderCoin("btc", data.btc || {});
+  renderCoin("eth", data.eth || {});
+  renderCoin("bnb", data.bnb || {});
+  renderWhaleSummary(data.whaleSummary || []);
+  renderStablecoinFlows(data.stablecoinFlows || []);
+  renderWhales(data.whales || []);
   hideRawPanel();
 }
-
 async function loadDashboard() {
-  const [overview, btc, eth, bnb, whales] = await Promise.all([
-    getJsonWithRetry(`${API_BASE}/api/overview`),
-    getJsonWithRetry(`${API_BASE}/api/coin/btc`),
-    getJsonWithRetry(`${API_BASE}/api/coin/eth`),
-    getJsonWithRetry(`${API_BASE}/api/coin/bnb`),
-    getJsonWithRetry(`${API_BASE}/api/whales`)
-  ]);
+  const [overview, btc, eth, bnb, whaleSummary, stablecoinFlows, whales] =
+    await Promise.all([
+      getJsonWithRetry(`${API_BASE}/api/overview?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/coin/btc?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/coin/eth?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/coin/bnb?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/whales-summary?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/stablecoin-flows?v=800`),
+      getJsonWithRetry(`${API_BASE}/api/whales?meta=1&page=1&limit=20&v=800`)
+    ]);
 
-  const data = { overview, btc, eth, bnb, whales };
+  const data = {
+    overview,
+    btc,
+    eth,
+    bnb,
+    whaleSummary,
+    stablecoinFlows,
+    whales
+  };
+
   lastGoodData = data;
   renderAll(data);
 }
