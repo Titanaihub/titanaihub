@@ -24,6 +24,7 @@ const {
 const { buildCoinFocusPackage } = require("../services/coinfocus-service.js");
 const { buildAlertPackage } = require("../services/alert-service.js");
 const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
+const { buildBinanceCoverageReport } = require("../services/data/data-quality-service.js");
 const { callDeepSeekChat, buildFallbackReply } = require("../services/ai-service.js");
 
 const router = express.Router();
@@ -42,30 +43,12 @@ router.get("/coin/:symbol", async (req, res) => {
   const symbol = String(req.params.symbol || "").toLowerCase();
 
   try {
-    if (["btc", "eth", "bnb"].includes(symbol)) {
+    if (COIN_UNIVERSE.some((c) => c.key === symbol)) {
       const data = await getStableCoin(symbol);
       return res.json(data);
     }
 
-    const meta = COIN_UNIVERSE.find((c) => c.key === symbol);
-    if (!meta) {
-      return res.status(404).json({ error: "Coin not found" });
-    }
-
-    return res.json({
-      price: meta.fallbackPrice,
-      signal: "WAIT",
-      change5m: 0,
-      change15m: 0,
-      change1h: 0,
-      change4h: 0,
-      funding: 0,
-      oi: 0,
-      bias: "Sideway",
-      entry: meta.fallbackPrice,
-      sl: meta.fallbackPrice * 0.985,
-      tp: meta.fallbackPrice * 1.02
-    });
+    return res.status(404).json({ error: "Coin not found" });
   } catch (err) {
     console.error(`coin route fallback ${symbol}:`, err.message);
     const mockCoins = loadMockCoinData();
@@ -192,9 +175,30 @@ router.get("/analysis/deep", async (req, res) => {
   }
 });
 
+router.get("/data-quality/binance", async (req, res) => {
+  try {
+    const report = await buildBinanceCoverageReport();
+    return res.json(report);
+  } catch (err) {
+    console.error("data-quality/binance route fallback:", err.message);
+    return res.json({
+      summary: {
+        total: 0,
+        usable: 0,
+        full: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        insufficient: 0
+      },
+      items: []
+    });
+  }
+});
+
 router.get("/debug-version", (req, res) => {
   res.json({
-    version: "TITAN-PRO-MODULAR-V2-DEEP",
+    version: "TITAN-PRO-MODULAR-V3-REALDATA",
     model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
     deepseekEnabled: Boolean(process.env.DEEPSEEK_API_KEY),
     coinUniverse: COIN_UNIVERSE.length
