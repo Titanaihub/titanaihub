@@ -152,159 +152,213 @@ function getSignedClass(value) {
   if (text.startsWith("-")) return "neg";
   return "flat";
 }
-const API_BASE = "/api";
-const REFRESH_MS = 30000;
-
-const state = {
-  loggedIn: false,
-  snapshot: {
-    overview: null,
-    coins: {},
-    coinFocus: [],
-    whales: [],
-    whaleSummary: [],
-    stablecoinFlows: [],
-    alerts: [],
-    deepAnalysis: null
-  }
-};
-
-const el = {
-  systemStatus: document.getElementById("systemStatus"),
-  lastUpdated: document.getElementById("lastUpdated"),
-  globalBias: document.getElementById("globalBias"),
-
-  totalMarketCap: document.getElementById("totalMarketCap"),
-  totalVolume24h: document.getElementById("totalVolume24h"),
-  btcDominance: document.getElementById("btcDominance"),
-  fearGreed: document.getElementById("fearGreed"),
-
-  topSetup: document.getElementById("topSetup"),
-  summaryConfidence: document.getElementById("summaryConfidence"),
-  riskLevel: document.getElementById("riskLevel"),
-
-  coinFocusGrid: document.getElementById("coinFocusGrid"),
-  whaleTableBody: document.getElementById("whaleTableBody"),
-  whaleSummaryGrid: document.getElementById("whaleSummaryGrid"),
-  stablecoinFlowGrid: document.getElementById("stablecoinFlowGrid"),
-  alertsGrid: document.getElementById("alertsGrid"),
-  rawSnapshot: document.getElementById("rawSnapshot"),
-
-  username: document.getElementById("username"),
-  password: document.getElementById("password"),
-  loginBtn: document.getElementById("loginBtn"),
-  loginState: document.getElementById("loginState"),
-  chatStatus: document.getElementById("chatStatus"),
-  chatMessages: document.getElementById("chatMessages"),
-  chatInput: document.getElementById("chatInput"),
-  sendChatBtn: document.getElementById("sendChatBtn"),
-
-  askAnalyzeBTC: document.getElementById("askAnalyzeBTC"),
-  askCompareCoins: document.getElementById("askCompareCoins"),
-  askRisk: document.getElementById("askRisk"),
-
-  btcPrice: document.getElementById("btcPrice"),
-  btcSignal: document.getElementById("btcSignal"),
-  btc5m: document.getElementById("btc5m"),
-  btc15m: document.getElementById("btc15m"),
-  btc1h: document.getElementById("btc1h"),
-  btc4h: document.getElementById("btc4h"),
-  btcFunding: document.getElementById("btcFunding"),
-  btcOI: document.getElementById("btcOI"),
-  btcBias: document.getElementById("btcBias"),
-  btcEntry: document.getElementById("btcEntry"),
-  btcSL: document.getElementById("btcSL"),
-  btcTP: document.getElementById("btcTP"),
-
-  ethPrice: document.getElementById("ethPrice"),
-  ethSignal: document.getElementById("ethSignal"),
-  eth5m: document.getElementById("eth5m"),
-  eth15m: document.getElementById("eth15m"),
-  eth1h: document.getElementById("eth1h"),
-  eth4h: document.getElementById("eth4h"),
-  ethFunding: document.getElementById("ethFunding"),
-  ethOI: document.getElementById("ethOI"),
-  ethBias: document.getElementById("ethBias"),
-  ethEntry: document.getElementById("ethEntry"),
-  ethSL: document.getElementById("ethSL"),
-  ethTP: document.getElementById("ethTP"),
-
-  bnbPrice: document.getElementById("bnbPrice"),
-  bnbSignal: document.getElementById("bnbSignal"),
-  bnb5m: document.getElementById("bnb5m"),
-  bnb15m: document.getElementById("bnb15m"),
-  bnb1h: document.getElementById("bnb1h"),
-  bnb4h: document.getElementById("bnb4h"),
-  bnbFunding: document.getElementById("bnbFunding"),
-  bnbOI: document.getElementById("bnbOI"),
-  bnbBias: document.getElementById("bnbBias"),
-  bnbEntry: document.getElementById("bnbEntry"),
-  bnbSL: document.getElementById("bnbSL"),
-  bnbTP: document.getElementById("bnbTP")
-};
-
-async function apiGet(path) {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`GET ${path} failed: ${res.status}`);
-  }
-  return res.json();
+function setText(node, value) {
+  if (!node) return;
+  node.textContent = formatMaybe(value);
 }
 
-async function apiPost(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body || {})
+function setHtml(node, value) {
+  if (!node) return;
+  node.innerHTML = value;
+}
+
+function renderOverview() {
+  const overview = state.snapshot.overview || {};
+
+  setText(el.systemStatus, overview.status || "LIVE");
+  setText(el.lastUpdated, overview.lastUpdated || "--");
+  setText(el.globalBias, overview.marketBias || "--");
+
+  if (el.globalBias) {
+    el.globalBias.className = "";
+    const bias = String(overview.marketBias || "").toLowerCase();
+    if (bias.includes("bull") || bias.includes("risk-on")) el.globalBias.classList.add("pos");
+    else if (bias.includes("bear") || bias.includes("risk-off") || bias.includes("panic")) el.globalBias.classList.add("neg");
+    else el.globalBias.classList.add("flat");
+  }
+
+  setText(el.totalMarketCap, formatUsdCompact(overview.totalMarketCap));
+  setText(el.totalVolume24h, formatUsdCompact(overview.totalVolume24h));
+  setText(
+    el.btcDominance,
+    Number.isFinite(Number(overview.btcDominance))
+      ? `${Number(overview.btcDominance).toFixed(1)}%`
+      : "--"
+  );
+  setText(
+    el.fearGreed,
+    Number.isFinite(Number(overview.fearGreed))
+      ? `${Math.round(Number(overview.fearGreed))}`
+      : "--"
+  );
+}
+
+function renderSummary() {
+  const coinFocus = Array.isArray(state.snapshot.coinFocus)
+    ? state.snapshot.coinFocus
+    : [];
+
+  if (!coinFocus.length) {
+    setText(el.topSetup, "--");
+    setText(el.summaryConfidence, "--");
+    setText(el.riskLevel, "--");
+    return;
+  }
+
+  const best = coinFocus[0];
+  setText(el.topSetup, `${best.symbol} / ${best.setupDirection || "Watchlist"}`);
+  setText(
+    el.summaryConfidence,
+    Number.isFinite(Number(best.confidenceScore))
+      ? `${Math.round(Number(best.confidenceScore))}%`
+      : "--"
+  );
+
+  const riskScore = Number(best.riskScore || 0);
+  let riskLabel = "Medium";
+  if (riskScore >= 70) riskLabel = "High";
+  else if (riskScore <= 35) riskLabel = "Low";
+
+  setText(el.riskLevel, riskLabel);
+}
+
+function renderSingleCoin(prefix, data) {
+  if (!data) return;
+
+  const priceNode = el[`${prefix}Price`];
+  const signalNode = el[`${prefix}Signal`];
+  const m5Node = el[`${prefix}5m`];
+  const m15Node = el[`${prefix}15m`];
+  const h1Node = el[`${prefix}1h`];
+  const h4Node = el[`${prefix}4h`];
+  const fundingNode = el[`${prefix}Funding`];
+  const oiNode = el[`${prefix}OI`];
+  const biasNode = el[`${prefix}Bias`];
+  const entryNode = el[`${prefix}Entry`];
+  const slNode = el[`${prefix}SL`];
+  const tpNode = el[`${prefix}TP`];
+
+  setText(priceNode, formatMaybe(data.priceFormatted || data.priceText || data.price || "--"));
+  setText(signalNode, data.signal || "WAIT");
+  setText(m5Node, formatMaybe(data.change5m || "--"));
+  setText(m15Node, formatMaybe(data.change15m || "--"));
+  setText(h1Node, formatMaybe(data.change1h || "--"));
+  setText(h4Node, formatMaybe(data.change4h || "--"));
+  setText(fundingNode, formatMaybe(data.funding || "--"));
+  setText(oiNode, formatMaybe(data.oi || "--"));
+  setText(biasNode, data.bias || "--");
+  setText(entryNode, formatMaybe(data.entry || "--"));
+  setText(slNode, formatMaybe(data.sl || "--"));
+  setText(tpNode, formatMaybe(data.tp || "--"));
+
+  if (signalNode) {
+    signalNode.className = `signal-badge ${getSignalClass(data.signal)}`;
+  }
+
+  [m5Node, m15Node, h1Node, h4Node].forEach((node) => {
+    if (!node) return;
+    node.classList.remove("pos", "neg", "flat");
+    node.classList.add(getSignedClass(node.textContent));
   });
 
-  const data = await res.json().catch(() => ({}));
+  if (biasNode) {
+    biasNode.classList.remove("pos", "neg", "flat");
+    const bias = String(data.bias || "").toLowerCase();
+    if (bias.includes("bull")) biasNode.classList.add("pos");
+    else if (bias.includes("bear")) biasNode.classList.add("neg");
+    else biasNode.classList.add("flat");
+  }
+}
 
-  if (!res.ok) {
-    throw new Error(data?.message || `POST ${path} failed: ${res.status}`);
+function renderCoinSnapshots() {
+  renderSingleCoin("btc", state.snapshot.coins.btc || null);
+  renderSingleCoin("eth", state.snapshot.coins.eth || null);
+  renderSingleCoin("bnb", state.snapshot.coins.bnb || null);
+}
+
+function buildMetricBox(label, value, valueClass = "") {
+  return `
+    <div class="metric-box">
+      <span>${escapeHtml(label)}</span>
+      <strong class="${escapeHtml(valueClass)}">${escapeHtml(formatMaybe(value))}</strong>
+    </div>
+  `;
+}
+
+function renderCoinFocus() {
+  const items = Array.isArray(state.snapshot.coinFocus)
+    ? state.snapshot.coinFocus
+    : [];
+
+  if (!el.coinFocusGrid) return;
+
+  if (!items.length) {
+    setHtml(
+      el.coinFocusGrid,
+      `
+        <div class="stat-card">
+          <span>No coin focus data</span>
+          <strong>--</strong>
+        </div>
+      `
+    );
+    return;
   }
 
-  return data;
-}
+  const html = items
+    .slice(0, 12)
+    .map((item) => {
+      const signalClass = getSignalClass(item.signal);
+      const c5Class = getSignedClass(item.change5m);
+      const c1Class = getSignedClass(item.change1h);
 
-function formatUsdCompact(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "--";
-  if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
-  return `$${n.toFixed(2)}`;
-}
+      return `
+        <article class="coin-focus-card">
+          <div class="coin-focus-card-top">
+            <div>
+              <h3>${escapeHtml(item.symbol)}</h3>
+              <div class="coin-focus-subtitle">${escapeHtml(item.setupDirection || "Watchlist")}</div>
+            </div>
+            <div class="coin-focus-price-wrap">
+              <div class="coin-focus-price">${escapeHtml(item.price || "--")}</div>
+              <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-only-core")}</div>
+            </div>
+          </div>
 
-function formatMaybe(value, fallback = "--") {
-  if (value === null || value === undefined || value === "") return fallback;
-  return String(value);
-}
+          <div class="coin-focus-badges">
+            <span class="signal-badge ${escapeHtml(signalClass)}">${escapeHtml(item.signal || "WAIT")}</span>
+            <span class="mini-badge">${escapeHtml(item.marketRegime || "--")}</span>
+            <span class="mini-badge">${escapeHtml(item.dataCompleteness || "--")} Data</span>
+          </div>
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+          <div class="coin-focus-grid-inner">
+            ${buildMetricBox("Setup Score", item.finalSetupScore)}
+            ${buildMetricBox("Confidence", `${formatMaybe(item.confidenceScore, "--")}%`)}
+            ${buildMetricBox("Risk", item.riskScore)}
+            ${buildMetricBox("Liquidity", item.liquiditySignal)}
+            ${buildMetricBox("Trend", item.trendState)}
+            ${buildMetricBox("Bias", item.bias)}
+            ${buildMetricBox("Funding State", item.fundingState)}
+            ${buildMetricBox("Derivatives", item.derivativesState)}
+            ${buildMetricBox("5m", item.change5m, c5Class)}
+            ${buildMetricBox("1h", item.change1h, c1Class)}
+            ${buildMetricBox("Entry", item.entry)}
+            ${buildMetricBox("SL", item.sl)}
+            ${buildMetricBox("TP", item.tp)}
+            ${buildMetricBox("OI", item.oi)}
+            ${buildMetricBox("Execution", item.executionMode)}
+            ${buildMetricBox("Flow", "Disabled until real provider")}
+          </div>
 
-function getSignalClass(signal) {
-  const s = String(signal || "").toUpperCase();
-  if (s.includes("LONG")) return "signal-long";
-  if (s.includes("SHORT")) return "signal-short";
-  return "signal-wait";
-}
+          <div class="coin-focus-note">
+            ${escapeHtml(item.explanation || "")}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
 
-function getSignedClass(value) {
-  const text = String(value || "");
-  if (text.startsWith("+")) return "pos";
-  if (text.startsWith("-")) return "neg";
-  return "flat";
+  setHtml(el.coinFocusGrid, html);
 }
 function renderWhales() {
   if (!el.whaleTableBody) return;
@@ -683,62 +737,68 @@ function renderAll() {
   renderAlerts();
   renderRawSnapshot();
 }
-async function loadOverview() {
-  state.snapshot.overview = await apiGet("/overview?v=1600");
-}
-
-async function loadCoins() {
-  const [btc, eth, bnb] = await Promise.all([
-    apiGet("/coin/btc?v=1600"),
-    apiGet("/coin/eth?v=1600"),
-    apiGet("/coin/bnb?v=1600")
+async function loadAllData() {
+  const [
+    overview,
+    btc,
+    eth,
+    bnb,
+    coinFocus,
+    whales,
+    whaleSummary,
+    stablecoinFlows,
+    alerts,
+    deepAnalysis
+  ] = await Promise.all([
+    apiGet("/overview?v=1500"),
+    apiGet("/coin/btc?v=1500"),
+    apiGet("/coin/eth?v=1500"),
+    apiGet("/coin/bnb?v=1500"),
+    apiGet("/coin-focus?limit=12&v=1500"),
+    apiGet("/whales-mixed?limit=20&v=1500"),
+    apiGet("/whales-summary?v=1500"),
+    apiGet("/stablecoin-flows?v=1500"),
+    apiGet("/alerts?v=1500"),
+    apiGet("/analysis/deep?v=1500")
   ]);
 
-  state.snapshot.coins = { btc, eth, bnb };
-}
-
-async function loadCoinFocus() {
-  state.snapshot.coinFocus = await apiGet("/coin-focus?limit=12&v=1600");
-}
-
-async function loadWhaleBlocks() {
-  const [whales, whaleSummary, stablecoinFlows] = await Promise.all([
-    apiGet("/whales-mixed?limit=20&v=1600"),
-    apiGet("/whales-summary?v=1600"),
-    apiGet("/stablecoin-flows?v=1600")
-  ]);
-
+  state.snapshot.overview = overview || null;
+  state.snapshot.coins = {
+    btc: btc || null,
+    eth: eth || null,
+    bnb: bnb || null
+  };
+  state.snapshot.coinFocus = Array.isArray(coinFocus) ? coinFocus : [];
   state.snapshot.whales = Array.isArray(whales) ? whales : [];
   state.snapshot.whaleSummary = Array.isArray(whaleSummary) ? whaleSummary : [];
   state.snapshot.stablecoinFlows = Array.isArray(stablecoinFlows) ? stablecoinFlows : [];
-}
-
-async function loadAlerts() {
-  state.snapshot.alerts = await apiGet("/alerts?v=1600");
-}
-
-async function loadDeepAnalysis() {
-  state.snapshot.deepAnalysis = await apiGet("/analysis/deep?v=1600");
+  state.snapshot.alerts = Array.isArray(alerts) ? alerts : [];
+  state.snapshot.deepAnalysis = deepAnalysis || null;
 }
 
 async function refreshDashboard() {
   try {
-    await Promise.all([
-      loadOverview(),
-      loadCoins(),
-      loadCoinFocus(),
-      loadWhaleBlocks(),
-      loadAlerts(),
-      loadDeepAnalysis()
-    ]);
-
+    await loadAllData();
     renderAll();
 
     if (el.lastUpdated) {
-      el.lastUpdated.textContent = formatTimestamp(new Date());
+      el.lastUpdated.textContent = new Date().toLocaleString();
+    }
+
+    if (el.systemStatus) {
+      el.systemStatus.textContent = "LIVE";
+      el.systemStatus.classList.remove("neg");
+      el.systemStatus.classList.add("pos");
     }
   } catch (err) {
     console.error("refreshDashboard failed:", err);
+
+    if (el.systemStatus) {
+      el.systemStatus.textContent = "ERROR";
+      el.systemStatus.classList.remove("pos");
+      el.systemStatus.classList.add("neg");
+    }
+
     addChatMessage("ai", `Dashboard refresh failed: ${err.message || err}`);
   }
 }
@@ -749,16 +809,28 @@ function startAutoRefresh() {
   }, REFRESH_MS);
 }
 
-function initDashboard() {
+function hideRawPanel() {
+  const rawPanel = document.getElementById("rawPanel");
+  if (rawPanel) {
+    rawPanel.style.display = "none";
+  }
+}
+
+async function boot() {
   bindTabs();
   bindChatEvents();
-  renderAll();
-  refreshDashboard();
+  hideRawPanel();
+
+  if (el.chatMessages && !el.chatMessages.children.length) {
+    addChatMessage("ai", "AI chat ready. Login first.");
+  }
+
+  await refreshDashboard();
   startAutoRefresh();
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initDashboard);
+  document.addEventListener("DOMContentLoaded", boot);
 } else {
-  initDashboard();
+  boot();
 }
