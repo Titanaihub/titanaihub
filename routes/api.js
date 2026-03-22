@@ -1,11 +1,17 @@
 const express = require("express");
 
-const { loadMockOverviewData, loadMockCoinData, loadMockWhaleData } = require("../js/mock-data.js");
+const {
+  loadMockOverviewData,
+  loadMockCoinData,
+  loadMockWhaleData
+} = require("../js/mock-data.js");
+
 const {
   DEFAULT_COIN_LIMIT,
   DEFAULT_WHALE_PAGE_SIZE,
   COIN_UNIVERSE
 } = require("../config/constants.js");
+
 const { sanitizeInt, detectReplyLanguage } = require("../utils/helpers.js");
 const { getStableOverview } = require("../services/overview-service.js");
 const { getStableCoin } = require("../services/coin-service.js");
@@ -17,6 +23,7 @@ const {
 } = require("../services/whale-service.js");
 const { buildCoinFocusPackage } = require("../services/coinfocus-service.js");
 const { buildAlertPackage } = require("../services/alert-service.js");
+const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
 const { callDeepSeekChat, buildFallbackReply } = require("../services/ai-service.js");
 
 const router = express.Router();
@@ -90,6 +97,7 @@ router.get("/alerts", async (req, res) => {
 router.get("/whales", async (req, res) => {
   try {
     const pkg = await buildWhalePackage();
+
     const wantsPaged =
       req.query.meta === "1" ||
       req.query.paged === "1" ||
@@ -164,9 +172,29 @@ router.get("/stablecoin-flows", async (req, res) => {
   }
 });
 
+router.get("/analysis/deep", async (req, res) => {
+  try {
+    const data = await buildDeepAnalysisPackage();
+    return res.json(data);
+  } catch (err) {
+    console.error("analysis/deep route fallback:", err.message);
+    return res.json({
+      overview: null,
+      marketState: null,
+      stablecoinAnalysis: null,
+      whales: {
+        summary: [],
+        mixedFeed: [],
+        stablecoinFlows: []
+      },
+      coins: []
+    });
+  }
+});
+
 router.get("/debug-version", (req, res) => {
   res.json({
-    version: "TITAN-PRO-MODULAR-V1",
+    version: "TITAN-PRO-MODULAR-V2-DEEP",
     model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
     deepseekEnabled: Boolean(process.env.DEEPSEEK_API_KEY),
     coinUniverse: COIN_UNIVERSE.length
