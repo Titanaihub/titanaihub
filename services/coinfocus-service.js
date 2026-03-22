@@ -16,13 +16,18 @@ function scoreToLabel(score) {
   return "Low";
 }
 
+function trapRiskToLiquiditySignal(trapRisk) {
+  const value = String(trapRisk || "Medium");
+  if (value === "High") return "High Sweep Risk";
+  if (value === "Medium") return "Stop Hunt Risk";
+  return "Cleaner Path";
+}
+
 function mapDeepAnalysisToCoinFocusItem(item) {
   const coin = item || {};
   const setup = coin.setupScore || {};
   const marketState = coin.marketState || {};
   const derivatives = coin.derivativesAnalysis || {};
-  const whale = coin.whaleAnalysis || {};
-  const stable = coin.stablecoinContext || {};
 
   const price = Number(coin.price || 0);
   const oi = Number(coin.oi || 0);
@@ -32,6 +37,9 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     key: coin.key || "",
     className: coin.className || "",
     chain: coin.chain || "",
+    source: coin.source || "unknown",
+    model: setup.model || "real-data-only-core",
+
     price: formatPrice(price),
     rawPrice: price,
     signal: coin.signal || "WAIT",
@@ -39,31 +47,28 @@ function mapDeepAnalysisToCoinFocusItem(item) {
 
     trendState: derivatives?.momentumState?.state || "Balanced",
     macroSentiment: marketState?.conviction || "Balanced",
+    marketRegime: marketState?.regime || "Neutral",
     setupDirection: setup?.setupDirection || "Watchlist",
 
-    momentumScore: Math.round(Number(setup?.momentumScore || derivatives?.momentumState?.momentumScore || 50)),
-    structureScore: Math.round(Number(setup?.structureScore || 50)),
-    derivativesScore: Math.round(
-      Number(100 - (derivatives?.trapRiskScore ?? 50))
+    momentumScore: Math.round(
+      Number(setup?.momentumScore || derivatives?.momentumState?.momentumScore || 50)
     ),
-    whaleBiasScore: Math.round(Number(whale?.pressure?.pressureScore || 50)),
-    newsSentimentScore: Math.round(Number(marketState?.sentimentScore || 50)),
+    structureScore: Math.round(Number(setup?.structureScore || 50)),
+    derivativesScore: Math.round(Number(100 - (derivatives?.trapRiskScore ?? 50))),
+    marketSentimentScore: Math.round(Number(setup?.marketSentimentScore || 50)),
     liquidityRisk: Math.round(Number(derivatives?.trapRiskScore || 50)),
 
     finalSetupScore: Math.round(Number(setup?.convictionScore || 50)),
     confidenceScore: Math.round(Number(setup?.executionReadinessScore || 50)),
+    riskScore: Math.round(Number(setup?.riskScore || 50)),
 
     scoreLabel: scoreToLabel(setup?.convictionScore || 50),
     confidenceLabel: scoreToLabel(setup?.executionReadinessScore || 50),
+    riskLabel: scoreToLabel(100 - Number(setup?.riskScore || 50)),
 
-    liquiditySignal:
-      derivatives?.trapRisk === "High"
-        ? "High Sweep Risk"
-        : derivatives?.trapRisk === "Medium"
-        ? "Stop Hunt Risk"
-        : "Cleaner Path",
+    liquiditySignal: trapRiskToLiquiditySignal(derivatives?.trapRisk),
 
-    funding: `${Number(coin.funding || 0).toFixed(3)}%`,
+    funding: `${Number(coin.funding || 0).toFixed(4)}%`,
     oi: formatUsd(oi),
     change5m: formatPercent(coin.change5m || 0),
     change15m: formatPercent(coin.change15m || 0),
@@ -74,14 +79,23 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     sl: formatPrice(coin.sl || price * 0.985),
     tp: formatPrice(coin.tp || price * 1.02),
 
-    longShortContext: whale?.pressure?.netBias || whale?.pressure?.directionalBias || "Mixed",
-    pendingOrders: Number(whale?.pressure?.pendingOrders || 0),
-
     tradeQuality: setup?.tradeQuality || "Average",
     executionMode: setup?.executionMode || "Wait Confirmation",
-    riskScore: Math.round(Number(setup?.riskScore || 50)),
-    marketRegime: marketState?.regime || "Neutral",
-    stablecoinState: stable?.marketLiquidityState || "Balanced",
+    dataCompleteness: setup?.dataCompleteness || "Medium",
+
+    derivativesState: derivatives?.oiPriceState?.oiState || "Mixed Participation",
+    derivativesBias: derivatives?.oiPriceState?.derivativesBias || "Neutral",
+    squeezeRisk: derivatives?.oiPriceState?.squeezeRisk || "Balanced",
+    squeezeSide: derivatives?.oiPriceState?.squeezeSide || "None",
+    fundingState: derivatives?.fundingState?.state || "Neutral",
+    trapRisk: derivatives?.trapRisk || "Medium",
+
+    realDataOnly: true,
+    usesWhales: false,
+    usesStablecoinFlow: false,
+    whaleState: "Disabled until real provider",
+    stablecoinState: "Disabled until real provider",
+
     explanation: coin.explanation || "",
     executionNotes: Array.isArray(coin.executionNotes) ? coin.executionNotes : []
   };
@@ -108,6 +122,7 @@ async function buildCoinFocusPackage() {
 
 module.exports = {
   scoreToLabel,
+  trapRiskToLiquiditySignal,
   mapDeepAnalysisToCoinFocusItem,
   buildCoinFocusPackage
 };
