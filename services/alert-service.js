@@ -2,7 +2,7 @@ const { CACHE_TTL_MS, RUNTIME_CACHE } = require("../config/constants.js");
 const { isFresh, now } = require("../utils/helpers.js");
 const { buildDeepAnalysisPackage } = require("./analysis-service.js");
 
-function buildRealFlowAlerts(deepPkg) {
+function buildPhase2Alerts(deepPkg) {
   const alerts = [];
   const coins = Array.isArray(deepPkg?.coins) ? deepPkg.coins : [];
   const marketState = deepPkg?.marketState || {};
@@ -12,12 +12,16 @@ function buildRealFlowAlerts(deepPkg) {
   const strongest = [...coins]
     .sort(
       (a, b) =>
-        Number(b?.setupScore?.convictionScore || 0) -
-        Number(a?.setupScore?.convictionScore || 0)
+        Number(b?.setupScore?.decisionScore || 0) -
+        Number(a?.setupScore?.decisionScore || 0)
     )
     .slice(0, 4);
 
-  const riskiest = [...coins]
+  const noTradeCoins = coins
+    .filter((coin) => String(coin?.setupScore?.executionTier || "") === "No Trade")
+    .slice(0, 4);
+
+  const riskCoins = [...coins]
     .sort(
       (a, b) =>
         Number(b?.setupScore?.riskScore || 0) -
@@ -30,7 +34,7 @@ function buildRealFlowAlerts(deepPkg) {
     symbol: "SYSTEM",
     title: `Analysis mode: ${mode}`,
     detail:
-      "Current alert engine uses real Binance futures data, derivatives internals, positioning pressure, crowding, and liquidity backdrop."
+      "Phase 2 enabled: real futures data + real flow + volatility + order book + liquidation proxy + decision engine."
   });
 
   alerts.push({
@@ -54,71 +58,95 @@ function buildRealFlowAlerts(deepPkg) {
   });
 
   for (const coin of strongest) {
+    const phase2 = coin?.phase2 || {};
+    const micro = phase2?.microstructure || {};
     const flow = coin?.whaleAnalysis?.pressure || {};
+
     alerts.push({
       type: "opportunity",
       symbol: coin.symbol,
-      title: `${coin.symbol} conviction ${coin.setupScore?.convictionScore ?? "--"}`,
+      title: `${coin.symbol} ${coin?.setupScore?.executionTier || "Tier"} / ${coin?.setupScore?.decisionScore ?? "--"}`,
       detail:
-        `${coin.setupScore?.setupDirection || "Watchlist"} | ` +
+        `${coin?.setupScore?.recommendedAction || "Wait"} | ` +
         `${flow.directionalBias || "Balanced"} | ` +
-        `${flow.pressureState || "Balanced"} | ` +
-        `Execution mode: ${coin.setupScore?.executionMode || "Wait Confirmation"}`
+        `${micro.microstructureBias || "Balanced"} | ` +
+        `${micro.tradeabilityState || "Unknown"}`
     });
   }
 
-  for (const coin of riskiest) {
-    const flow = coin?.whaleAnalysis?.pressure || {};
+  for (const coin of noTradeCoins) {
+    const phase2 = coin?.phase2 || {};
+    const micro = phase2?.microstructure || {};
+
+    alerts.push({
+      type: "caution",
+      symbol: coin.symbol,
+      title: `${coin.symbol} No Trade`,
+      detail:
+        `${coin?.setupScore?.noTradeReason || "No clear edge"} | ` +
+        `Vol: ${micro?.volatility?.state || "Unknown"} | ` +
+        `Spread: ${micro?.orderBook?.spreadState || "Unknown"} | ` +
+        `Liq: ${micro?.liquidation?.liquidationState || "Unknown"}`
+    });
+  }
+
+  for (const coin of riskCoins) {
+    const phase2 = coin?.phase2 || {};
+    const micro = phase2?.microstructure || {};
+    const flags = Array.isArray(coin?.setupScore?.riskFlags)
+      ? coin.setupScore.riskFlags.join(", ")
+      : "";
+
     alerts.push({
       type: "risk",
       symbol: coin.symbol,
-      title: `${coin.symbol} risk ${coin.setupScore?.riskScore ?? "--"}`,
+      title: `${coin.symbol} risk ${coin?.setupScore?.riskScore ?? "--"}`,
       detail:
-        `Trap risk: ${coin.derivativesAnalysis?.trapRisk || "Medium"} | ` +
-        `Flow: ${flow.pressureState || "Balanced"} | ` +
-        `Crowding: ${flow.crowdingState || "Balanced"}`
+        `Trap: ${coin?.derivativesAnalysis?.trapRisk || "Medium"} | ` +
+        `Book: ${micro?.orderBook?.bookPressureState || "Unknown"} | ` +
+        `Flags: ${flags || "None"}`
     });
   }
 
-  const squeezeCandidates = coins
-    .filter((coin) => {
-      const side = String(coin?.derivativesAnalysis?.oiPriceState?.squeezeSide || "");
-      return side && side !== "None" && side !== "Unknown" && side !== "Two-Way";
-    })
-    .slice(0, 3);
-
-  for (const coin of squeezeCandidates) {
-    alerts.push({
-      type: "derivatives",
-      symbol: coin.symbol,
-      title: `${coin.symbol} ${coin.derivativesAnalysis?.oiPriceState?.squeezeSide || "Squeeze Risk"}`,
-      detail:
-        `Funding: ${coin.derivativesAnalysis?.fundingState?.state || "Neutral"} | ` +
-        `OI/Price: ${coin.derivativesAnalysis?.oiPriceState?.oiState || "Mixed"} | ` +
-        `Bias: ${coin.derivativesAnalysis?.oiPriceState?.derivativesBias || "Neutral"}`
-    });
-  }
-
-  const crowdedNames = coins
+  const crowdingCoins = coins
     .filter((coin) => {
       const crowd = String(coin?.whaleAnalysis?.pressure?.crowdingState || "");
       return crowd === "Long Crowded" || crowd === "Short Crowded";
     })
     .slice(0, 3);
 
-  for (const coin of crowdedNames) {
+  for (const coin of crowdingCoins) {
     alerts.push({
       type: "positioning",
       symbol: coin.symbol,
-      title: `${coin.symbol} ${coin.whaleAnalysis?.pressure?.crowdingState || "Crowding"}`,
+      title: `${coin.symbol} ${coin?.whaleAnalysis?.pressure?.crowdingState || "Crowding"}`,
       detail:
-        `Directional bias: ${coin.whaleAnalysis?.pressure?.directionalBias || "Balanced"} | ` +
-        `OI state: ${coin.whaleAnalysis?.pressure?.oiPressureState || "Mixed Participation"} | ` +
-        `Basis: ${coin.whaleAnalysis?.pressure?.basisState || "Neutral Basis"}`
+        `Flow: ${coin?.whaleAnalysis?.pressure?.directionalBias || "Balanced"} | ` +
+        `OI: ${coin?.whaleAnalysis?.pressure?.oiPressureState || "Mixed Participation"} | ` +
+        `Basis: ${coin?.whaleAnalysis?.pressure?.basisState || "Neutral Basis"}`
     });
   }
 
-  return alerts.slice(0, 12);
+  const liquidationCoins = coins
+    .filter((coin) =>
+      String(coin?.phase2?.microstructure?.liquidation?.liquidationState || "").includes("Risk")
+    )
+    .slice(0, 3);
+
+  for (const coin of liquidationCoins) {
+    const liq = coin?.phase2?.microstructure?.liquidation || {};
+    alerts.push({
+      type: "liquidation",
+      symbol: coin.symbol,
+      title: `${coin.symbol} ${liq?.liquidationState || "Liquidation Risk"}`,
+      detail:
+        `Short near: ${liq?.shortLiqNear ? Number(liq.shortLiqNear).toFixed(4) : "--"} | ` +
+        `Long near: ${liq?.longLiqNear ? Number(liq.longLiqNear).toFixed(4) : "--"} | ` +
+        `Score: ${liq?.liquidationScore ?? "--"}`
+    });
+  }
+
+  return alerts.slice(0, 14);
 }
 
 async function buildAlertPackage() {
@@ -127,7 +155,7 @@ async function buildAlertPackage() {
   }
 
   const deepPkg = await buildDeepAnalysisPackage();
-  const alerts = buildRealFlowAlerts(deepPkg);
+  const alerts = buildPhase2Alerts(deepPkg);
 
   RUNTIME_CACHE.alerts.list = alerts;
   RUNTIME_CACHE.alerts.updatedAt = now();
@@ -136,6 +164,6 @@ async function buildAlertPackage() {
 }
 
 module.exports = {
-  buildRealFlowAlerts,
+  buildPhase2Alerts,
   buildAlertPackage
 };
