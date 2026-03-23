@@ -165,22 +165,16 @@ async function loadAllData() {
     eth,
     bnb,
     coinFocus,
-    flowFeed,
-    positioningSummary,
-    liquiditySummary,
     alerts,
     deepAnalysis
   ] = await Promise.all([
-    apiGet("/overview?v=2400"),
-    apiGet("/coin/btc?v=2400"),
-    apiGet("/coin/eth?v=2400"),
-    apiGet("/coin/bnb?v=2400"),
-    apiGet("/coin-focus?limit=12&v=2400"),
-    apiGet("/flow-feed?limit=20&v=2400"),
-    apiGet("/positioning-summary?v=2400"),
-    apiGet("/liquidity-summary?v=2400"),
-    apiGet("/alerts?v=2400"),
-    apiGet("/analysis/deep?v=2400")
+    apiGet("/overview?v=2401"),
+    apiGet("/coin/btc?v=2401"),
+    apiGet("/coin/eth?v=2401"),
+    apiGet("/coin/bnb?v=2401"),
+    apiGet("/coin-focus?limit=12&v=2401"),
+    apiGet("/alerts?v=2401"),
+    apiGet("/analysis/deep?v=2401")
   ]);
 
   appState.snapshot.overview = overview || null;
@@ -190,12 +184,16 @@ async function loadAllData() {
     bnb: bnb || null
   };
   appState.snapshot.coinFocus = Array.isArray(coinFocus) ? coinFocus : [];
-  appState.snapshot.whales = Array.isArray(flowFeed) ? flowFeed : [];
-  appState.snapshot.whaleSummary = Array.isArray(positioningSummary) ? positioningSummary : [];
-  appState.snapshot.stablecoinFlows =
-    liquiditySummary && !Array.isArray(liquiditySummary) ? liquiditySummary : null;
   appState.snapshot.alerts = Array.isArray(alerts) ? alerts : [];
   appState.snapshot.deepAnalysis = deepAnalysis || null;
+
+  const whalesBlock = deepAnalysis?.whales || {};
+  appState.snapshot.whales = Array.isArray(whalesBlock.mixedFeed) ? whalesBlock.mixedFeed : [];
+  appState.snapshot.whaleSummary = Array.isArray(whalesBlock.summary) ? whalesBlock.summary : [];
+  appState.snapshot.stablecoinFlows =
+    whalesBlock.stablecoinFlows && !Array.isArray(whalesBlock.stablecoinFlows)
+      ? whalesBlock.stablecoinFlows
+      : null;
 }
 
 async function refreshDashboard() {
@@ -222,11 +220,13 @@ async function refreshDashboard() {
       elements.systemStatus.classList.add("neg");
     }
 
-    window.TitanChat.addChatMessage(
-      elements,
-      "ai",
-      `Dashboard refresh failed: ${err.message || err}`
-    );
+    if (window.TitanChat?.addChatMessage) {
+      window.TitanChat.addChatMessage(
+        elements,
+        "ai",
+        `Dashboard refresh failed: ${err.message || err}`
+      );
+    }
   }
 }
 
@@ -239,10 +239,15 @@ function startAutoRefresh() {
 async function boot() {
   bindTabs();
   hideRawPanel();
-  window.TitanChat.bindChatEvents(elements, appState);
+
+  if (window.TitanChat?.bindChatEvents) {
+    window.TitanChat.bindChatEvents(elements, appState);
+  }
 
   if (elements.chatMessages && !elements.chatMessages.children.length) {
-    window.TitanChat.addChatMessage(elements, "ai", "AI chat ready. Login first.");
+    if (window.TitanChat?.addChatMessage) {
+      window.TitanChat.addChatMessage(elements, "ai", "AI chat ready. Login first.");
+    }
   }
 
   await refreshDashboard();
