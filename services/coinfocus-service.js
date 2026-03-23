@@ -37,6 +37,9 @@ function mapDeepAnalysisToCoinFocusItem(item) {
   const derivatives = coin.derivativesAnalysis || {};
   const flowAnalysis = coin.whaleAnalysis || {};
   const stablecoinContext = coin.stablecoinContext || {};
+  const phase2 = coin.phase2 || {};
+  const micro = phase2.microstructure || {};
+  const riskFlags = Array.isArray(setup.riskFlags) ? setup.riskFlags : [];
 
   const price = Number(coin.price || 0);
   const oi = Number(coin.oi || 0);
@@ -47,7 +50,7 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     className: coin.className || "",
     chain: coin.chain || "",
     source: coin.source || "unknown",
-    model: setup.model || "real-data-flow-core",
+    model: setup.model || "real-data-flow-core-phase2",
 
     price: formatPrice(price),
     rawPrice: price,
@@ -113,6 +116,21 @@ function mapDeepAnalysisToCoinFocusItem(item) {
 
     liquidityBackdrop: stablecoinContext?.marketLiquidityState || "Balanced",
     liquidityPressure: stablecoinContext?.liquidityPressure || "Balanced",
+
+    phase2Enabled: Boolean(setup?.phase2Enabled),
+    microstructureScore: Number(setup?.microstructureScore || 50),
+    decisionScore: Number(setup?.decisionScore || 50),
+    executionTier: setup?.executionTier || "No Trade",
+    recommendedAction: setup?.recommendedAction || "Wait",
+    noTradeReason: setup?.noTradeReason || "",
+    riskFlags,
+
+    microstructureBias: micro?.microstructureBias || "Balanced",
+    tradeabilityState: micro?.tradeabilityState || "Unknown",
+    volatilityState: micro?.volatility?.state || "Unknown",
+    orderBookState: micro?.orderBook?.bookPressureState || "Unknown",
+    spreadState: micro?.orderBook?.spreadState || "Unknown",
+    liquidationState: micro?.liquidation?.liquidationState || "Unknown",
 
     explanation: coin.explanation || "",
     executionNotes: Array.isArray(coin.executionNotes) ? coin.executionNotes : []
