@@ -1322,3 +1322,351 @@ a {
     min-height: 96px;
   }
 }
+/* ===== Titan Theme Refresh: Logo Palette ===== */
+
+:root {
+  --bg-main: #08111f;
+  --bg-panel: #0f1930;
+  --bg-panel-2: #162344;
+  --bg-soft: #1b2a4d;
+  --line: rgba(143, 221, 255, 0.14);
+  --line-strong: rgba(88, 231, 255, 0.28);
+
+  --text-main: #eef4ff;
+  --text-soft: #9baed1;
+  --text-dim: #7f92b8;
+
+  --cyan: #58e7ff;
+  --cyan-soft: #8fddff;
+  --violet: #8c63ff;
+  --purple: #c06cff;
+  --gold: #d8b36a;
+
+  --green: #3ddc84;
+  --green-soft: rgba(61, 220, 132, 0.14);
+
+  --red: #ff5f6d;
+  --red-soft: rgba(255, 95, 109, 0.14);
+
+  --neutral: #a8b3c7;
+  --neutral-soft: rgba(168, 179, 199, 0.12);
+
+  --glow-cyan: 0 0 0 1px rgba(88, 231, 255, 0.12), 0 0 24px rgba(88, 231, 255, 0.08);
+  --glow-violet: 0 0 0 1px rgba(140, 99, 255, 0.12), 0 0 24px rgba(140, 99, 255, 0.08);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at top left, rgba(88, 231, 255, 0.06), transparent 24%),
+    radial-gradient(circle at top right, rgba(192, 108, 255, 0.06), transparent 22%),
+    linear-gradient(180deg, #07101d 0%, #08111f 100%);
+  color: var(--text-main);
+}
+
+body {
+  font-size: 15px;
+}
+
+.app-shell {
+  background: transparent;
+}
+
+.topbar,
+.panel,
+.coin-card,
+.coin-focus-card,
+.summary-card,
+.alert-card,
+.stat-card,
+.mini-stat {
+  background:
+    linear-gradient(180deg, rgba(22, 35, 68, 0.96) 0%, rgba(13, 24, 48, 0.98) 100%);
+  border: 1px solid var(--line);
+  box-shadow: var(--glow-cyan);
+}
+
+.panel:hover,
+.coin-card:hover,
+.coin-focus-card:hover,
+.summary-card:hover,
+.alert-card:hover {
+  border-color: var(--line-strong);
+}
+
+.brand-mark {
+  background:
+    linear-gradient(145deg, rgba(88, 231, 255, 0.92), rgba(140, 99, 255, 0.92));
+  color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.08),
+    0 0 24px rgba(88, 231, 255, 0.18);
+}
+
+.brand-text h1,
+.section-head h2,
+.coin-head h3,
+.coin-focus-card h3,
+.summary-card h3,
+.alert-card h3 {
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+.brand-text p,
+.section-head p,
+.summary-card-note,
+.coin-focus-note,
+.alert-card p,
+.stat-card span,
+.metric-box span,
+.mini-stat span,
+.summary-row span {
+  color: var(--text-soft);
+}
+
+.top-tabs .tab-btn,
+.btn,
+.mini-badge,
+.signal-badge {
+  border: 1px solid var(--line);
+}
+
+.top-tabs .tab-btn {
+  background: rgba(255,255,255,0.02);
+  color: var(--text-soft);
+}
+
+.top-tabs .tab-btn.active,
+.top-tabs .tab-btn:hover {
+  color: #ffffff;
+  background:
+    linear-gradient(135deg, rgba(88, 231, 255, 0.18), rgba(140, 99, 255, 0.2));
+  border-color: rgba(88, 231, 255, 0.35);
+  box-shadow: 0 0 18px rgba(88, 231, 255, 0.08);
+}
+
+.btn-primary {
+  background:
+    linear-gradient(135deg, rgba(88, 231, 255, 0.22), rgba(140, 99, 255, 0.26));
+  color: #ffffff;
+  border-color: rgba(88, 231, 255, 0.35);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn-secondary {
+  background: rgba(255,255,255,0.03);
+  color: var(--text-main);
+  border-color: var(--line);
+}
+
+.input,
+.chat-textarea {
+  background: rgba(8, 17, 31, 0.72);
+  color: var(--text-main);
+  border: 1px solid var(--line);
+}
+
+.input::placeholder,
+.chat-textarea::placeholder {
+  color: var(--text-dim);
+}
+
+.input:focus,
+.chat-textarea:focus {
+  border-color: rgba(88, 231, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(88, 231, 255, 0.08);
+  outline: none;
+}
+
+.metric-box,
+.summary-row,
+.chat-bubble,
+.chat-messages,
+.raw-box {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(143, 221, 255, 0.08);
+}
+
+.coin-price,
+.coin-focus-price,
+.stat-card strong,
+.summary-row strong,
+.mini-stat strong {
+  color: var(--text-main);
+}
+
+/* ===== Global semantic colors: international convention ===== */
+
+.pos,
+.buy,
+.long,
+.bullish {
+  color: var(--green) !important;
+}
+
+.neg,
+.sell,
+.short,
+.bearish {
+  color: var(--red) !important;
+}
+
+.flat,
+.neutral,
+.wait,
+.balanced {
+  color: var(--neutral) !important;
+}
+
+/* signal badges */
+.signal-badge.signal-long {
+  color: #dfffea;
+  background: var(--green-soft);
+  border-color: rgba(61, 220, 132, 0.35);
+}
+
+.signal-badge.signal-short {
+  color: #ffe3e7;
+  background: var(--red-soft);
+  border-color: rgba(255, 95, 109, 0.35);
+}
+
+.signal-badge.signal-wait {
+  color: #d9e2f3;
+  background: var(--neutral-soft);
+  border-color: rgba(168, 179, 199, 0.22);
+}
+
+/* badges / status */
+.unlocked,
+.chat-status-badge.unlocked {
+  color: var(--green);
+}
+
+.locked,
+.chat-status-badge.locked {
+  color: #ffc2c8;
+  background: var(--red-soft);
+  border-color: rgba(255, 95, 109, 0.28);
+}
+
+#systemStatus.pos {
+  color: var(--green) !important;
+}
+
+#systemStatus.neg {
+  color: var(--red) !important;
+}
+
+#globalBias.pos {
+  color: var(--green) !important;
+}
+
+#globalBias.neg {
+  color: var(--red) !important;
+}
+
+#globalBias.flat {
+  color: var(--neutral) !important;
+}
+
+/* alert card tones */
+.alert-card.alert-system {
+  border-color: rgba(143, 221, 255, 0.16);
+}
+
+.alert-card.alert-macro {
+  border-color: rgba(140, 99, 255, 0.22);
+  box-shadow: var(--glow-violet);
+}
+
+.alert-card.alert-flow,
+.alert-card.alert-opportunity {
+  border-color: rgba(61, 220, 132, 0.22);
+}
+
+.alert-card.alert-risk,
+.alert-card.alert-caution,
+.alert-card.alert-liquidation {
+  border-color: rgba(255, 95, 109, 0.22);
+}
+
+.alert-type {
+  color: var(--text-main);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* warning note */
+.coin-focus-warning {
+  color: #ffd3d8;
+  background: rgba(255, 95, 109, 0.12);
+  border: 1px solid rgba(255, 95, 109, 0.28);
+}
+
+/* tables */
+.data-table th {
+  color: var(--text-soft);
+  background: rgba(255,255,255,0.02);
+}
+
+.data-table td {
+  color: var(--text-main);
+  border-color: rgba(143, 221, 255, 0.06);
+}
+
+.data-table tr:hover td {
+  background: rgba(88, 231, 255, 0.03);
+}
+
+/* link color */
+a {
+  color: var(--cyan-soft);
+}
+
+a:hover {
+  color: var(--cyan);
+}
+
+/* type scale polish */
+.brand-text h1 {
+  font-size: 34px;
+}
+
+.section-head h2 {
+  font-size: 24px;
+}
+
+.coin-price,
+.coin-focus-price {
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.stat-card strong,
+.summary-row strong {
+  font-size: 18px;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .brand-text h1 {
+    font-size: 28px;
+  }
+
+  .section-head h2 {
+    font-size: 21px;
+  }
+
+  .coin-price,
+  .coin-focus-price {
+    font-size: 26px;
+  }
+}
