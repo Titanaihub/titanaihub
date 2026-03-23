@@ -1166,3 +1166,55 @@ a {
     font-size: 12px;
   }
 }
+/* ===== Mobile polish: Real Flow Feed ===== */
+
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.whale-detail-table {
+  min-width: 1200px;
+}
+
+.whale-detail-table th,
+.whale-detail-table td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.whale-detail-table th {
+  font-size: 12px;
+}
+
+.whale-detail-table td {
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .table-wrap {
+    border-radius: 16px;
+  }
+
+  .whale-detail-table {
+    min-width: 980px;
+  }
+
+  .whale-detail-table th,
+  .whale-detail-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .whale-detail-table {
+    min-width: 920px;
+  }
+
+  .whale-detail-table th,
+  .whale-detail-table td {
+    padding: 9px 10px;
+    font-size: 11px;
+  }
+}
