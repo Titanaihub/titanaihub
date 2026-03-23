@@ -1,35 +1,39 @@
-window.TitanApi = {
-  async fetchJson(url, options = {}) {
-    const res = await fetch(url, options);
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+window.TitanApi = (() => {
+  const API_BASE = "https://titan-ai-api.onrender.com/api";
+
+  async function apiGet(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store"
+    });
+
+    if (!res.ok) {
+      throw new Error(`GET ${path} failed: ${res.status}`);
+    }
+
     return res.json();
-  },
-
-  async getOverview() {
-    return this.fetchJson(`${window.TitanConfig.API_BASE}/api/overview`);
-  },
-
-  async getCoin(symbol) {
-    return this.fetchJson(`${window.TitanConfig.API_BASE}/api/coin/${symbol}`);
-  },
-
-  async getWhales() {
-    return this.fetchJson(`${window.TitanConfig.API_BASE}/api/whales`);
-  },
-
-  async login(username, password) {
-    return this.fetchJson(`${window.TitanConfig.API_BASE}/api/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-  },
-
-  async askChat(question, snapshot) {
-    return this.fetchJson(`${window.TitanConfig.API_BASE}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, snapshot })
-    });
   }
-};
+
+  async function apiPost(path, body) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body || {})
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || `POST ${path} failed: ${res.status}`);
+    }
+
+    return data;
+  }
+
+  return {
+    API_BASE,
+    apiGet,
+    apiPost
+  };
+})();
