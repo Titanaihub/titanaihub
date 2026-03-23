@@ -1,11 +1,11 @@
 const { COIN_UNIVERSE } = require("../config/constants.js");
 const { getStableOverview } = require("./overview-service.js");
 const { getAllStableCoins } = require("./coin-service.js");
+const { buildRealFlowPackage } = require("./real-flow-service.js");
 
 const { detectMarketState } = require("./analysis/market-regime.js");
 const { buildDerivativesAnalysis } = require("./analysis/derivatives-analysis.js");
 const {
-  buildAnalysisExplanation,
   buildExecutionNotes
 } = require("./analysis/explanation-builder.js");
 
@@ -18,44 +18,88 @@ function toNum(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function buildUnavailableWhaleAnalysis() {
-  return {
-    pressure: {
-      longUsd: 0,
-      shortUsd: 0,
-      totalOpen: 0,
-      imbalancePct: 0,
-      pendingOrders: 0,
-      whaleCount: 0,
-      netBias: "Unavailable",
-      pressureState: "Unavailable",
-      directionalBias: "Unavailable",
-      pressureScore: 50,
-      absorptionState: "Unavailable",
-      routeState: "Unavailable",
-      explanation: "Whale analysis disabled until real on-chain / flow source is connected."
-    },
-    conflict: {
-      conflict: "Unavailable",
-      conflictScore: 50
-    },
-    sponsorScore: 50,
-    sponsorState: "Unavailable"
-  };
-}
+function buildStablecoinContextFromLiquiditySummary(liquiditySummary) {
+  const summaryState = String(liquiditySummary?.summaryState || "Unavailable");
 
-function buildUnavailableStablecoinContext() {
+  let averageScore = 50;
+  if (summaryState === "Risk-On") averageScore = 65;
+  else if (summaryState === "Defensive") averageScore = 35;
+
   return {
     items: [],
     totalNet: 0,
-    averageScore: 50,
-    marketLiquidityState: "Unavailable",
-    liquidityPressure: "Unavailable",
-    explanation: "Stablecoin exchange-flow analysis disabled until real provider is connected."
+    averageScore,
+    marketLiquidityState: summaryState,
+    liquidityPressure: summaryState,
+    explanation: "Liquidity state derived from real Binance futures internals."
   };
 }
 
-function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis }) {
+function buildFlowAnalysisForSymbol(symbol, realFlowPkg) {
+  const summaryRows = Array.isArray(realFlowPkg?.positioningSummary)
+    ? realFlowPkg.positioningSummary
+    : [];
+
+  const feedRows = Array.isArray(realFlowPkg?.flowFeed)
+    ? realFlowPkg.flowFeed
+    : [];
+
+  const summary = summaryRows.find((row) => row.symbol === symbol) || null;
+  const feed = feedRows.find((row) => row.symbol === symbol) || null;
+
+  if (!summary && !feed) {
+    return {
+      pressure: {
+        directionalBias: "Unavailable",
+        pressureState: "Unavailable",
+        crowdingState: "Unavailable",
+        oiPressureState: "Unavailable",
+        basisState: "Unavailable",
+        pressureScore: 50,
+        compositeScore: 50,
+        explanation: "Real flow data unavailable for this symbol."
+      },
+      conflict: {
+        conflict: "Unavailable",
+        conflictScore: 50
+      },
+      sponsorScore: 50,
+      sponsorState: "Unavailable"
+    };
+  }
+
+  const directionalBias = summary?.directionalBias || "Balanced";
+  const pressureState = summary?.pressureState || feed?.pressureState || "Balanced";
+  const crowdingState = summary?.crowdingState || feed?.crowdingState || "Balanced";
+  const oiPressureState = summary?.oiPressureState || feed?.oiPressureState || "Mixed Participation";
+  const basisState = summary?.basisState || feed?.basisState || "Neutral Basis";
+  const compositeScore = toNum(summary?.compositeScore, 50);
+
+  let sponsorState = "Balanced";
+  if (directionalBias === "Bullish Positioning") sponsorState = "Bullish Sponsor";
+  else if (directionalBias === "Bearish Positioning") sponsorState = "Bearish Sponsor";
+
+  return {
+    pressure: {
+      directionalBias,
+      pressureState,
+      crowdingState,
+      oiPressureState,
+      basisState,
+      pressureScore: compositeScore,
+      compositeScore,
+      explanation: `Real flow shows ${directionalBias.toLowerCase()} with ${pressureState.toLowerCase()}, ${crowdingState.toLowerCase()}, and ${oiPressureState.toLowerCase()}.`
+    },
+    conflict: {
+      conflict: "Low",
+      conflictScore: 25
+    },
+    sponsorScore: compositeScore,
+    sponsorState
+  };
+}
+
+function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis, flowAnalysis, stablecoinContext }) {
   const momentumScore = toNum(derivativesAnalysis?.momentumState?.momentumScore, 50);
   const trapRiskScore = toNum(derivativesAnalysis?.trapRiskScore, 50);
   const fundingExtreme = toNum(derivativesAnalysis?.fundingState?.extremeScore, 20);
@@ -72,33 +116,39 @@ function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis }) {
   const marketSentimentScore = toNum(marketState?.sentimentScore, 50);
   const stressScore = toNum(marketState?.stressScore, 50);
   const opportunityScore = toNum(marketState?.opportunityScore, 50);
+  const sponsorScore = toNum(flowAnalysis?.sponsorScore, 50);
+  const liquidityScore = toNum(stablecoinContext?.averageScore, 50);
 
   const convictionScore = clamp(
-    momentumScore * 0.34 +
-      structureScore * 0.26 +
-      marketSentimentScore * 0.16 +
-      opportunityScore * 0.12 +
-      (100 - trapRiskScore) * 0.12,
+    momentumScore * 0.24 +
+      structureScore * 0.18 +
+      marketSentimentScore * 0.12 +
+      opportunityScore * 0.1 +
+      sponsorScore * 0.22 +
+      liquidityScore * 0.06 +
+      (100 - trapRiskScore) * 0.08,
     0,
     100
   );
 
   const executionReadinessScore = clamp(
-    convictionScore * 0.56 +
-      (100 - fundingExtreme) * 0.14 +
-      (100 - stressScore) * 0.12 +
+    convictionScore * 0.5 +
+      sponsorScore * 0.15 +
+      (100 - fundingExtreme) * 0.1 +
+      (100 - stressScore) * 0.1 +
       (toNum(coin?.oi, 0) > 0 ? 10 : 0) +
-      (signal === "WAIT" ? -8 : 6),
+      (signal === "WAIT" ? -8 : 5),
     0,
     100
   );
 
   const riskScore = clamp(
-    trapRiskScore * 0.48 +
-      fundingExtreme * 0.22 +
-      stressScore * 0.2 +
+    trapRiskScore * 0.4 +
+      fundingExtreme * 0.16 +
+      stressScore * 0.16 +
+      (100 - sponsorScore) * 0.18 +
       (signal === "WAIT" ? 8 : 0) +
-      (regime === "Panic" ? 12 : 0),
+      (regime === "Panic" ? 10 : 0),
     0,
     100
   );
@@ -123,14 +173,15 @@ function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis }) {
   else if (executionReadinessScore >= 58) executionMode = "Probe / Scale";
 
   return {
-    model: "real-data-only-core",
+    model: "real-data-flow-core",
     usesWhales: false,
     usesStablecoinFlow: false,
+    usesRealFlow: true,
     setupDirection,
     structureScore: Math.round(structureScore),
     momentumScore: Math.round(momentumScore),
-    sponsorScore: 50,
-    stablecoinScore: 50,
+    sponsorScore: Math.round(sponsorScore),
+    stablecoinScore: Math.round(liquidityScore),
     marketSentimentScore: Math.round(marketSentimentScore),
     convictionScore: Math.round(convictionScore),
     executionReadinessScore: Math.round(executionReadinessScore),
@@ -142,10 +193,12 @@ function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis }) {
   };
 }
 
-function buildRealOnlyExplanation({
+function buildRealFlowExplanation({
   symbol,
   marketState,
   derivativesAnalysis,
+  flowAnalysis,
+  stablecoinContext,
   setupScore
 }) {
   const lines = [];
@@ -165,15 +218,19 @@ function buildRealOnlyExplanation({
   );
 
   lines.push(
-    `Funding is ${String(
-      derivativesAnalysis?.fundingState?.state || "neutral"
-    ).toLowerCase()} with trap risk ${String(
-      derivativesAnalysis?.trapRisk || "medium"
+    `Real flow shows ${String(
+      flowAnalysis?.pressure?.directionalBias || "balanced"
+    ).toLowerCase()} with ${String(
+      flowAnalysis?.pressure?.pressureState || "balanced"
+    ).toLowerCase()} and ${String(
+      flowAnalysis?.pressure?.crowdingState || "balanced"
     ).toLowerCase()}.`
   );
 
   lines.push(
-    `This score currently uses real futures market data only. Whale flow and stablecoin exchange-flow are excluded until real providers are connected.`
+    `Liquidity backdrop is ${String(
+      stablecoinContext?.marketLiquidityState || "unavailable"
+    ).toLowerCase()}.`
   );
 
   lines.push(
@@ -183,21 +240,24 @@ function buildRealOnlyExplanation({
   return lines.join(" ");
 }
 
-function buildSingleCoinAnalysis({ meta, coin, marketState }) {
+function buildSingleCoinAnalysis({ meta, coin, marketState, realFlowPkg, stablecoinContext }) {
   const derivativesAnalysis = buildDerivativesAnalysis(coin || {});
-  const whaleAnalysis = buildUnavailableWhaleAnalysis();
-  const stablecoinAnalysis = buildUnavailableStablecoinContext();
+  const flowAnalysis = buildFlowAnalysisForSymbol(meta.symbol, realFlowPkg);
 
   const setupScore = buildRealOnlySetupScore({
     coin: coin || {},
     marketState,
-    derivativesAnalysis
+    derivativesAnalysis,
+    flowAnalysis,
+    stablecoinContext
   });
 
-  const explanation = buildRealOnlyExplanation({
+  const explanation = buildRealFlowExplanation({
     symbol: meta.symbol,
     marketState,
     derivativesAnalysis,
+    flowAnalysis,
+    stablecoinContext,
     setupScore
   });
 
@@ -205,7 +265,7 @@ function buildSingleCoinAnalysis({ meta, coin, marketState }) {
     coin: coin || {},
     setupScore,
     derivativesAnalysis,
-    whaleAnalysis
+    whaleAnalysis: flowAnalysis
   });
 
   return {
@@ -229,11 +289,11 @@ function buildSingleCoinAnalysis({ meta, coin, marketState }) {
 
     marketState,
     derivativesAnalysis,
-    whaleAnalysis,
+    whaleAnalysis: flowAnalysis,
     stablecoinContext: {
-      marketLiquidityState: stablecoinAnalysis.marketLiquidityState,
-      liquidityPressure: stablecoinAnalysis.liquidityPressure,
-      averageScore: stablecoinAnalysis.averageScore
+      marketLiquidityState: stablecoinContext.marketLiquidityState,
+      liquidityPressure: stablecoinContext.liquidityPressure,
+      averageScore: stablecoinContext.averageScore
     },
     setupScore,
     explanation,
@@ -244,6 +304,7 @@ function buildSingleCoinAnalysis({ meta, coin, marketState }) {
 async function buildDeepAnalysisPackage() {
   const overview = await getStableOverview();
   const liveCoins = await getAllStableCoins();
+  const realFlowPkg = await buildRealFlowPackage();
 
   const marketState = detectMarketState({
     marketBias: overview?.marketBias,
@@ -251,13 +312,17 @@ async function buildDeepAnalysisPackage() {
     btcDominance: overview?.btcDominance
   });
 
-  const stablecoinAnalysis = buildUnavailableStablecoinContext();
+  const stablecoinAnalysis = buildStablecoinContextFromLiquiditySummary(
+    realFlowPkg.liquiditySummary
+  );
 
   const coins = COIN_UNIVERSE.map((meta) =>
     buildSingleCoinAnalysis({
       meta,
       coin: liveCoins[meta.symbol] || {},
-      marketState
+      marketState,
+      realFlowPkg,
+      stablecoinContext: stablecoinAnalysis
     })
   ).sort(
     (a, b) =>
@@ -266,23 +331,23 @@ async function buildDeepAnalysisPackage() {
   );
 
   return {
-    mode: "real-data-only-core",
+    mode: "real-data-flow-core",
     overview,
     marketState,
     stablecoinAnalysis,
     whales: {
-      summary: [],
-      mixedFeed: [],
-      stablecoinFlows: [],
-      status: "disabled-until-real-provider"
+      summary: realFlowPkg.positioningSummary,
+      mixedFeed: realFlowPkg.flowFeed,
+      stablecoinFlows: realFlowPkg.liquiditySummary,
+      status: "real-flow-from-binance-internals"
     },
     coins
   };
 }
 
 module.exports = {
-  buildUnavailableWhaleAnalysis,
-  buildUnavailableStablecoinContext,
+  buildStablecoinContextFromLiquiditySummary,
+  buildFlowAnalysisForSymbol,
   buildRealOnlySetupScore,
   buildSingleCoinAnalysis,
   buildDeepAnalysisPackage
