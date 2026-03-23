@@ -1,4 +1,9 @@
 window.TitanFormatters = (() => {
+  function toNum(value, fallback = NaN) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   function formatMaybe(value, fallback = "--") {
     if (value === null || value === undefined || value === "") return fallback;
     return String(value);
@@ -13,14 +18,24 @@ window.TitanFormatters = (() => {
       .replaceAll("'", "&#39;");
   }
 
-  function toNum(value, fallback = 0) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+  function formatPrice(value) {
+    const n = toNum(value);
+    if (!Number.isFinite(n)) return "--";
+
+    const abs = Math.abs(n);
+
+    if (abs >= 1000) return `$${n.toFixed(2)}`;
+    if (abs >= 100) return `$${n.toFixed(2)}`;
+    if (abs >= 1) return `$${n.toFixed(3)}`;
+    if (abs >= 0.01) return `$${n.toFixed(4)}`;
+    if (abs >= 0.0001) return `$${n.toFixed(6)}`;
+    return `$${n.toFixed(8)}`;
   }
 
   function formatUsdCompact(value) {
-    const n = Number(value);
+    const n = toNum(value);
     if (!Number.isFinite(n)) return "--";
+
     if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
     if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
     if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
@@ -28,26 +43,31 @@ window.TitanFormatters = (() => {
     return `$${n.toFixed(2)}`;
   }
 
-  function formatPrice(value) {
-    const n = Number(value);
+  function formatPercent(value, digits = 2) {
+    const n = toNum(value);
     if (!Number.isFinite(n)) return "--";
-
-    const abs = Math.abs(n);
-
-    if (abs >= 1000) return `$${n.toFixed(2)}`;
-    if (abs >= 1) return `$${n.toFixed(2)}`;
-    if (abs >= 0.1) return `$${n.toFixed(4)}`;
-    if (abs >= 0.01) return `$${n.toFixed(5)}`;
-    if (abs >= 0.001) return `$${n.toFixed(6)}`;
-    if (abs >= 0.0001) return `$${n.toFixed(7)}`;
-    if (abs >= 0.00001) return `$${n.toFixed(8)}`;
-    return `$${n.toExponential(4)}`;
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${n.toFixed(digits)}%`;
   }
 
-  function formatPercent(value, digits = 2) {
-    const n = Number(value);
+  function formatSignedNumber(value, digits = 2) {
+    const n = toNum(value);
     if (!Number.isFinite(n)) return "--";
-    return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${n.toFixed(digits)}`;
+  }
+
+  function formatRatio(value, digits = 3) {
+    const n = toNum(value);
+    if (!Number.isFinite(n)) return "--";
+    return n.toFixed(digits);
+  }
+
+  function shortText(value, maxLength = 140) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength - 3)}...`;
   }
 
   function getSignalClass(signal) {
@@ -66,11 +86,15 @@ window.TitanFormatters = (() => {
 
   function getBiasClass(value) {
     const text = String(value || "").toLowerCase();
+
     if (
       text.includes("bull") ||
       text.includes("buy") ||
+      text.includes("long") ||
       text.includes("risk-on") ||
-      text.includes("constructive")
+      text.includes("support") ||
+      text.includes("constructive") ||
+      text.includes("bid")
     ) {
       return "pos";
     }
@@ -78,9 +102,11 @@ window.TitanFormatters = (() => {
     if (
       text.includes("bear") ||
       text.includes("sell") ||
+      text.includes("short") ||
       text.includes("risk-off") ||
-      text.includes("panic") ||
-      text.includes("defensive")
+      text.includes("ask pressure") ||
+      text.includes("defensive") ||
+      text.includes("discount")
     ) {
       return "neg";
     }
@@ -89,12 +115,15 @@ window.TitanFormatters = (() => {
   }
 
   return {
+    toNum,
     formatMaybe,
     escapeHtml,
-    toNum,
-    formatUsdCompact,
     formatPrice,
+    formatUsdCompact,
     formatPercent,
+    formatSignedNumber,
+    formatRatio,
+    shortText,
     getSignalClass,
     getSignedClass,
     getBiasClass
