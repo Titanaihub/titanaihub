@@ -72,29 +72,15 @@ router.get("/alerts", async (req, res) => {
 
 router.get("/analysis/deep", async (req, res) => {
   try {
-    const data = await buildDeepAnalysisPackage();
-    return res.json(data);
-  } catch (err) {
-    console.error("analysis/deep route fallback:", err.message);
-    return res.json({
-      mode: "real-data-only-core",
-      overview: null,
-      marketState: null,
-      stablecoinAnalysis: {
-        items: [],
-        totalNet: 0,
-        averageScore: 50,
-        marketLiquidityState: "Unavailable",
-        liquidityPressure: "Unavailable",
-        explanation: "Analysis unavailable"
-      },
-      whales: {
-        summary: [],
-        mixedFeed: [],
-        stablecoinFlows: [],
-        status: "unavailable"
-      },
-      coins: []
+    const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
+    const payload = await buildDeepAnalysisPackage();
+    return res.json(payload);
+  } catch (error) {
+    console.error("GET /api/analysis/deep failed:", error);
+
+    return res.status(500).json({
+      error: true,
+      message: error.message || "analysis/deep failed"
     });
   }
 });
