@@ -159,15 +159,7 @@ function renderAll() {
 async function loadAllData() {
   const { apiGet } = window.TitanApi;
 
-  const [
-    overview,
-    btc,
-    eth,
-    bnb,
-    coinFocus,
-    alerts,
-    deepAnalysis
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     apiGet("/overview?v=2401"),
     apiGet("/coin/btc?v=2401"),
     apiGet("/coin/eth?v=2401"),
@@ -176,6 +168,19 @@ async function loadAllData() {
     apiGet("/alerts?v=2401"),
     apiGet("/analysis/deep?v=2401")
   ]);
+
+  const getValue = (index, fallback = null) => {
+    const result = results[index];
+    return result && result.status === "fulfilled" ? result.value : fallback;
+  };
+
+  const overview = getValue(0, null);
+  const btc = getValue(1, null);
+  const eth = getValue(2, null);
+  const bnb = getValue(3, null);
+  const coinFocus = getValue(4, []);
+  const alerts = getValue(5, []);
+  const deepAnalysis = getValue(6, null);
 
   appState.snapshot.overview = overview || null;
   appState.snapshot.coins = {
@@ -194,39 +199,69 @@ async function loadAllData() {
     whalesBlock.stablecoinFlows && !Array.isArray(whalesBlock.stablecoinFlows)
       ? whalesBlock.stablecoinFlows
       : null;
-}
 
+  return {
+    overviewOk: Boolean(overview),
+    btcOk: Boolean(btc),
+    ethOk: Boolean(eth),
+    bnbOk: Boolean(bnb),
+    coinFocusOk: Array.isArray(coinFocus) && coinFocus.length > 0,
+    alertsOk: Array.isArray(alerts),
+    deepAnalysisOk: Boolean(deepAnalysis)
+  };
+}
 async function refreshDashboard() {
   try {
-    await loadAllData();
+    const health = await loadAllData();
     renderAll();
 
+    const hasCoreData =
+      health.overviewOk ||
+      health.btcOk ||
+      health.ethOk ||
+      health.bnbOk;
+
     if (elements.systemStatus) {
-      elements.systemStatus.textContent = "LIVE";
-      elements.systemStatus.classList.remove("neg");
-      elements.systemStatus.classList.add("pos");
+      if (hasCoreData) {
+        elements.systemStatus.textContent = "LIVE";
+        elements.systemStatus.classList.remove("neg");
+        elements.systemStatus.classList.add("pos");
+      } else {
+        elements.systemStatus.textContent = "WAIT";
+        elements.systemStatus.classList.remove("pos");
+        elements.systemStatus.classList.add("neg");
+      }
     }
 
     if (elements.lastUpdated) {
+      const overviewTs = appState.snapshot.overview?.lastUpdated;
       const deepTs = appState.snapshot.deepAnalysis?.overview?.lastUpdated;
-      elements.lastUpdated.textContent = deepTs || new Date().toLocaleString();
+      elements.lastUpdated.textContent = overviewTs || deepTs || "--";
+    }
+
+    if (elements.globalBias) {
+      const overviewBias = appState.snapshot.overview?.marketBias;
+      const deepBias = appState.snapshot.deepAnalysis?.overview?.marketBias;
+      elements.globalBias.textContent = overviewBias || deepBias || "WAIT";
     }
   } catch (err) {
     console.error("refreshDashboard failed:", err);
 
     if (elements.systemStatus) {
-      elements.systemStatus.textContent = "ERROR";
+      elements.systemStatus.textContent = "WAIT";
       elements.systemStatus.classList.remove("pos");
       elements.systemStatus.classList.add("neg");
     }
 
-    if (window.TitanChat?.addChatMessage) {
-      window.TitanChat.addChatMessage(
-        elements,
-        "ai",
-        `Dashboard refresh failed: ${err.message || err}`
-      );
+    if (elements.lastUpdated) {
+      elements.lastUpdated.textContent = "--";
     }
+
+    if (elements.globalBias) {
+      elements.globalBias.textContent = "WAIT";
+    }
+
+    renderAll();
   }
 }
 
