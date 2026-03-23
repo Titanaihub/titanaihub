@@ -5,9 +5,8 @@ const { buildRealFlowPackage } = require("./real-flow-service.js");
 
 const { detectMarketState } = require("./analysis/market-regime.js");
 const { buildDerivativesAnalysis } = require("./analysis/derivatives-analysis.js");
-const {
-  buildExecutionNotes
-} = require("./analysis/explanation-builder.js");
+const { buildExecutionNotes } = require("./analysis/explanation-builder.js");
+const { buildPhase2AnalysisBlock } = require("./phase2/phase2-analysis-service.js");
 
 function clamp(value, min, max) {
   return Math.min(Math.max(Number(value || 0), min), max);
@@ -39,7 +38,6 @@ function buildFlowAnalysisForSymbol(symbol, realFlowPkg) {
   const summaryRows = Array.isArray(realFlowPkg?.positioningSummary)
     ? realFlowPkg.positioningSummary
     : [];
-
   const feedRows = Array.isArray(realFlowPkg?.flowFeed)
     ? realFlowPkg.flowFeed
     : [];
@@ -99,7 +97,13 @@ function buildFlowAnalysisForSymbol(symbol, realFlowPkg) {
   };
 }
 
-function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis, flowAnalysis, stablecoinContext }) {
+function buildRealOnlySetupScore({
+  coin,
+  marketState,
+  derivativesAnalysis,
+  flowAnalysis,
+  stablecoinContext
+}) {
   const momentumScore = toNum(derivativesAnalysis?.momentumState?.momentumScore, 50);
   const trapRiskScore = toNum(derivativesAnalysis?.trapRiskScore, 50);
   const fundingExtreme = toNum(derivativesAnalysis?.fundingState?.extremeScore, 20);
@@ -123,7 +127,7 @@ function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis, flowA
     momentumScore * 0.24 +
       structureScore * 0.18 +
       marketSentimentScore * 0.12 +
-      opportunityScore * 0.1 +
+      opportunityScore * 0.10 +
       sponsorScore * 0.22 +
       liquidityScore * 0.06 +
       (100 - trapRiskScore) * 0.08,
@@ -177,6 +181,7 @@ function buildRealOnlySetupScore({ coin, marketState, derivativesAnalysis, flowA
     usesWhales: false,
     usesStablecoinFlow: false,
     usesRealFlow: true,
+    phase2Enabled: false,
     setupDirection,
     structureScore: Math.round(structureScore),
     momentumScore: Math.round(momentumScore),
@@ -240,11 +245,17 @@ function buildRealFlowExplanation({
   return lines.join(" ");
 }
 
-function buildSingleCoinAnalysis({ meta, coin, marketState, realFlowPkg, stablecoinContext }) {
+async function buildSingleCoinAnalysis({
+  meta,
+  coin,
+  marketState,
+  realFlowPkg,
+  stablecoinContext
+}) {
   const derivativesAnalysis = buildDerivativesAnalysis(coin || {});
   const flowAnalysis = buildFlowAnalysisForSymbol(meta.symbol, realFlowPkg);
 
-  const setupScore = buildRealOnlySetupScore({
+  const baseSetupScore = buildRealOnlySetupScore({
     coin: coin || {},
     marketState,
     derivativesAnalysis,
@@ -252,14 +263,28 @@ function buildSingleCoinAnalysis({ meta, coin, marketState, realFlowPkg, stablec
     stablecoinContext
   });
 
-  const explanation = buildRealFlowExplanation({
+  const baseExplanation = buildRealFlowExplanation({
     symbol: meta.symbol,
     marketState,
     derivativesAnalysis,
     flowAnalysis,
     stablecoinContext,
-    setupScore
+    setupScore: baseSetupScore
   });
+
+  const phase2Block = await buildPhase2AnalysisBlock({
+    symbol: meta.symbol,
+    coin: coin || {},
+    setupScore: baseSetupScore,
+    flowAnalysis,
+    stablecoinContext,
+    derivativesAnalysis,
+    explanation: baseExplanation
+  });
+
+  const setupScore = phase2Block?.enhancedSetupScore || baseSetupScore;
+  const explanation = phase2Block?.enhancedExplanation || baseExplanation;
+  const decisionProfile = phase2Block?.decisionProfile || null;
 
   const executionNotes = buildExecutionNotes({
     coin: coin || {},
@@ -295,6 +320,7 @@ function buildSingleCoinAnalysis({ meta, coin, marketState, realFlowPkg, stablec
       liquidityPressure: stablecoinContext.liquidityPressure,
       averageScore: stablecoinContext.averageScore
     },
+    phase2: decisionProfile,
     setupScore,
     explanation,
     executionNotes
@@ -316,22 +342,26 @@ async function buildDeepAnalysisPackage() {
     realFlowPkg.liquiditySummary
   );
 
-  const coins = COIN_UNIVERSE.map((meta) =>
-    buildSingleCoinAnalysis({
-      meta,
-      coin: liveCoins[meta.symbol] || {},
-      marketState,
-      realFlowPkg,
-      stablecoinContext: stablecoinAnalysis
-    })
-  ).sort(
+  const coins = await Promise.all(
+    COIN_UNIVERSE.map((meta) =>
+      buildSingleCoinAnalysis({
+        meta,
+        coin: liveCoins[meta.symbol] || {},
+        marketState,
+        realFlowPkg,
+        stablecoinContext: stablecoinAnalysis
+      })
+    )
+  );
+
+  coins.sort(
     (a, b) =>
       Number(b?.setupScore?.convictionScore || 0) -
       Number(a?.setupScore?.convictionScore || 0)
   );
 
   return {
-    mode: "real-data-flow-core",
+    mode: "real-data-flow-core-phase2",
     overview,
     marketState,
     stablecoinAnalysis,
