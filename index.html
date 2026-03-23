@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Titan AI Hub</title>
-  <link rel="stylesheet" href="./styles.css?v=1000" />
+  <link rel="stylesheet" href="./styles.css?v=2400" />
 </head>
 <body>
   <div class="app-shell">
@@ -186,53 +186,54 @@
           </article>
         </div>
       </section>
-      <section class="panel panel-full" id="whalesSection">
-  <div class="section-head">
-    <div>
-      <h2>Real Flow Feed</h2>
-      <p>Live Binance futures positioning, pressure, crowding, OI and basis states</p>
-    </div>
-  </div>
 
-  <div class="table-wrap">
-    <table class="data-table whale-detail-table">
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Futures Symbol</th>
-          <th>Pressure</th>
-          <th>Crowding</th>
-          <th>OI State</th>
-          <th>Basis</th>
-          <th>Global L/S</th>
-          <th>Top Acct L/S</th>
-          <th>Top Pos L/S</th>
-          <th>Taker Ratio</th>
-          <th>OI Value</th>
-          <th>OI Change</th>
-          <th>Premium</th>
-        </tr>
-      </thead>
-      <tbody id="whaleTableBody">
-        <tr>
-          <td colspan="13">Loading real flow feed...</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
+      <section class="panel panel-full" id="whalesSection">
+        <div class="section-head">
+          <div>
+            <h2>Real Flow Feed</h2>
+            <p>Live Binance futures positioning, pressure, crowding, OI and basis states</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table whale-detail-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Futures Symbol</th>
+                <th>Pressure</th>
+                <th>Crowding</th>
+                <th>OI State</th>
+                <th>Basis</th>
+                <th>Global L/S</th>
+                <th>Top Acct L/S</th>
+                <th>Top Pos L/S</th>
+                <th>Taker Ratio</th>
+                <th>OI Value</th>
+                <th>OI Change</th>
+                <th>Premium</th>
+              </tr>
+            </thead>
+            <tbody id="whaleTableBody">
+              <tr>
+                <td colspan="13">Loading real flow feed...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section class="panel panel-full">
         <div class="section-head">
           <div>
             <h2>Positioning Summary</h2>
-<p>Directional bias, pressure, crowding, OI state and basis by asset</p>
+            <p>Directional bias, pressure, crowding, OI state and basis by asset</p>
           </div>
         </div>
 
         <div id="whaleSummaryGrid" class="summary-cards-grid">
           <div class="stat-card">
-            <span>Loading whale summary...</span>
+            <span>Loading positioning summary...</span>
             <strong>--</strong>
           </div>
         </div>
@@ -242,23 +243,22 @@
         <div class="section-head">
           <div>
             <h2>Liquidity Summary</h2>
-<p>Aggregated pressure, crowding and basis backdrop from real Binance futures internals</p>
+            <p>Aggregated pressure, crowding and basis backdrop from real Binance futures internals</p>
           </div>
         </div>
 
         <div id="stablecoinFlowGrid" class="summary-cards-grid">
           <div class="stat-card">
-            <span>Loading stablecoin flow...</span>
+            <span>Loading liquidity summary...</span>
             <strong>--</strong>
           </div>
         </div>
       </section>
-
       <section class="panel panel-full" id="alertsSection">
         <div class="section-head">
           <div>
             <h2>Smart Alerts</h2>
-            <p>Opportunity, flow, and trap-risk alerts from the engine</p>
+            <p>Opportunity, flow, positioning, liquidation and execution alerts from the engine</p>
           </div>
         </div>
 
@@ -280,6 +280,7 @@
 
         <pre id="rawSnapshot" class="raw-box">Loading...</pre>
       </section>
+
       <section class="panel chat-panel panel-full" id="aiChatPanel">
         <div class="section-head">
           <div>
@@ -337,13 +338,14 @@
       </section>
     </main>
   </div>
-  <script src="./js/api-client.js?v=2000"></script>
-<script src="./js/formatters.js?v=2000"></script>
-<script src="./js/render-overview.js?v=2000"></script>
-<script src="./js/render-coin-focus.js?v=2000"></script>
-<script src="./js/render-real-flow.js?v=2000"></script>
-<script src="./js/render-alerts.js?v=2000"></script>
-<script src="./js/chat.js?v=2000"></script>
-<script src="./js/dashboard.js?v=2000"></script>
+
+  <script src="./js/api-client.js?v=2400"></script>
+  <script src="./js/formatters.js?v=2400"></script>
+  <script src="./js/render-overview.js?v=2400"></script>
+  <script src="./js/render-coin-focus.js?v=2400"></script>
+  <script src="./js/render-real-flow.js?v=2400"></script>
+  <script src="./js/render-alerts.js?v=2400"></script>
+  <script src="./js/chat.js?v=2400"></script>
+  <script src="./js/dashboard.js?v=2400"></script>
 </body>
 </html>
