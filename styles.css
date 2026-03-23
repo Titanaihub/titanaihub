@@ -705,3 +705,235 @@ a {
     width: 100%;
   }
 }
+/* ===== Phase 2 / Real Flow / Alerts ===== */
+
+.pos {
+  color: #16c784;
+}
+
+.neg {
+  color: #ea3943;
+}
+
+.flat {
+  color: #9aa4b2;
+}
+
+.coin-focus-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.coin-focus-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.coin-focus-card-top h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.coin-focus-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.coin-focus-price-wrap {
+  text-align: right;
+}
+
+.coin-focus-price {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.coin-focus-tag {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+  word-break: break-word;
+}
+
+.coin-focus-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d8dee9;
+}
+
+.coin-focus-grid-inner,
+.summary-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.coin-focus-note,
+.summary-card-note {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.coin-focus-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(234, 57, 67, 0.12);
+  border: 1px solid rgba(234, 57, 67, 0.28);
+  color: #ffb4ba;
+  font-size: 12px;
+}
+
+.summary-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.summary-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.summary-card-top h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.alert-card {
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.alert-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.alert-type {
+  font-size: 11px;
+  opacity: 0.8;
+  letter-spacing: 0.08em;
+}
+
+.alert-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.alert-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  opacity: 0.9;
+}
+
+.alert-opportunity {
+  border-color: rgba(22, 199, 132, 0.28);
+  background: rgba(22, 199, 132, 0.08);
+}
+
+.alert-risk {
+  border-color: rgba(234, 57, 67, 0.28);
+  background: rgba(234, 57, 67, 0.08);
+}
+
+.alert-caution {
+  border-color: rgba(240, 185, 11, 0.28);
+  background: rgba(240, 185, 11, 0.08);
+}
+
+.alert-liquidation {
+  border-color: rgba(255, 120, 60, 0.28);
+  background: rgba(255, 120, 60, 0.08);
+}
+
+.alert-positioning {
+  border-color: rgba(120, 120, 255, 0.28);
+  background: rgba(120, 120, 255, 0.08);
+}
+
+.alert-flow {
+  border-color: rgba(64, 196, 255, 0.28);
+  background: rgba(64, 196, 255, 0.08);
+}
+
+.alert-macro {
+  border-color: rgba(180, 140, 255, 0.28);
+  background: rgba(180, 140, 255, 0.08);
+}
+
+.alert-system {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (max-width: 768px) {
+  .coin-focus-grid-inner,
+  .summary-card-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .coin-focus-card,
+  .summary-card,
+  .alert-card {
+    padding: 14px;
+  }
+
+  .coin-focus-price {
+    font-size: 18px;
+  }
+
+  .coin-focus-card-top h3,
+  .summary-card-top h3 {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 560px) {
+  .coin-focus-grid-inner,
+  .summary-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coin-focus-card-top,
+  .summary-card-top,
+  .alert-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .coin-focus-price-wrap {
+    text-align: left;
+  }
+}
