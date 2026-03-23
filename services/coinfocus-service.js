@@ -16,11 +16,18 @@ function scoreToLabel(score) {
   return "Low";
 }
 
-function trapRiskToLiquiditySignal(trapRisk) {
-  const value = String(trapRisk || "Medium");
-  if (value === "High") return "High Sweep Risk";
-  if (value === "Medium") return "Stop Hunt Risk";
-  return "Cleaner Path";
+function liquidityStateFromFlow(flowAnalysis) {
+  const pressure = String(flowAnalysis?.pressure?.pressureState || "Balanced");
+  const basis = String(flowAnalysis?.pressure?.basisState || "Neutral Basis");
+  const oiPressure = String(flowAnalysis?.pressure?.oiPressureState || "Mixed Participation");
+
+  if (pressure === "Buy Pressure" && oiPressure === "Aggressive Long Build") return "Aggressive Bid";
+  if (pressure === "Sell Pressure" && oiPressure === "Aggressive Short Build") return "Aggressive Offer";
+  if (basis === "Rich Premium") return "Premium Rich";
+  if (basis === "Discount") return "Discounted";
+  if (oiPressure === "Short Covering") return "Short Covering";
+  if (oiPressure === "Long Flush") return "Long Flush";
+  return "Balanced";
 }
 
 function mapDeepAnalysisToCoinFocusItem(item) {
@@ -28,6 +35,8 @@ function mapDeepAnalysisToCoinFocusItem(item) {
   const setup = coin.setupScore || {};
   const marketState = coin.marketState || {};
   const derivatives = coin.derivativesAnalysis || {};
+  const flowAnalysis = coin.whaleAnalysis || {};
+  const stablecoinContext = coin.stablecoinContext || {};
 
   const price = Number(coin.price || 0);
   const oi = Number(coin.oi || 0);
@@ -38,7 +47,7 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     className: coin.className || "",
     chain: coin.chain || "",
     source: coin.source || "unknown",
-    model: setup.model || "real-data-only-core",
+    model: setup.model || "real-data-flow-core",
 
     price: formatPrice(price),
     rawPrice: price,
@@ -66,7 +75,7 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     confidenceLabel: scoreToLabel(setup?.executionReadinessScore || 50),
     riskLabel: scoreToLabel(100 - Number(setup?.riskScore || 50)),
 
-    liquiditySignal: trapRiskToLiquiditySignal(derivatives?.trapRisk),
+    liquiditySignal: liquidityStateFromFlow(flowAnalysis),
 
     funding: `${Number(coin.funding || 0).toFixed(4)}%`,
     oi: formatUsd(oi),
@@ -93,8 +102,17 @@ function mapDeepAnalysisToCoinFocusItem(item) {
     realDataOnly: true,
     usesWhales: false,
     usesStablecoinFlow: false,
-    whaleState: "Disabled until real provider",
-    stablecoinState: "Disabled until real provider",
+    usesRealFlow: true,
+
+    flowDirection: flowAnalysis?.pressure?.directionalBias || "Balanced",
+    flowPressure: flowAnalysis?.pressure?.pressureState || "Balanced",
+    flowCrowding: flowAnalysis?.pressure?.crowdingState || "Balanced",
+    flowOIState: flowAnalysis?.pressure?.oiPressureState || "Mixed Participation",
+    flowBasisState: flowAnalysis?.pressure?.basisState || "Neutral Basis",
+    flowScore: Number(flowAnalysis?.pressure?.compositeScore || 50),
+
+    liquidityBackdrop: stablecoinContext?.marketLiquidityState || "Balanced",
+    liquidityPressure: stablecoinContext?.liquidityPressure || "Balanced",
 
     explanation: coin.explanation || "",
     executionNotes: Array.isArray(coin.executionNotes) ? coin.executionNotes : []
@@ -122,7 +140,7 @@ async function buildCoinFocusPackage() {
 
 module.exports = {
   scoreToLabel,
-  trapRiskToLiquiditySignal,
+  liquidityStateFromFlow,
   mapDeepAnalysisToCoinFocusItem,
   buildCoinFocusPackage
 };
