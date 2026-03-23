@@ -29,6 +29,12 @@ window.TitanRenderCoinFocus = (() => {
     return formatMaybe(value);
   }
 
+  function buildRiskFlags(flags) {
+    const list = Array.isArray(flags) ? flags.filter(Boolean) : [];
+    if (!list.length) return "None";
+    return list.slice(0, 3).join(", ");
+  }
+
   function renderSingleCoin(elements, prefix, data) {
     if (!data) return;
 
@@ -106,7 +112,20 @@ window.TitanRenderCoinFocus = (() => {
         const biasClass = getBiasClass(item.bias);
         const flowText = item.usesRealFlow
           ? `${formatMaybe(item.flowPressure)} / ${formatMaybe(item.flowCrowding)}`
-          : "Disabled until real provider";
+          : "Disabled";
+
+        const actionClass = getBiasClass(item.recommendedAction || item.setupDirection || "");
+        const tierClass =
+          String(item.executionTier || "").includes("No Trade")
+            ? "neg"
+            : String(item.executionTier || "").includes("Tier 1") ||
+              String(item.executionTier || "").includes("Tier 2")
+            ? "pos"
+            : "flat";
+
+        const noTradeNote = item.noTradeReason
+          ? `<div class="coin-focus-warning">No Trade: ${escapeHtml(item.noTradeReason)}</div>`
+          : "";
 
         return `
           <article class="coin-focus-card">
@@ -117,33 +136,41 @@ window.TitanRenderCoinFocus = (() => {
               </div>
               <div class="coin-focus-price-wrap">
                 <div class="coin-focus-price">${escapeHtml(formatMaybe(item.price || "--"))}</div>
-                <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core")}</div>
+                <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core-phase2")}</div>
               </div>
             </div>
 
             <div class="coin-focus-badges">
               <span class="signal-badge ${escapeHtml(signalClass)}">${escapeHtml(item.signal || "WAIT")}</span>
               <span class="mini-badge">${escapeHtml(item.marketRegime || "--")}</span>
-              <span class="mini-badge">${escapeHtml(item.dataCompleteness || "--")} Data</span>
+              <span class="mini-badge ${escapeHtml(tierClass)}">${escapeHtml(item.executionTier || "No Trade")}</span>
             </div>
 
             <div class="coin-focus-grid-inner">
-              ${buildMetricBox("Setup Score", item.finalSetupScore)}
-              ${buildMetricBox("Confidence", `${formatMaybe(item.confidenceScore, "--")}%`)}
+              ${buildMetricBox("Setup", item.finalSetupScore)}
+              ${buildMetricBox("Decision", item.decisionScore)}
+              ${buildMetricBox("Micro", item.microstructureScore)}
               ${buildMetricBox("Risk", item.riskScore)}
-              ${buildMetricBox("Liquidity", item.liquiditySignal)}
+              ${buildMetricBox("Action", item.recommendedAction || "Wait", actionClass)}
+              ${buildMetricBox("Tradeability", item.tradeabilityState || "--")}
               ${buildMetricBox("Trend", item.trendState)}
               ${buildMetricBox("Bias", item.bias, biasClass)}
-              ${buildMetricBox("Funding State", item.fundingState)}
-              ${buildMetricBox("Derivatives", item.derivativesState)}
+              ${buildMetricBox("Flow", flowText)}
+              ${buildMetricBox("Book", item.orderBookState || "--")}
+              ${buildMetricBox("Vol", item.volatilityState || "--")}
+              ${buildMetricBox("Liq", item.liquidationState || "--")}
               ${buildMetricBox("5m", item.change5m, c5Class)}
               ${buildMetricBox("1h", item.change1h, c1Class)}
               ${buildMetricBox("Entry", item.entry)}
               ${buildMetricBox("SL", item.sl)}
               ${buildMetricBox("TP", item.tp)}
               ${buildMetricBox("OI", item.oi)}
-              ${buildMetricBox("Execution", item.executionMode)}
-              ${buildMetricBox("Flow", flowText)}
+            </div>
+
+            ${noTradeNote}
+
+            <div class="coin-focus-note">
+              <strong>Flags:</strong> ${escapeHtml(buildRiskFlags(item.riskFlags))}
             </div>
 
             <div class="coin-focus-note">
