@@ -3,6 +3,8 @@ window.TitanRenderCoinFocus = (() => {
     escapeHtml,
     formatMaybe,
     formatPrice,
+    formatPercent,
+    shortText,
     getSignalClass,
     getSignedClass,
     getBiasClass
@@ -23,16 +25,58 @@ window.TitanRenderCoinFocus = (() => {
   }
 
   function normalizeDisplayPrice(value) {
-    if (typeof value === "number") return formatPrice(value);
     const n = Number(value);
     if (Number.isFinite(n)) return formatPrice(n);
+    return formatMaybe(value);
+  }
+
+  function normalizeDisplayPercent(value) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return formatPercent(n);
     return formatMaybe(value);
   }
 
   function buildRiskFlags(flags) {
     const list = Array.isArray(flags) ? flags.filter(Boolean) : [];
     if (!list.length) return "None";
-    return list.slice(0, 3).join(", ");
+    return list.slice(0, 2).join(" • ");
+  }
+
+  function shortenTradeability(value) {
+    const text = String(value || "");
+    if (!text) return "--";
+    if (text === "Breakout Watch") return "Breakout";
+    if (text === "Low Tradeability") return "Low";
+    if (text === "Fragile / Sweep Risk") return "Sweep Risk";
+    return text;
+  }
+
+  function shortenLiq(value) {
+    const text = String(value || "");
+    if (!text) return "--";
+    if (text === "Balanced Liquidation Pressure") return "Balanced";
+    if (text === "Short Liquidation Risk Above") return "Short Risk";
+    if (text === "Long Liquidation Risk Below") return "Long Risk";
+    return text;
+  }
+
+  function shortenVol(value) {
+    const text = String(value || "");
+    if (!text) return "--";
+    if (text === "Compressed") return "Compressed";
+    if (text === "Extreme") return "Extreme";
+    if (text === "Normal") return "Normal";
+    if (text === "Elevated") return "Elevated";
+    return text;
+  }
+
+  function shortenFlow(item) {
+    const pressure = String(item.flowPressure || "");
+    const crowd = String(item.flowCrowding || "");
+
+    if (!pressure && !crowd) return "--";
+    if (pressure && crowd) return `${pressure} / ${crowd}`;
+    return pressure || crowd || "--";
   }
 
   function renderSingleCoin(elements, prefix, data) {
@@ -53,10 +97,10 @@ window.TitanRenderCoinFocus = (() => {
 
     setText(priceNode, normalizeDisplayPrice(data.priceFormatted || data.priceText || data.price));
     setText(signalNode, data.signal || "WAIT");
-    setText(m5Node, formatMaybe(data.change5m || "--"));
-    setText(m15Node, formatMaybe(data.change15m || "--"));
-    setText(h1Node, formatMaybe(data.change1h || "--"));
-    setText(h4Node, formatMaybe(data.change4h || "--"));
+    setText(m5Node, normalizeDisplayPercent(data.change5m));
+    setText(m15Node, normalizeDisplayPercent(data.change15m));
+    setText(h1Node, normalizeDisplayPercent(data.change1h));
+    setText(h4Node, normalizeDisplayPercent(data.change4h));
     setText(fundingNode, formatMaybe(data.funding || "--"));
     setText(oiNode, formatMaybe(data.oi || "--"));
     setText(biasNode, data.bias || "--");
@@ -107,13 +151,11 @@ window.TitanRenderCoinFocus = (() => {
       .slice(0, 12)
       .map((item) => {
         const signalClass = getSignalClass(item.signal);
-        const c5Class = getSignedClass(item.change5m);
-        const c1Class = getSignedClass(item.change1h);
+        const c5Value = normalizeDisplayPercent(item.change5m);
+        const c1Value = normalizeDisplayPercent(item.change1h);
+        const c5Class = getSignedClass(c5Value);
+        const c1Class = getSignedClass(c1Value);
         const biasClass = getBiasClass(item.bias);
-        const flowText = item.usesRealFlow
-          ? `${formatMaybe(item.flowPressure)} / ${formatMaybe(item.flowCrowding)}`
-          : "Disabled";
-
         const actionClass = getBiasClass(item.recommendedAction || item.setupDirection || "");
         const tierClass =
           String(item.executionTier || "").includes("No Trade")
@@ -130,13 +172,14 @@ window.TitanRenderCoinFocus = (() => {
         return `
           <article class="coin-focus-card">
             <div class="coin-focus-card-top">
-              <div>
+              <div class="coin-focus-card-heading">
                 <h3>${escapeHtml(item.symbol)}</h3>
                 <div class="coin-focus-subtitle">${escapeHtml(item.setupDirection || "Watchlist")}</div>
               </div>
+
               <div class="coin-focus-price-wrap">
                 <div class="coin-focus-price">${escapeHtml(formatMaybe(item.price || "--"))}</div>
-                <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core-phase2")}</div>
+                <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core")}</div>
               </div>
             </div>
 
@@ -151,20 +194,23 @@ window.TitanRenderCoinFocus = (() => {
               ${buildMetricBox("Decision", item.decisionScore)}
               ${buildMetricBox("Micro", item.microstructureScore)}
               ${buildMetricBox("Risk", item.riskScore)}
+
               ${buildMetricBox("Action", item.recommendedAction || "Wait", actionClass)}
-              ${buildMetricBox("Tradeability", item.tradeabilityState || "--")}
-              ${buildMetricBox("Trend", item.trendState)}
-              ${buildMetricBox("Bias", item.bias, biasClass)}
-              ${buildMetricBox("Flow", flowText)}
+              ${buildMetricBox("Tradeability", shortenTradeability(item.tradeabilityState || "--"))}
+              ${buildMetricBox("Trend", item.trendState || "--")}
+              ${buildMetricBox("Bias", item.bias || "--", biasClass)}
+
+              ${buildMetricBox("Flow", shortenFlow(item))}
               ${buildMetricBox("Book", item.orderBookState || "--")}
-              ${buildMetricBox("Vol", item.volatilityState || "--")}
-              ${buildMetricBox("Liq", item.liquidationState || "--")}
-              ${buildMetricBox("5m", item.change5m, c5Class)}
-              ${buildMetricBox("1h", item.change1h, c1Class)}
-              ${buildMetricBox("Entry", item.entry)}
-              ${buildMetricBox("SL", item.sl)}
-              ${buildMetricBox("TP", item.tp)}
-              ${buildMetricBox("OI", item.oi)}
+              ${buildMetricBox("Vol", shortenVol(item.volatilityState || "--"))}
+              ${buildMetricBox("Liq", shortenLiq(item.liquidationState || "--"))}
+
+              ${buildMetricBox("5m", c5Value, c5Class)}
+              ${buildMetricBox("1h", c1Value, c1Class)}
+              ${buildMetricBox("Entry", normalizeDisplayPrice(item.entry))}
+              ${buildMetricBox("SL", normalizeDisplayPrice(item.sl))}
+              ${buildMetricBox("TP", normalizeDisplayPrice(item.tp))}
+              ${buildMetricBox("OI", item.oi || "--")}
             </div>
 
             ${noTradeNote}
@@ -174,7 +220,7 @@ window.TitanRenderCoinFocus = (() => {
             </div>
 
             <div class="coin-focus-note">
-              ${escapeHtml(item.explanation || "")}
+              ${escapeHtml(shortText(item.explanation || "", 240))}
             </div>
           </article>
         `;
