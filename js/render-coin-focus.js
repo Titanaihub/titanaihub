@@ -4,6 +4,7 @@ window.TitanRenderCoinFocus = (() => {
     formatMaybe,
     formatPrice,
     formatPercent,
+    formatUsdCompact,
     shortText,
     getSignalClass,
     getSignedClass,
@@ -34,6 +35,21 @@ window.TitanRenderCoinFocus = (() => {
     const n = Number(value);
     if (Number.isFinite(n)) return formatPercent(n);
     return formatMaybe(value);
+  }
+
+  function normalizeFunding(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return formatMaybe(value);
+
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${n.toFixed(6)}`;
+  }
+
+  function normalizeOi(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return formatMaybe(value);
+
+    return formatUsdCompact(n);
   }
 
   function buildRiskFlags(flags) {
@@ -101,8 +117,8 @@ window.TitanRenderCoinFocus = (() => {
     setText(m15Node, normalizeDisplayPercent(data.change15m));
     setText(h1Node, normalizeDisplayPercent(data.change1h));
     setText(h4Node, normalizeDisplayPercent(data.change4h));
-    setText(fundingNode, formatMaybe(data.funding || "--"));
-    setText(oiNode, formatMaybe(data.oi || "--"));
+    setText(fundingNode, normalizeFunding(data.funding));
+    setText(oiNode, normalizeOi(data.oi));
     setText(biasNode, data.bias || "--");
     setText(entryNode, normalizeDisplayPrice(data.entry));
     setText(slNode, normalizeDisplayPrice(data.sl));
@@ -210,7 +226,7 @@ window.TitanRenderCoinFocus = (() => {
               ${buildMetricBox("Entry", normalizeDisplayPrice(item.entry))}
               ${buildMetricBox("SL", normalizeDisplayPrice(item.sl))}
               ${buildMetricBox("TP", normalizeDisplayPrice(item.tp))}
-              ${buildMetricBox("OI", item.oi || "--")}
+              ${buildMetricBox("OI", normalizeOi(item.oi))}
             </div>
 
             ${noTradeNote}
