@@ -92,7 +92,7 @@ function bindTabs() {
   const map = {
     Overview: "overviewSection",
     "Coin Focus": "coinFocusSection",
-    Whales: "whalesSection",
+    Flow: "whalesSection",
     Alerts: "alertsSection",
     "AI Chat": "aiChatPanel"
   };
