@@ -39,7 +39,7 @@
     <nav class="top-tabs">
       <button class="tab-btn active" type="button">Overview</button>
       <button class="tab-btn" type="button">Coin Focus</button>
-      <button class="tab-btn" type="button">Whales</button>
+      <button class="tab-btn" type="button">Flow</button>
       <button class="tab-btn" type="button">Alerts</button>
       <button class="tab-btn" type="button">AI Chat</button>
     </nav>
@@ -101,7 +101,7 @@
         <div class="section-head">
           <div>
             <h2>Coin Focus Pro</h2>
-            <p>Multi-asset setup ranking, structure, liquidity and confidence map</p>
+            <p>Multi-asset setup ranking with real flow, microstructure, volatility and execution tiers</p>
           </div>
         </div>
 
@@ -117,7 +117,7 @@
         <div class="section-head">
           <div>
             <h2>Coin Focus Snapshot</h2>
-            <p>Live dashboard for major market leaders</p>
+            <p>Live futures snapshot for major market leaders</p>
           </div>
         </div>
 
@@ -187,46 +187,46 @@
         </div>
       </section>
       <section class="panel panel-full" id="whalesSection">
-        <div class="section-head">
-          <div>
-            <h2>Mixed Whale Feed</h2>
-            <p>Largest live whale positioning across multiple assets</p>
-          </div>
-        </div>
+  <div class="section-head">
+    <div>
+      <h2>Real Flow Feed</h2>
+      <p>Live Binance futures positioning, pressure, crowding, OI and basis states</p>
+    </div>
+  </div>
 
-        <div class="table-wrap">
-          <table class="data-table whale-detail-table">
-            <thead>
-              <tr>
-                <th>Address</th>
-                <th>Symbol</th>
-                <th>Action</th>
-                <th>Position</th>
-                <th>Price</th>
-                <th>Entry</th>
-                <th>Exit</th>
-                <th>TP</th>
-                <th>SL</th>
-                <th>Status</th>
-                <th>Pending Type</th>
-                <th>Pending Price</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-            <tbody id="whaleTableBody">
-              <tr>
-                <td colspan="13">Loading whale activity...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+  <div class="table-wrap">
+    <table class="data-table whale-detail-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Futures Symbol</th>
+          <th>Pressure</th>
+          <th>Crowding</th>
+          <th>OI State</th>
+          <th>Basis</th>
+          <th>Global L/S</th>
+          <th>Top Acct L/S</th>
+          <th>Top Pos L/S</th>
+          <th>Taker Ratio</th>
+          <th>OI Value</th>
+          <th>OI Change</th>
+          <th>Premium</th>
+        </tr>
+      </thead>
+      <tbody id="whaleTableBody">
+        <tr>
+          <td colspan="13">Loading real flow feed...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
       <section class="panel panel-full">
         <div class="section-head">
           <div>
-            <h2>Whale Summary</h2>
-            <p>Direction, average levels and order concentration by asset</p>
+            <h2>Positioning Summary</h2>
+<p>Directional bias, pressure, crowding, OI state and basis by asset</p>
           </div>
         </div>
 
@@ -241,8 +241,8 @@
       <section class="panel panel-full">
         <div class="section-head">
           <div>
-            <h2>Stablecoin Flow</h2>
-            <p>Exchange inflow / outflow and future buy-side pressure</p>
+            <h2>Liquidity Summary</h2>
+<p>Aggregated pressure, crowding and basis backdrop from real Binance futures internals</p>
           </div>
         </div>
 
