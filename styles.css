@@ -1670,3 +1670,33 @@ a:hover {
     font-size: 26px;
   }
 }
+/* ===== Header logo image ===== */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-mark-image {
+  padding: 0;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(88, 231, 255, 0.16), rgba(140, 99, 255, 0.18));
+  border: 1px solid rgba(88, 231, 255, 0.22);
+}
+
+.brand-logo-img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+@media (max-width: 768px) {
+  .brand-logo-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
+  }
+}
