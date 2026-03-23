@@ -171,16 +171,16 @@ async function loadAllData() {
     alerts,
     deepAnalysis
   ] = await Promise.all([
-    apiGet("/overview?v=2000"),
-    apiGet("/coin/btc?v=2000"),
-    apiGet("/coin/eth?v=2000"),
-    apiGet("/coin/bnb?v=2000"),
-    apiGet("/coin-focus?limit=12&v=2000"),
-    apiGet("/flow-feed?limit=20&v=2000"),
-    apiGet("/positioning-summary?v=2000"),
-    apiGet("/liquidity-summary?v=2000"),
-    apiGet("/alerts?v=2000"),
-    apiGet("/analysis/deep?v=2000")
+    apiGet("/overview?v=2400"),
+    apiGet("/coin/btc?v=2400"),
+    apiGet("/coin/eth?v=2400"),
+    apiGet("/coin/bnb?v=2400"),
+    apiGet("/coin-focus?limit=12&v=2400"),
+    apiGet("/flow-feed?limit=20&v=2400"),
+    apiGet("/positioning-summary?v=2400"),
+    apiGet("/liquidity-summary?v=2400"),
+    apiGet("/alerts?v=2400"),
+    apiGet("/analysis/deep?v=2400")
   ]);
 
   appState.snapshot.overview = overview || null;
@@ -203,14 +203,15 @@ async function refreshDashboard() {
     await loadAllData();
     renderAll();
 
-    if (elements.lastUpdated) {
-      elements.lastUpdated.textContent = new Date().toLocaleString();
-    }
-
     if (elements.systemStatus) {
       elements.systemStatus.textContent = "LIVE";
       elements.systemStatus.classList.remove("neg");
       elements.systemStatus.classList.add("pos");
+    }
+
+    if (elements.lastUpdated) {
+      const deepTs = appState.snapshot.deepAnalysis?.overview?.lastUpdated;
+      elements.lastUpdated.textContent = deepTs || new Date().toLocaleString();
     }
   } catch (err) {
     console.error("refreshDashboard failed:", err);
@@ -252,4 +253,4 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", boot);
 } else {
   boot();
-      }
+}
