@@ -1,267 +1,143 @@
-(function () {
-  function byId(id) {
-    return document.getElementById(id);
-  }
+window.TitanChat = (() => {
+  const { apiPost } = window.TitanApi;
 
-  function getText(id) {
-    const el = byId(id);
-    return el ? String(el.textContent || "").trim() : "";
-  }
-
-  async function postJson(url, body) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      let msg = `HTTP ${res.status}`;
-      try {
-        const data = await res.json();
-        msg = data?.message || msg;
-      } catch (_) {}
-      throw new Error(msg);
-    }
-
-    return res.json();
-  }
-
-  function appendChatMessage(role, text) {
-    const box = byId("chatMessages");
-    if (!box) return;
+  function addChatMessage(elements, role, message) {
+    if (!elements.chatMessages) return;
 
     const row = document.createElement("div");
     row.className = `chat-row ${role === "user" ? "chat-row-user" : "chat-row-ai"}`;
 
     const bubble = document.createElement("div");
     bubble.className = `chat-bubble ${role === "user" ? "chat-bubble-user" : "chat-bubble-ai"}`;
-    bubble.textContent = text;
+    bubble.textContent = String(message || "");
 
     row.appendChild(bubble);
-    box.appendChild(row);
-    box.scrollTop = box.scrollHeight;
+    elements.chatMessages.appendChild(row);
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   }
 
-  function buildSnapshot() {
-    return {
-      overview: {
-        status: getText("systemStatus"),
-        lastUpdated: getText("lastUpdated"),
-        marketBias: getText("globalBias"),
-        totalMarketCap: getText("totalMarketCap"),
-        totalVolume24h: getText("totalVolume24h"),
-        btcDominance: getText("btcDominance"),
-        fearGreed: getText("fearGreed")
-      },
-      coins: {
-        btc: {
-          signal: getText("btcSignal"),
-          price: getText("btcPrice"),
-          change5m: getText("btc5m"),
-          change15m: getText("btc15m"),
-          change1h: getText("btc1h"),
-          change4h: getText("btc4h"),
-          funding: getText("btcFunding"),
-          oi: getText("btcOI"),
-          bias: getText("btcBias"),
-          entry: getText("btcEntry"),
-          sl: getText("btcSL"),
-          tp: getText("btcTP")
-        },
-        eth: {
-          signal: getText("ethSignal"),
-          price: getText("ethPrice"),
-          change5m: getText("eth5m"),
-          change15m: getText("eth15m"),
-          change1h: getText("eth1h"),
-          change4h: getText("eth4h"),
-          funding: getText("ethFunding"),
-          oi: getText("ethOI"),
-          bias: getText("ethBias"),
-          entry: getText("ethEntry"),
-          sl: getText("ethSL"),
-          tp: getText("ethTP")
-        },
-        bnb: {
-          signal: getText("bnbSignal"),
-          price: getText("bnbPrice"),
-          change5m: getText("bnb5m"),
-          change15m: getText("bnb15m"),
-          change1h: getText("bnb1h"),
-          change4h: getText("bnb4h"),
-          funding: getText("bnbFunding"),
-          oi: getText("bnbOI"),
-          bias: getText("bnbBias"),
-          entry: getText("bnbEntry"),
-          sl: getText("bnbSL"),
-          tp: getText("bnbTP")
-        }
-      }
-    };
-  }
+  function updateChatUi(elements, appState) {
+    if (elements.chatStatus) {
+      elements.chatStatus.textContent = appState.loggedIn ? "Unlocked" : "Locked";
+      elements.chatStatus.classList.remove("locked", "unlocked");
+      elements.chatStatus.classList.add(appState.loggedIn ? "unlocked" : "locked");
+    }
 
-  let isLoggedIn = false;
-  let isSending = false;
+    if (elements.loginState) {
+      elements.loginState.textContent = appState.loggedIn ? "Logged in" : "Owner-only analysis";
+    }
 
-  function updateChatUI() {
-    const chatInput = byId("chatInput");
-    const sendBtn = byId("sendChatBtn");
-    const loginBtn = byId("loginBtn");
-    const loginState = byId("loginState");
-    const chatStatus = byId("chatStatus");
-
-    if (chatInput) {
-      chatInput.disabled = !isLoggedIn || isSending;
-      chatInput.placeholder = isLoggedIn
-        ? "Ask AI about the current market..."
+    if (elements.chatInput) {
+      elements.chatInput.disabled = !appState.loggedIn;
+      elements.chatInput.placeholder = appState.loggedIn
+        ? "Ask about BTC, ETH, BNB, risk, setup, execution..."
         : "Login first to use AI chat...";
     }
 
-    if (sendBtn) {
-      sendBtn.disabled = !isLoggedIn || isSending;
-      sendBtn.textContent = isSending ? "Sending..." : "Send";
-    }
-
-    if (loginBtn) {
-      loginBtn.textContent = isLoggedIn ? "Logout" : "Login";
-    }
-
-    if (loginState) {
-      loginState.textContent = isLoggedIn ? "Logged in as admin" : "Owner-only analysis";
-    }
-
-    if (chatStatus) {
-      chatStatus.textContent = isLoggedIn ? "Connected" : "Locked";
-      chatStatus.classList.toggle("connected", isLoggedIn);
-      chatStatus.classList.toggle("locked", !isLoggedIn);
+    if (elements.sendChatBtn) {
+      elements.sendChatBtn.disabled = !appState.loggedIn;
     }
   }
-  async function loginOrLogout() {
-    if (isLoggedIn) {
-      isLoggedIn = false;
-      updateChatUI();
-      appendChatMessage("ai", "Logged out.");
-      return;
+
+  function buildChatSnapshot(snapshot) {
+    return JSON.stringify({
+      overview: snapshot.overview,
+      coins: snapshot.coins,
+      coinFocus: snapshot.coinFocus,
+      whales: snapshot.whales,
+      alerts: snapshot.alerts
+    });
+  }
+
+  async function handleLogin(elements, appState) {
+    try {
+      const username = elements.username ? elements.username.value : "";
+      const password = elements.password ? elements.password.value : "";
+
+      await apiPost("/login", { username, password });
+
+      appState.loggedIn = true;
+      updateChatUi(elements, appState);
+      addChatMessage(elements, "ai", "Login successful. AI chat unlocked.");
+    } catch (err) {
+      appState.loggedIn = false;
+      updateChatUi(elements, appState);
+      addChatMessage(elements, "ai", err.message || "Login failed.");
     }
+  }
 
-    const username = byId("username");
-    const password = byId("password");
+  async function handleSendChat(elements, appState, prefilledQuestion = "") {
+    if (!appState.loggedIn) return;
 
-    const user = username ? username.value.trim() : "";
-    const pass = password ? password.value.trim() : "";
+    const question = String(
+      prefilledQuestion || (elements.chatInput ? elements.chatInput.value : "")
+    ).trim();
 
-    if (!user || !pass) {
-      appendChatMessage("ai", "Please enter username and password first.");
-      return;
+    if (!question) return;
+
+    addChatMessage(elements, "user", question);
+
+    if (elements.chatInput && !prefilledQuestion) {
+      elements.chatInput.value = "";
     }
 
     try {
-      const data = await postJson("/api/login", {
-        username: user,
-        password: pass
+      const data = await apiPost("/chat", {
+        question,
+        snapshot: buildChatSnapshot(appState.snapshot)
       });
 
-      if (data?.ok || data?.success) {
-        isLoggedIn = true;
-        updateChatUI();
-        appendChatMessage("ai", `Login successful. Welcome, ${user}.`);
-      } else {
-        appendChatMessage("ai", data?.message || "Login failed.");
-      }
+      addChatMessage(elements, "ai", data?.reply || "No reply.");
     } catch (err) {
-      appendChatMessage("ai", `Login failed: ${err.message}`);
+      addChatMessage(elements, "ai", err.message || "Chat request failed.");
     }
   }
 
-  async function sendChat(questionText) {
-    if (!isLoggedIn || isSending) return;
-
-    const text = String(questionText || "").trim();
-    if (!text) return;
-
-    const chatInput = byId("chatInput");
-    isSending = true;
-    updateChatUI();
-
-    appendChatMessage("user", text);
-
-    if (chatInput) {
-      chatInput.value = "";
+  function bindChatEvents(elements, appState) {
+    if (elements.loginBtn) {
+      elements.loginBtn.addEventListener("click", () => handleLogin(elements, appState));
     }
 
-    try {
-      const data = await postJson("/api/chat", {
-        question: text,
-        snapshot: JSON.stringify(buildSnapshot())
-      });
-
-      appendChatMessage("ai", data?.reply || "No reply.");
-    } catch (err) {
-      appendChatMessage("ai", `Chat error: ${err.message}`);
-    } finally {
-      isSending = false;
-      updateChatUI();
-    }
-  }
-
-  function wireQuickButtons() {
-    const analyzeBtn = byId("askAnalyzeBTC");
-    const compareBtn = byId("askCompareCoins");
-    const riskBtn = byId("askRisk");
-
-    if (analyzeBtn) {
-      analyzeBtn.addEventListener("click", function () {
-        sendChat("Analyze BTC now");
-      });
+    if (elements.sendChatBtn) {
+      elements.sendChatBtn.addEventListener("click", () => handleSendChat(elements, appState));
     }
 
-    if (compareBtn) {
-      compareBtn.addEventListener("click", function () {
-        sendChat("Compare BTC ETH BNB");
-      });
-    }
-
-    if (riskBtn) {
-      riskBtn.addEventListener("click", function () {
-        sendChat("What is the market risk now?");
-      });
-    }
-  }
-
-  function initChat() {
-    const loginBtn = byId("loginBtn");
-    const sendBtn = byId("sendChatBtn");
-    const chatInput = byId("chatInput");
-
-    if (loginBtn) {
-      loginBtn.addEventListener("click", loginOrLogout);
-    }
-
-    if (sendBtn) {
-      sendBtn.addEventListener("click", function () {
-        sendChat(chatInput ? chatInput.value : "");
-      });
-    }
-
-    if (chatInput) {
-      chatInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          sendChat(chatInput.value);
+    if (elements.chatInput) {
+      elements.chatInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          handleSendChat(elements, appState);
         }
       });
     }
 
-    wireQuickButtons();
-    updateChatUI();
+    if (elements.askAnalyzeBTC) {
+      elements.askAnalyzeBTC.addEventListener("click", () => {
+        handleSendChat(elements, appState, "ช่วยวิเคราะห์ BTC แบบลึกจากข้อมูลจริงตอนนี้");
+      });
+    }
+
+    if (elements.askCompareCoins) {
+      elements.askCompareCoins.addEventListener("click", () => {
+        handleSendChat(elements, appState, "ช่วยเปรียบเทียบ BTC ETH และ BNB ตอนนี้ เหรียญไหนน่าสนใจกว่า");
+      });
+    }
+
+    if (elements.askRisk) {
+      elements.askRisk.addEventListener("click", () => {
+        handleSendChat(elements, appState, "ช่วยสรุประดับความเสี่ยงของตลาดตอนนี้");
+      });
+    }
+
+    updateChatUi(elements, appState);
   }
 
-  window.appendChatMessage = appendChatMessage;
-
-  document.addEventListener("DOMContentLoaded", function () {
-    initChat();
-  });
+  return {
+    addChatMessage,
+    updateChatUi,
+    buildChatSnapshot,
+    handleLogin,
+    handleSendChat,
+    bindChatEvents
+  };
 })();
