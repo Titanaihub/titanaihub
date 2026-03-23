@@ -22,7 +22,7 @@ window.TitanRenderRealFlow = (() => {
     if (!rows.length) {
       elements.whaleTableBody.innerHTML = `
         <tr>
-          <td colspan="13">No real flow data</td>
+          <td colspan="13">No real flow feed available</td>
         </tr>
       `;
       return;
