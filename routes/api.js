@@ -2,29 +2,22 @@ const express = require("express");
 
 const {
   loadMockOverviewData,
-  loadMockCoinData,
-  loadMockWhaleData
+  loadMockCoinData
 } = require("../js/mock-data.js");
 
 const {
   DEFAULT_COIN_LIMIT,
-  DEFAULT_WHALE_PAGE_SIZE,
   COIN_UNIVERSE
 } = require("../config/constants.js");
 
 const { sanitizeInt, detectReplyLanguage } = require("../utils/helpers.js");
 const { getStableOverview } = require("../services/overview-service.js");
 const { getStableCoin } = require("../services/coin-service.js");
-const {
-  buildWhalePackage,
-  applyWhaleFilters,
-  paginateRows,
-  getLegacyWhaleRows
-} = require("../services/whale-service.js");
 const { buildCoinFocusPackage } = require("../services/coinfocus-service.js");
 const { buildAlertPackage } = require("../services/alert-service.js");
 const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
 const { buildBinanceCoverageReport } = require("../services/data/data-quality-service.js");
+const { buildRealFlowPackage } = require("../services/real-flow-service.js");
 const { callDeepSeekChat, buildFallbackReply } = require("../services/ai-service.js");
 
 const router = express.Router();
@@ -77,84 +70,6 @@ router.get("/alerts", async (req, res) => {
   }
 });
 
-router.get("/whales", async (req, res) => {
-  try {
-    const pkg = await buildWhalePackage();
-
-    const wantsPaged =
-      req.query.meta === "1" ||
-      req.query.paged === "1" ||
-      req.query.page ||
-      req.query.limit ||
-      req.query.symbol ||
-      req.query.side ||
-      req.query.status ||
-      req.query.chain;
-
-    const filteredRows = applyWhaleFilters(pkg.allRows, req.query);
-
-    if (!wantsPaged) {
-      return res.json(getLegacyWhaleRows(filteredRows));
-    }
-
-    const page = sanitizeInt(req.query.page, 1);
-    const limit = sanitizeInt(req.query.limit, DEFAULT_WHALE_PAGE_SIZE);
-    const paged = paginateRows(filteredRows, page, limit);
-
-    return res.json({
-      items: getLegacyWhaleRows(paged.items),
-      pagination: {
-        page: paged.page,
-        limit: paged.limit,
-        total: paged.total,
-        totalPages: paged.totalPages,
-        hasNextPage: paged.hasNextPage,
-        hasPrevPage: paged.hasPrevPage
-      },
-      filters: {
-        symbol: req.query.symbol || "",
-        side: req.query.side || "",
-        status: req.query.status || "",
-        chain: req.query.chain || ""
-      }
-    });
-  } catch (err) {
-    console.error("whales route fallback:", err.message);
-    return res.json(loadMockWhaleData());
-  }
-});
-
-router.get("/whales-mixed", async (req, res) => {
-  try {
-    const pkg = await buildWhalePackage();
-    const limit = sanitizeInt(req.query.limit, 20);
-    return res.json(getLegacyWhaleRows(pkg.mixedFeed.slice(0, limit)));
-  } catch (err) {
-    console.error("whales-mixed route fallback:", err.message);
-    return res.json([]);
-  }
-});
-
-router.get("/whales-summary", async (req, res) => {
-  try {
-    const pkg = await buildWhalePackage();
-    return res.json(pkg.summary);
-  } catch (err) {
-    console.error("whales-summary route fallback:", err.message);
-    return res.json([]);
-  }
-});
-
-router.get("/stablecoin-flows", async (req, res) => {
-  try {
-    const pkg = await buildWhalePackage();
-    return res.json(pkg.stablecoinFlows);
-  } catch (err) {
-    console.error("stablecoin-flows route fallback:", err.message);
-    return res.json([]);
-  }
-});
-
 router.get("/analysis/deep", async (req, res) => {
   try {
     const data = await buildDeepAnalysisPackage();
@@ -162,13 +77,22 @@ router.get("/analysis/deep", async (req, res) => {
   } catch (err) {
     console.error("analysis/deep route fallback:", err.message);
     return res.json({
+      mode: "real-data-only-core",
       overview: null,
       marketState: null,
-      stablecoinAnalysis: null,
+      stablecoinAnalysis: {
+        items: [],
+        totalNet: 0,
+        averageScore: 50,
+        marketLiquidityState: "Unavailable",
+        liquidityPressure: "Unavailable",
+        explanation: "Analysis unavailable"
+      },
       whales: {
         summary: [],
         mixedFeed: [],
-        stablecoinFlows: []
+        stablecoinFlows: [],
+        status: "unavailable"
       },
       coins: []
     });
@@ -196,9 +120,98 @@ router.get("/data-quality/binance", async (req, res) => {
   }
 });
 
+router.get("/flow-feed", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    const limit = sanitizeInt(req.query.limit, 20);
+    return res.json(pkg.flowFeed.slice(0, limit));
+  } catch (err) {
+    console.error("flow-feed route fallback:", err.message);
+    return res.json([]);
+  }
+});
+
+router.get("/positioning-summary", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    return res.json(pkg.positioningSummary);
+  } catch (err) {
+    console.error("positioning-summary route fallback:", err.message);
+    return res.json([]);
+  }
+});
+
+router.get("/liquidity-summary", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    return res.json(pkg.liquiditySummary);
+  } catch (err) {
+    console.error("liquidity-summary route fallback:", err.message);
+    return res.json({
+      source: "binance-market-internals",
+      totalSymbols: 0,
+      buyPressureCount: 0,
+      sellPressureCount: 0,
+      balancedCount: 0,
+      longCrowdedCount: 0,
+      shortCrowdedCount: 0,
+      richPremiumCount: 0,
+      discountCount: 0,
+      summaryState: "Unavailable"
+    });
+  }
+});
+
+/*
+  backward-compatible routes:
+  เดิมหน้าเว็บใช้ whales-mixed / whales-summary / stablecoin-flows
+  ตอนนี้ map ให้กลายเป็น real flow ทั้งหมด
+*/
+router.get("/whales-mixed", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    const limit = sanitizeInt(req.query.limit, 20);
+    return res.json(pkg.flowFeed.slice(0, limit));
+  } catch (err) {
+    console.error("whales-mixed compatibility route fallback:", err.message);
+    return res.json([]);
+  }
+});
+
+router.get("/whales-summary", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    return res.json(pkg.positioningSummary);
+  } catch (err) {
+    console.error("whales-summary compatibility route fallback:", err.message);
+    return res.json([]);
+  }
+});
+
+router.get("/stablecoin-flows", async (req, res) => {
+  try {
+    const pkg = await buildRealFlowPackage();
+    return res.json(pkg.liquiditySummary);
+  } catch (err) {
+    console.error("stablecoin-flows compatibility route fallback:", err.message);
+    return res.json({
+      source: "binance-market-internals",
+      totalSymbols: 0,
+      buyPressureCount: 0,
+      sellPressureCount: 0,
+      balancedCount: 0,
+      longCrowdedCount: 0,
+      shortCrowdedCount: 0,
+      richPremiumCount: 0,
+      discountCount: 0,
+      summaryState: "Unavailable"
+    });
+  }
+});
+
 router.get("/debug-version", (req, res) => {
   res.json({
-    version: "TITAN-PRO-MODULAR-V3-REALDATA",
+    version: "TITAN-PRO-REALFLOW-V1",
     model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
     deepseekEnabled: Boolean(process.env.DEEPSEEK_API_KEY),
     coinUniverse: COIN_UNIVERSE.length
@@ -236,7 +249,7 @@ router.post("/chat", async (req, res) => {
 
   let overview = parsed?.overview || null;
   let coins = parsed?.coins || {};
-  let whales = parsed?.whales || [];
+  let flows = parsed?.whales || [];
   let coinFocus = parsed?.coinFocus || [];
   let alerts = parsed?.alerts || [];
 
@@ -252,9 +265,9 @@ router.post("/chat", async (req, res) => {
   if (!eth) eth = await getStableCoin("eth");
   if (!bnb) bnb = await getStableCoin("bnb");
 
-  if (!Array.isArray(whales) || whales.length === 0) {
-    const pkg = await buildWhalePackage();
-    whales = pkg.mixedFeed.slice(0, 30);
+  if (!Array.isArray(flows) || flows.length === 0) {
+    const pkg = await buildRealFlowPackage();
+    flows = pkg.flowFeed.slice(0, 20);
   }
 
   if (!Array.isArray(coinFocus) || coinFocus.length === 0) {
@@ -272,7 +285,7 @@ router.post("/chat", async (req, res) => {
       btc,
       eth,
       bnb,
-      whales,
+      whales: flows,
       coinFocus,
       alerts
     });
