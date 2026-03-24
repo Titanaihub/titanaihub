@@ -35,6 +35,12 @@ const elements = {
   alertsGrid: document.getElementById("alertsGrid"),
   rawSnapshot: document.getElementById("rawSnapshot"),
 
+  healthOverallStatus: document.getElementById("healthOverallStatus"),
+  healthLastChecked: document.getElementById("healthLastChecked"),
+  healthOkCount: document.getElementById("healthOkCount"),
+  healthIssueCount: document.getElementById("healthIssueCount"),
+  healthGrid: document.getElementById("healthGrid"),
+
   username: document.getElementById("username"),
   password: document.getElementById("password"),
   loginBtn: document.getElementById("loginBtn"),
@@ -94,6 +100,7 @@ function bindTabs() {
     "Coin Focus": "coinFocusSection",
     Flow: "whalesSection",
     Alerts: "alertsSection",
+    Health: "healthSection",
     "AI Chat": "aiChatPanel"
   };
 
@@ -153,6 +160,11 @@ function renderAll() {
   window.TitanRenderRealFlow.renderPositioningSummary(elements, appState.snapshot);
   window.TitanRenderRealFlow.renderLiquiditySummary(elements, appState.snapshot);
   window.TitanRenderAlerts.renderAlerts(elements, appState.snapshot);
+
+  if (window.TitanRenderHealth?.renderHealth) {
+    window.TitanRenderHealth.renderHealth(elements, appState.snapshot);
+  }
+
   renderRawSnapshot();
 }
 
@@ -160,13 +172,13 @@ async function loadAllData() {
   const { apiGet } = window.TitanApi;
 
   const results = await Promise.allSettled([
-    apiGet("/overview?v=2401"),
-    apiGet("/coin/btc?v=2401"),
-    apiGet("/coin/eth?v=2401"),
-    apiGet("/coin/bnb?v=2401"),
-    apiGet("/coin-focus?limit=12&v=2401"),
-    apiGet("/alerts?v=2401"),
-    apiGet("/analysis/deep?v=2401")
+    apiGet("/overview?v=2600"),
+    apiGet("/coin/btc?v=2600"),
+    apiGet("/coin/eth?v=2600"),
+    apiGet("/coin/bnb?v=2600"),
+    apiGet("/coin-focus?limit=12&v=2600"),
+    apiGet("/alerts?v=2600"),
+    apiGet("/analysis/deep?v=2600")
   ]);
 
   const getValue = (index, fallback = null) => {
@@ -206,8 +218,12 @@ async function loadAllData() {
     ethOk: Boolean(eth),
     bnbOk: Boolean(bnb),
     coinFocusOk: Array.isArray(coinFocus) && coinFocus.length > 0,
-    alertsOk: Array.isArray(alerts),
-    deepAnalysisOk: Boolean(deepAnalysis)
+    alertsOk: Array.isArray(alerts) && alerts.length > 0,
+    deepAnalysisOk: Boolean(deepAnalysis),
+    whalesOk: Array.isArray(appState.snapshot.whales) && appState.snapshot.whales.length > 0,
+    whaleSummaryOk:
+      Array.isArray(appState.snapshot.whaleSummary) && appState.snapshot.whaleSummary.length > 0,
+    liquidityOk: Boolean(appState.snapshot.stablecoinFlows)
   };
 }
 async function refreshDashboard() {
@@ -224,11 +240,11 @@ async function refreshDashboard() {
     if (elements.systemStatus) {
       if (hasCoreData) {
         elements.systemStatus.textContent = "LIVE";
-        elements.systemStatus.classList.remove("neg");
+        elements.systemStatus.classList.remove("neg", "flat");
         elements.systemStatus.classList.add("pos");
       } else {
         elements.systemStatus.textContent = "WAIT";
-        elements.systemStatus.classList.remove("pos");
+        elements.systemStatus.classList.remove("pos", "flat");
         elements.systemStatus.classList.add("neg");
       }
     }
@@ -243,13 +259,23 @@ async function refreshDashboard() {
       const overviewBias = appState.snapshot.overview?.marketBias;
       const deepBias = appState.snapshot.deepAnalysis?.overview?.marketBias;
       elements.globalBias.textContent = overviewBias || deepBias || "WAIT";
+      elements.globalBias.classList.remove("pos", "neg", "flat");
+
+      const biasText = String(overviewBias || deepBias || "WAIT").toLowerCase();
+      if (biasText.includes("bull") || biasText.includes("risk-on")) {
+        elements.globalBias.classList.add("pos");
+      } else if (biasText.includes("bear") || biasText.includes("risk-off") || biasText.includes("panic")) {
+        elements.globalBias.classList.add("neg");
+      } else {
+        elements.globalBias.classList.add("flat");
+      }
     }
   } catch (err) {
     console.error("refreshDashboard failed:", err);
 
     if (elements.systemStatus) {
       elements.systemStatus.textContent = "WAIT";
-      elements.systemStatus.classList.remove("pos");
+      elements.systemStatus.classList.remove("pos", "flat");
       elements.systemStatus.classList.add("neg");
     }
 
@@ -259,6 +285,8 @@ async function refreshDashboard() {
 
     if (elements.globalBias) {
       elements.globalBias.textContent = "WAIT";
+      elements.globalBias.classList.remove("pos", "neg");
+      elements.globalBias.classList.add("flat");
     }
 
     renderAll();
