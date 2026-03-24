@@ -125,34 +125,30 @@ a:hover {
   gap: 16px;
 }
 
-.brand-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  font-size: 24px;
-  font-weight: 800;
-  color: #ffffff;
-  background: linear-gradient(145deg, rgba(88, 231, 255, 0.92), rgba(140, 99, 255, 0.92));
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 0 24px rgba(88, 231, 255, 0.18);
-}
-
+.brand-mark,
 .brand-mark-image {
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  min-height: 72px;
   padding: 0;
-  overflow: hidden;
-  background: linear-gradient(145deg, rgba(88, 231, 255, 0.16), rgba(140, 99, 255, 0.18));
-  border: 1px solid rgba(88, 231, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .brand-logo-img {
   display: block;
   width: 72px;
   height: 72px;
-  object-fit: cover;
-  border-radius: 18px;
+  object-fit: contain;
+  object-position: center center;
+  border-radius: 0;
+  background: transparent;
 }
 
 .brand-text h1 {
@@ -1102,10 +1098,10 @@ a:hover {
   }
 
   .brand-logo-img {
-    width: 60px;
-    height: 60px;
-    border-radius: 16px;
-  }
+  width: 60px;
+  height: 60px;
+  border-radius: 0;
+}
 
   .brand-text h1 {
     font-size: 28px;
