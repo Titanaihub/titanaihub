@@ -44,12 +44,13 @@
     </header>
 
     <nav class="top-tabs">
-      <button class="tab-btn active" type="button">Overview</button>
-      <button class="tab-btn" type="button">Coin Focus</button>
-      <button class="tab-btn" type="button">Flow</button>
-      <button class="tab-btn" type="button">Alerts</button>
-      <button class="tab-btn" type="button">AI Chat</button>
-    </nav>
+  <button class="tab-btn active" type="button">Overview</button>
+  <button class="tab-btn" type="button">Coin Focus</button>
+  <button class="tab-btn" type="button">Flow</button>
+  <button class="tab-btn" type="button">Alerts</button>
+  <button class="tab-btn" type="button">Health</button>
+  <button class="tab-btn" type="button">AI Chat</button>
+</nav>
 
     <main class="main-grid">
       <section class="panel" id="overviewSection">
@@ -261,21 +262,40 @@
           </div>
         </div>
       </section>
-      <section class="panel panel-full" id="alertsSection">
-        <div class="section-head">
-          <div>
-            <h2>Smart Alerts</h2>
-            <p>Real-time opportunity, flow, positioning, liquidation and execution alerts</p>
-          </div>
-        </div>
+      <section class="panel panel-full" id="healthSection">
+  <div class="section-head">
+    <div>
+      <h2>System Health</h2>
+      <p>Quick status check for API, feed availability, render readiness and update health</p>
+    </div>
+  </div>
 
-        <div id="alertsGrid" class="alerts-grid">
-          <div class="stat-card">
-            <span>Loading alerts...</span>
-            <strong>--</strong>
-          </div>
-        </div>
-      </section>
+  <div class="health-topbar">
+    <div class="health-mini">
+      <span>Overall</span>
+      <strong id="healthOverallStatus">CHECKING</strong>
+    </div>
+    <div class="health-mini">
+      <span>Last Check</span>
+      <strong id="healthLastChecked">--</strong>
+    </div>
+    <div class="health-mini">
+      <span>Healthy Endpoints</span>
+      <strong id="healthOkCount">0</strong>
+    </div>
+    <div class="health-mini">
+      <span>Issues</span>
+      <strong id="healthIssueCount">0</strong>
+    </div>
+  </div>
+
+  <div id="healthGrid" class="health-grid">
+    <div class="stat-card">
+      <span>Checking system health...</span>
+      <strong>--</strong>
+    </div>
+  </div>
+</section>
 
       <section class="panel" id="rawPanel" style="display: none;">
         <div class="section-head">
@@ -346,13 +366,14 @@
     </main>
   </div>
 
-  <script src="./js/api-client.js?v=2500"></script>
-<script src="./js/formatters.js?v=2500"></script>
-<script src="./js/render-overview.js?v=2500"></script>
-<script src="./js/render-coin-focus.js?v=2500"></script>
-<script src="./js/render-real-flow.js?v=2500"></script>
-<script src="./js/render-alerts.js?v=2500"></script>
-<script src="./js/chat.js?v=2500"></script>
-<script src="./js/dashboard.js?v=2500"></script>
+  <script src="./js/api-client.js?v=2600"></script>
+<script src="./js/formatters.js?v=2600"></script>
+<script src="./js/render-overview.js?v=2600"></script>
+<script src="./js/render-coin-focus.js?v=2600"></script>
+<script src="./js/render-real-flow.js?v=2600"></script>
+<script src="./js/render-alerts.js?v=2600"></script>
+<script src="./js/render-health.js?v=2600"></script>
+<script src="./js/chat.js?v=2600"></script>
+<script src="./js/dashboard.js?v=2600"></script>
 </body>
 </html>
