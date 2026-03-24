@@ -80,9 +80,11 @@ a:hover {
 .alert-card,
 .stat-card,
 .mini-stat {
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg);
+  background: linear-gradient(180deg, rgba(19, 31, 68, 0.96), rgba(9, 18, 44, 0.96));
+  border: 1px solid rgba(110, 180, 255, 0.16);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .topbar,
@@ -102,9 +104,14 @@ a:hover {
 .coin-card:hover,
 .coin-focus-card:hover,
 .summary-card:hover,
-.alert-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+.alert-card:hover,
+.stat-card:hover,
+.mini-stat:hover {
+  border-color: rgba(110, 180, 255, 0.28);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(110, 180, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .topbar {
@@ -152,14 +159,13 @@ a:hover {
 .brand-text h1 {
   margin: 0;
   font-size: 34px;
-  color: #111827;
+  color: #f4f8ff;
   letter-spacing: -0.02em;
-  text-shadow: none;
 }
 
 .brand-text p {
   margin: 4px 0 0;
-  color: #4b5563;
+  color: rgba(214, 228, 255, 0.78);
   font-size: 14px;
 }
 
@@ -240,14 +246,13 @@ a:hover {
 .section-head h2 {
   margin: 0;
   font-size: 24px;
-  color: #111827;
+  color: #f4f8ff;
   letter-spacing: -0.02em;
-  text-shadow: none;
 }
 
 .section-head p {
   margin: 6px 0 0;
-  color: #4b5563;
+  color: rgba(214, 228, 255, 0.78);
   font-size: 14px;
 }
 
@@ -279,9 +284,9 @@ a:hover {
 
 .summary-row {
   padding: 14px 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(110, 180, 255, 0.12);
   border-radius: 14px;
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.03);
 }
 .coin-grid {
   display: grid;
@@ -303,7 +308,7 @@ a:hover {
 .coin-head h3 {
   margin: 0;
   font-size: 22px;
-  color: #111827;
+  color: #f4f8ff;
 }
 
 .coin-price {
@@ -322,9 +327,9 @@ a:hover {
 
 .metric-box {
   padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(110, 180, 255, 0.12);
   border-radius: 12px;
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.03);
   justify-content: space-between;
 }
 
@@ -405,7 +410,7 @@ a:hover {
 .coin-focus-card-top h3 {
   margin: 0;
   font-size: 20px;
-  color: #111827;
+  color: #f4f8ff;
 }
 
 .coin-focus-subtitle {
@@ -517,7 +522,7 @@ a:hover {
 .alert-card h3 {
   margin: 0;
   font-size: 18px;
-  color: #111827;
+  color: #f4f8ff;
 }
 
 .alert-card {
@@ -593,13 +598,13 @@ a:hover {
 }
 
 .data-table th {
-  color: #374151;
+  color: rgba(214, 228, 255, 0.78);
   font-weight: 600;
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .data-table tr:hover td {
-  background: #f3f4f6;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .whale-detail-table {
@@ -634,9 +639,9 @@ a:hover {
   word-break: break-word;
   padding: 16px;
   border-radius: 16px;
-  border: 1px solid rgba(143, 221, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-  color: #dbe4ff;
+  border: 1px solid rgba(110, 180, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f4f8ff;
   font-size: 12px;
 }
 
@@ -752,8 +757,8 @@ a:hover {
   padding: 14px;
   margin-bottom: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(143, 221, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(110, 180, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .chat-row {
@@ -775,8 +780,8 @@ a:hover {
   line-height: 1.5;
   font-size: 14px;
   white-space: pre-wrap;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(143, 221, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(110, 180, 255, 0.12);
 }
 
 .chat-bubble-user {
@@ -793,9 +798,9 @@ a:hover {
   width: 100%;
   min-width: 0;
   padding: 12px 14px;
-  color: var(--text-main);
-  background: rgba(8, 17, 31, 0.72);
-  border: 1px solid var(--line);
+  color: #f4f8ff;
+  background: rgba(19, 31, 68, 0.96);
+  border: 1px solid rgba(110, 180, 255, 0.16);
   border-radius: 12px;
   outline: none;
 }
