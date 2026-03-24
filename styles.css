@@ -154,8 +154,9 @@ a:hover {
 .brand-text h1 {
   margin: 0;
   font-size: 34px;
-  color: var(--text-main);
+  color: #ffffff;
   letter-spacing: -0.02em;
+  text-shadow: 0 0 12px rgba(88, 231, 255, 0.18);
 }
 
 .brand-text p {
@@ -241,13 +242,14 @@ a:hover {
 .section-head h2 {
   margin: 0;
   font-size: 24px;
-  color: var(--text-main);
+  color: #ffffff;
   letter-spacing: -0.02em;
+  text-shadow: 0 0 10px rgba(88, 231, 255, 0.14);
 }
 
 .section-head p {
   margin: 6px 0 0;
-  color: var(--text-soft);
+  color: #b8c7e6;
   font-size: 14px;
 }
 
@@ -303,7 +305,7 @@ a:hover {
 .coin-head h3 {
   margin: 0;
   font-size: 22px;
-  color: var(--text-main);
+  color: #ffffff;
 }
 
 .coin-price {
@@ -405,7 +407,7 @@ a:hover {
 .coin-focus-card-top h3 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-main);
+  color: #ffffff;
 }
 
 .coin-focus-subtitle {
@@ -517,7 +519,7 @@ a:hover {
 .alert-card h3 {
   margin: 0;
   font-size: 18px;
-  color: var(--text-main);
+  color: #f8fbff;
 }
 
 .alert-card {
@@ -1105,6 +1107,7 @@ a:hover {
 
   .brand-text h1 {
     font-size: 28px;
+    color: #ffffff;
   }
 
   .section-head h2 {
@@ -1204,6 +1207,7 @@ a:hover {
 @media (max-width: 480px) {
   .brand-text h1 {
     font-size: 20px;
+    color: #ffffff;
   }
 
   .coin-price,
