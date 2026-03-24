@@ -1,34 +1,34 @@
 :root {
-  --bg-main: #08111f;
-  --bg-panel: #0f1930;
-  --bg-panel-2: #162344;
-  --bg-soft: #1b2a4d;
+  --bg-main: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #ffffff;
+  --bg-soft: #f9fafb;
 
-  --line: rgba(143, 221, 255, 0.14);
-  --line-strong: rgba(88, 231, 255, 0.28);
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
 
-  --text-main: #eef4ff;
-  --text-soft: #9baed1;
-  --text-dim: #7f92b8;
+  --text-main: #111827;
+  --text-soft: #374151;
+  --text-dim: #6b7280;
 
-  --cyan: #58e7ff;
-  --cyan-soft: #8fddff;
-  --violet: #8c63ff;
-  --purple: #c06cff;
-  --gold: #d8b36a;
+  --cyan: #2563eb;
+  --cyan-soft: #3b82f6;
+  --violet: #7c3aed;
+  --purple: #9333ea;
+  --gold: #d97706;
 
-  --green: #3ddc84;
-  --green-soft: rgba(61, 220, 132, 0.14);
+  --green: #16a34a;
+  --green-soft: rgba(22, 163, 74, 0.10);
 
-  --red: #ff5f6d;
-  --red-soft: rgba(255, 95, 109, 0.14);
+  --red: #dc2626;
+  --red-soft: rgba(220, 38, 38, 0.10);
 
-  --neutral: #a8b3c7;
-  --neutral-soft: rgba(168, 179, 199, 0.12);
+  --neutral: #6b7280;
+  --neutral-soft: rgba(107, 114, 128, 0.10);
 
-  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.28);
-  --glow-cyan: 0 0 0 1px rgba(88, 231, 255, 0.12), 0 0 24px rgba(88, 231, 255, 0.08);
-  --glow-violet: 0 0 0 1px rgba(140, 99, 255, 0.12), 0 0 24px rgba(140, 99, 255, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --glow-cyan: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --glow-violet: 0 1px 2px rgba(15, 23, 42, 0.04);
 
   --radius-xl: 22px;
   --radius-lg: 18px;
@@ -46,10 +46,7 @@ html {
 
 html,
 body {
-  background:
-    radial-gradient(circle at top left, rgba(88, 231, 255, 0.06), transparent 24%),
-    radial-gradient(circle at top right, rgba(192, 108, 255, 0.06), transparent 22%),
-    linear-gradient(180deg, #07101d 0%, #08111f 100%);
+  background: var(--bg-main);
   color: var(--text-main);
 }
 
@@ -83,9 +80,9 @@ a:hover {
 .alert-card,
 .stat-card,
 .mini-stat {
-  background: linear-gradient(180deg, rgba(22, 35, 68, 0.96) 0%, rgba(13, 24, 48, 0.98) 100%);
+  background: var(--bg-panel);
   border: 1px solid var(--line);
-  box-shadow: var(--glow-cyan);
+  box-shadow: var(--shadow-lg);
 }
 
 .topbar,
@@ -106,7 +103,8 @@ a:hover {
 .coin-focus-card:hover,
 .summary-card:hover,
 .alert-card:hover {
-  border-color: var(--line-strong);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
 }
 
 .topbar {
@@ -154,14 +152,14 @@ a:hover {
 .brand-text h1 {
   margin: 0;
   font-size: 34px;
-  color: #ffffff;
+  color: #111827;
   letter-spacing: -0.02em;
-  text-shadow: 0 0 12px rgba(88, 231, 255, 0.18);
+  text-shadow: none;
 }
 
 .brand-text p {
   margin: 4px 0 0;
-  color: var(--text-soft);
+  color: #4b5563;
   font-size: 14px;
 }
 
@@ -199,9 +197,9 @@ a:hover {
 }
 
 .tab-btn {
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text-soft);
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
   padding: 11px 16px;
   border-radius: 12px;
   cursor: pointer;
@@ -210,10 +208,10 @@ a:hover {
 
 .tab-btn:hover,
 .tab-btn.active {
-  color: #ffffff;
-  background: linear-gradient(135deg, rgba(88, 231, 255, 0.18), rgba(140, 99, 255, 0.2));
-  border-color: rgba(88, 231, 255, 0.35);
-  box-shadow: 0 0 18px rgba(88, 231, 255, 0.08);
+  color: #111827;
+  background: #eff6ff;
+  border-color: #93c5fd;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.10);
 }
 
 .main-grid {
@@ -242,14 +240,14 @@ a:hover {
 .section-head h2 {
   margin: 0;
   font-size: 24px;
-  color: #ffffff;
+  color: #111827;
   letter-spacing: -0.02em;
-  text-shadow: 0 0 10px rgba(88, 231, 255, 0.14);
+  text-shadow: none;
 }
 
 .section-head p {
   margin: 6px 0 0;
-  color: #b8c7e6;
+  color: #4b5563;
   font-size: 14px;
 }
 
@@ -281,9 +279,9 @@ a:hover {
 
 .summary-row {
   padding: 14px 16px;
-  border: 1px solid var(--line);
+  border: 1px solid #e5e7eb;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.02);
+  background: #f9fafb;
 }
 .coin-grid {
   display: grid;
@@ -305,7 +303,7 @@ a:hover {
 .coin-head h3 {
   margin: 0;
   font-size: 22px;
-  color: #ffffff;
+  color: #111827;
 }
 
 .coin-price {
@@ -324,9 +322,9 @@ a:hover {
 
 .metric-box {
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: #f9fafb;
   justify-content: space-between;
 }
 
@@ -407,7 +405,7 @@ a:hover {
 .coin-focus-card-top h3 {
   margin: 0;
   font-size: 20px;
-  color: #ffffff;
+  color: #111827;
 }
 
 .coin-focus-subtitle {
@@ -519,7 +517,7 @@ a:hover {
 .alert-card h3 {
   margin: 0;
   font-size: 18px;
-  color: #f8fbff;
+  color: #111827;
 }
 
 .alert-card {
@@ -595,13 +593,13 @@ a:hover {
 }
 
 .data-table th {
-  color: var(--text-soft);
+  color: #374151;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.02);
+  background: #f9fafb;
 }
 
 .data-table tr:hover td {
-  background: rgba(88, 231, 255, 0.03);
+  background: #f3f4f6;
 }
 
 .whale-detail-table {
