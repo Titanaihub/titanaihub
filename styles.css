@@ -7,9 +7,9 @@
 --line: #e5e7eb;
 --line-strong: #d1d5db;
 
---text-main: #111827;
---text-soft: #374151;
---text-dim: #6b7280;
+--text-main: #f4f8ff;
+  --text-soft: rgba(214, 228, 255, 0.78);
+  --text-dim: rgba(214, 228, 255, 0.48);
 
 --cyan: #2563eb;
 --cyan-soft: #3b82f6;
@@ -204,21 +204,24 @@ margin-bottom: 18px;
 }
 
 .tab-btn {
-border: 1px solid #d1d5db;
-background: #ffffff;
-color: #374151;
-padding: 11px 16px;
-border-radius: 12px;
-cursor: pointer;
-transition: 0.18s ease;
+  border: 1px solid rgba(110, 180, 255, 0.16);
+  background: linear-gradient(180deg, rgba(19, 31, 68, 0.96), rgba(9, 18, 44, 0.96));
+  color: rgba(214, 228, 255, 0.78);
+  padding: 11px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.18s ease;
 }
 
 .tab-btn:hover,
 .tab-btn.active {
-color: #111827;
-background: #eff6ff;
-border-color: #93c5fd;
-box-shadow: 0 4px 12px rgba(59, 130, 246, 0.10);
+  color: #f4f8ff;
+  background: linear-gradient(180deg, rgba(28, 44, 90, 0.98), rgba(12, 22, 52, 0.98));
+  border-color: rgba(110, 180, 255, 0.28);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(110, 180, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .main-grid {
@@ -353,15 +356,15 @@ word-break: break-word;
 }
 
 .signal-badge {
-display: inline-flex;
-align-items: center;
-justify-content: center;
-min-width: 76px;
-padding: 7px 10px;
-border-radius: 999px;
-font-size: 12px;
-font-weight: 700;
-border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(110, 180, 255, 0.16);
 }
 
 .signal-badge.signal-long {
