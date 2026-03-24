@@ -61,7 +61,7 @@ window.TitanRenderHealth = (() => {
         empty: false,
         meta: {
           items: overview ? "1" : "0",
-          source: "overview",
+          source: "/overview",
           note: overview?.lastUpdated || "--"
         }
       },
@@ -72,7 +72,7 @@ window.TitanRenderHealth = (() => {
         empty: false,
         meta: {
           items: [coins.btc, coins.eth, coins.bnb].filter(Boolean).length,
-          source: "coin endpoints",
+          source: "/coin/btc /coin/eth /coin/bnb",
           note: "snapshot"
         }
       },
@@ -83,7 +83,7 @@ window.TitanRenderHealth = (() => {
         empty: coinFocus.length === 0,
         meta: {
           items: coinFocus.length,
-          source: "coin-focus",
+          source: "/coin-focus",
           note: coinFocus.length ? "live" : "no live data"
         }
       },
@@ -93,8 +93,8 @@ window.TitanRenderHealth = (() => {
         ok: Boolean(deepAnalysis),
         empty: false,
         meta: {
-          items: Array.isArray(deepAnalysis?.coins) ? deepAnalysis.coins.length : 0,
-          source: "analysis/deep",
+          items: deepAnalysis ? "1" : "0",
+          source: "/analysis/deep",
           note: deepAnalysis?.mode || "--"
         }
       },
@@ -128,7 +128,7 @@ window.TitanRenderHealth = (() => {
         meta: {
           items: liquidity ? "1" : "0",
           source: "stablecoinFlows",
-          note: liquidity?.summaryState || "empty"
+          note: liquidity?.marketLiquidityState || liquidity?.liquidityPressure || "empty"
         }
       },
       {
@@ -138,7 +138,7 @@ window.TitanRenderHealth = (() => {
         empty: alerts.length === 0,
         meta: {
           items: alerts.length,
-          source: "alerts",
+          source: "/alerts",
           note: alerts.length ? "live" : "empty"
         }
       }
