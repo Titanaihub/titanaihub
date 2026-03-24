@@ -11,6 +11,14 @@
   --text-soft: #374151;
   --text-dim: #6b7280;
 
+  --card-dark-1: rgba(19, 31, 68, 0.96);
+  --card-dark-2: rgba(9, 18, 44, 0.96);
+  --card-line: rgba(110, 180, 255, 0.16);
+  --card-line-strong: rgba(110, 180, 255, 0.28);
+  --card-text-main: #f4f8ff;
+  --card-text-soft: rgba(214, 228, 255, 0.78);
+  --card-text-dim: rgba(214, 228, 255, 0.52);
+
   --cyan: #2563eb;
   --cyan-soft: #3b82f6;
   --violet: #7c3aed;
@@ -18,18 +26,15 @@
   --gold: #d97706;
 
   --green: #16a34a;
-  --green-soft: rgba(22, 163, 74, 0.10);
+  --green-soft: rgba(22, 163, 74, 0.14);
 
   --red: #dc2626;
-  --red-soft: rgba(220, 38, 38, 0.10);
+  --red-soft: rgba(220, 38, 38, 0.14);
 
   --neutral: #6b7280;
-  --neutral-soft: rgba(107, 114, 128, 0.10);
+  --neutral-soft: rgba(107, 114, 128, 0.12);
 
   --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --glow-cyan: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --glow-violet: 0 1px 2px rgba(15, 23, 42, 0.04);
-
   --radius-xl: 22px;
   --radius-lg: 18px;
   --radius-md: 16px;
@@ -72,16 +77,21 @@ a:hover {
   background: transparent;
 }
 
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+
 .topbar,
-.panel,
 .coin-card,
 .coin-focus-card,
 .summary-card,
 .alert-card,
 .stat-card,
 .mini-stat {
-  background: linear-gradient(180deg, rgba(19, 31, 68, 0.96), rgba(9, 18, 44, 0.96));
-  border: 1px solid rgba(110, 180, 255, 0.16);
+  background: linear-gradient(180deg, var(--card-dark-1), var(--card-dark-2));
+  border: 1px solid var(--card-line);
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.24),
     inset 0 0 0 1px rgba(255, 255, 255, 0.02);
@@ -100,14 +110,18 @@ a:hover {
   border-radius: var(--radius-lg);
 }
 
-.panel:hover,
+.panel:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
 .coin-card:hover,
 .coin-focus-card:hover,
 .summary-card:hover,
 .alert-card:hover,
 .stat-card:hover,
 .mini-stat:hover {
-  border-color: rgba(110, 180, 255, 0.28);
+  border-color: var(--card-line-strong);
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.24),
     0 0 0 1px rgba(110, 180, 255, 0.08),
@@ -159,13 +173,13 @@ a:hover {
 .brand-text h1 {
   margin: 0;
   font-size: 34px;
-  color: #f4f8ff;
+  color: var(--card-text-main);
   letter-spacing: -0.02em;
 }
 
 .brand-text p {
   margin: 4px 0 0;
-  color: rgba(214, 228, 255, 0.78);
+  color: var(--card-text-soft);
   font-size: 14px;
 }
 
@@ -184,14 +198,14 @@ a:hover {
 
 .mini-stat span {
   display: block;
-  color: var(--text-soft);
+  color: var(--card-text-soft);
   font-size: 12px;
   margin-bottom: 6px;
 }
 
 .mini-stat strong {
   font-size: 16px;
-  color: var(--text-main);
+  color: var(--card-text-main);
   word-break: break-word;
 }
 
@@ -203,9 +217,9 @@ a:hover {
 }
 
 .tab-btn {
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid rgba(110, 180, 255, 0.16);
+  background: linear-gradient(180deg, var(--card-dark-1), var(--card-dark-2));
+  color: var(--card-text-soft);
   padding: 11px 16px;
   border-radius: 12px;
   cursor: pointer;
@@ -214,10 +228,13 @@ a:hover {
 
 .tab-btn:hover,
 .tab-btn.active {
-  color: #111827;
-  background: #eff6ff;
-  border-color: #93c5fd;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.10);
+  color: var(--card-text-main);
+  background: linear-gradient(180deg, rgba(28, 44, 90, 0.98), rgba(12, 22, 52, 0.98));
+  border-color: var(--card-line-strong);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(110, 180, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .main-grid {
@@ -246,13 +263,13 @@ a:hover {
 .section-head h2 {
   margin: 0;
   font-size: 24px;
-  color: #f4f8ff;
+  color: #111827;
   letter-spacing: -0.02em;
 }
 
 .section-head p {
   margin: 6px 0 0;
-  color: rgba(214, 228, 255, 0.78);
+  color: #4b5563;
   font-size: 14px;
 }
 
@@ -270,7 +287,7 @@ a:hover {
 .stat-card span,
 .summary-row span {
   display: block;
-  color: var(--text-soft);
+  color: var(--card-text-soft);
   font-size: 13px;
   margin-bottom: 8px;
 }
@@ -278,7 +295,7 @@ a:hover {
 .stat-card strong,
 .summary-row strong {
   font-size: 18px;
-  color: var(--text-main);
+  color: var(--card-text-main);
   word-break: break-word;
 }
 
@@ -287,7 +304,9 @@ a:hover {
   border: 1px solid rgba(110, 180, 255, 0.12);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
+  color: var(--card-text-main);
 }
+
 .coin-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -308,15 +327,17 @@ a:hover {
 .coin-head h3 {
   margin: 0;
   font-size: 22px;
-  color: #f4f8ff;
+  color: var(--card-text-main);
 }
 
 .coin-price {
   margin: 14px 0 16px;
-  font-size: 34px;
+  font-size: clamp(28px, 2.2vw, 34px);
   font-weight: 800;
-  color: var(--text-main);
-  word-break: break-word;
+  color: var(--card-text-main);
+  line-height: 1.05;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .coin-metrics {
@@ -331,15 +352,16 @@ a:hover {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   justify-content: space-between;
+  color: var(--card-text-main);
 }
 
 .metric-box span {
   display: block;
-  color: var(--text-soft);
+  color: var(--card-text-soft);
   font-size: 11px;
   line-height: 1.2;
   margin-bottom: 6px;
-  opacity: 0.75;
+  opacity: 1;
 }
 
 .metric-box strong {
@@ -347,7 +369,7 @@ a:hover {
   margin-top: 6px;
   font-size: 13px;
   line-height: 1.25;
-  color: var(--text-main);
+  color: var(--card-text-main);
   word-break: break-word;
 }
 
@@ -410,7 +432,7 @@ a:hover {
 .coin-focus-card-top h3 {
   margin: 0;
   font-size: 20px;
-  color: #f4f8ff;
+  color: var(--card-text-main);
 }
 
 .coin-focus-subtitle {
@@ -426,11 +448,12 @@ a:hover {
 }
 
 .coin-focus-price {
-  font-size: 34px;
+  font-size: clamp(28px, 2.2vw, 34px);
   font-weight: 800;
-  line-height: 1.1;
-  color: var(--text-main);
-  word-break: break-word;
+  line-height: 1.05;
+  color: var(--card-text-main);
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .coin-focus-tag {
@@ -522,7 +545,7 @@ a:hover {
 .alert-card h3 {
   margin: 0;
   font-size: 18px;
-  color: #f4f8ff;
+  color: var(--card-text-main);
 }
 
 .alert-card {
