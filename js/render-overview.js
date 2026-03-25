@@ -87,12 +87,41 @@ window.TitanRenderOverview = (() => {
       return;
     }
 
-    function classifySignal(text = "") {
-      const v = String(text).toLowerCase();
-      if (v.includes("long")) return "pos";
-      if (v.includes("short")) return "neg";
-      return "flat";
-    }
+    const buyPressureCount = items.filter((x) =>
+      String(x.flowPressure || "").toLowerCase().includes("buy")
+    ).length;
+
+    const sellPressureCount = items.filter((x) =>
+      String(x.flowPressure || "").toLowerCase().includes("sell")
+    ).length;
+
+    const balancedCount = items.length - buyPressureCount - sellPressureCount;
+
+    const longCrowdedCount = items.filter((x) =>
+      String(x.flowCrowding || "").toLowerCase().includes("long")
+    ).length;
+
+    const shortCrowdedCount = items.filter((x) =>
+      String(x.flowCrowding || "").toLowerCase().includes("short")
+    ).length;
+
+    const richPremiumCount = items.filter((x) =>
+      String(x.basisState || x.premiumState || "").toLowerCase().includes("rich")
+    ).length;
+
+    const discountCount = items.filter((x) =>
+      String(x.basisState || x.premiumState || "").toLowerCase().includes("discount")
+    ).length;
+
+    const marketRegime =
+      buyPressureCount > sellPressureCount
+        ? "Risk-On"
+        : sellPressureCount > buyPressureCount
+        ? "Risk-Off"
+        : "Balanced";
+
+    const marketRegimeClass =
+      marketRegime === "Risk-On" ? "pos" : marketRegime === "Risk-Off" ? "neg" : "flat";
 
     function classifyPressure(text = "") {
       const v = String(text).toLowerCase();
@@ -119,11 +148,11 @@ window.TitanRenderOverview = (() => {
       const v = String(item.liquidationState || "").toLowerCase();
 
       if (v.includes("long liquidation risk below")) {
-        return { label: "Below", className: "neg" };
+        return { label: "Sweep Below", className: "neg" };
       }
 
       if (v.includes("short liquidation risk above")) {
-        return { label: "Above", className: "pos" };
+        return { label: "Sweep Above", className: "pos" };
       }
 
       if (v.includes("balanced")) {
@@ -157,51 +186,12 @@ window.TitanRenderOverview = (() => {
       return { label: "Wait", className: "flat" };
     }
 
-    function formatPriceCell(value) {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return "--";
-
-      return `$${n.toLocaleString(undefined, {
-        minimumFractionDigits: n < 1 ? 4 : 2,
-        maximumFractionDigits: n < 1 ? 6 : 2
-      })}`;
-    }
-
-    const buyPressureCount = items.filter((x) =>
-      String(x.flowPressure || "").toLowerCase().includes("buy")
-    ).length;
-
-    const sellPressureCount = items.filter((x) =>
-      String(x.flowPressure || "").toLowerCase().includes("sell")
-    ).length;
-
-    const balancedCount = items.length - buyPressureCount - sellPressureCount;
-
-    const longCrowdedCount = items.filter((x) =>
-      String(x.flowCrowding || "").toLowerCase().includes("long")
-    ).length;
-
-    const shortCrowdedCount = items.filter((x) =>
-      String(x.flowCrowding || "").toLowerCase().includes("short")
-    ).length;
-
-    const marketRegime =
-      buyPressureCount > sellPressureCount
-        ? "Risk-On"
-        : sellPressureCount > buyPressureCount
-        ? "Risk-Off"
-        : "Balanced";
-
-    const marketRegimeClass =
-      marketRegime === "Risk-On" ? "pos" : marketRegime === "Risk-Off" ? "neg" : "flat";
-
     const ranked = [...items]
       .sort((a, b) => Number(b.finalSetupScore || 0) - Number(a.finalSetupScore || 0))
-      .slice(0, 10);
+      .slice(0, 8);
 
     const rowsHtml = ranked
       .map((item) => {
-        const signalClass = classifySignal(item.signal || "");
         const pressureClass = classifyPressure(item.flowPressure || "");
         const crowdingClass = classifyCrowding(item.flowCrowding || "");
         const basisClass = classifyBasis(item.basisState || item.premiumState || "");
@@ -210,16 +200,11 @@ window.TitanRenderOverview = (() => {
 
         return `
           <tr>
-            <td><strong class="${signalClass}">${escapeHtml(item.symbol || "--")}</strong></td>
-            <td>${escapeHtml(formatPriceCell(item.price))}</td>
-            <td class="${signalClass}">${escapeHtml(item.signal || "--")}</td>
+            <td><strong>${escapeHtml(item.symbol || "--")}</strong></td>
             <td class="${pressureClass}">${escapeHtml(item.flowPressure || "--")}</td>
             <td class="${crowdingClass}">${escapeHtml(item.flowCrowding || "--")}</td>
             <td class="${basisClass}">${escapeHtml(item.basisState || item.premiumState || "--")}</td>
             <td class="${sweep.className}">${escapeHtml(sweep.label)}</td>
-            <td>${escapeHtml(formatPriceCell(item.entry))}</td>
-            <td class="neg">${escapeHtml(formatPriceCell(item.sl))}</td>
-            <td class="pos">${escapeHtml(formatPriceCell(item.tp))}</td>
             <td class="${action.className}">${escapeHtml(action.label)}</td>
           </tr>
         `;
@@ -231,7 +216,7 @@ window.TitanRenderOverview = (() => {
         <div class="liquidity-summary-top">
           <div>
             <h3>Liquidity Summary</h3>
-            <p>Real coin-level liquidity detail from tracked coin focus set</p>
+            <p>Stop hunt / sweep risk / crowded side / price magnet across tracked coins</p>
           </div>
           <div class="liquidity-summary-regime ${marketRegimeClass}">
             ${escapeHtml(marketRegime)}
@@ -240,7 +225,7 @@ window.TitanRenderOverview = (() => {
 
         <div class="liquidity-summary-grid">
           <div class="liquidity-mini-card">
-            <span>Tracked Coins</span>
+            <span>Symbols</span>
             <strong>${items.length}</strong>
           </div>
           <div class="liquidity-mini-card">
@@ -263,6 +248,14 @@ window.TitanRenderOverview = (() => {
             <span>Short Crowded</span>
             <strong class="pos">${shortCrowdedCount}</strong>
           </div>
+          <div class="liquidity-mini-card">
+            <span>Rich Premium</span>
+            <strong class="neg">${richPremiumCount}</strong>
+          </div>
+          <div class="liquidity-mini-card">
+            <span>Discount</span>
+            <strong class="pos">${discountCount}</strong>
+          </div>
         </div>
 
         <div class="table-wrap liquidity-summary-table-wrap">
@@ -270,15 +263,10 @@ window.TitanRenderOverview = (() => {
             <thead>
               <tr>
                 <th>Coin</th>
-                <th>Price</th>
-                <th>Signal</th>
                 <th>Pressure</th>
                 <th>Crowding</th>
                 <th>Basis</th>
-                <th>Sweep</th>
-                <th>Entry</th>
-                <th>SL</th>
-                <th>TP</th>
+                <th>Sweep Risk</th>
                 <th>Action</th>
               </tr>
             </thead>
