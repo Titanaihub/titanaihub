@@ -32,14 +32,14 @@ window.TitanDemoTrading = (() => {
     if (!mount) return;
 
     if (!payload) {
-      mount.innerHTML = `<div class="stat-card"><span>Demo account</span><strong>Loading...</strong></div>`;
+      mount.innerHTML = `<div class="stat-card"><span>Futures account</span><strong>Loading...</strong></div>`;
       return;
     }
 
     if (payload.needsKeys) {
       mount.innerHTML = `
         <div class="stat-card">
-          <span>Binance Futures Testnet</span>
+          <span>Connection</span>
           <strong>Set BINANCE_TESTNET_API_KEY / BINANCE_TESTNET_API_SECRET on the server</strong>
         </div>`;
       return;
@@ -49,10 +49,10 @@ window.TitanDemoTrading = (() => {
       const msg =
         payload.message ||
         (payload.snapshot && !payload.snapshot.ok && payload.snapshot.message) ||
-        "Unable to load testnet data";
+        "Unable to load account data";
       mount.innerHTML = `
         <div class="stat-card">
-          <span>Demo account</span>
+          <span>Futures account</span>
           <strong>${escapeHtml(msg)}</strong>
         </div>`;
       return;
@@ -62,13 +62,15 @@ window.TitanDemoTrading = (() => {
     if (!snap.ok) {
       mount.innerHTML = `
         <div class="stat-card">
-          <span>Testnet</span>
+          <span>Account</span>
           <strong>${escapeHtml(snap.message || snap.error || "Error")}</strong>
         </div>`;
       return;
     }
 
-    const te = payload.tradingEnabled ? "Execute: ON" : "Execute: OFF (set BINANCE_TESTNET_TRADING_ENABLED=true)";
+    const te = payload.tradingEnabled
+      ? "Execution: active · Testnet"
+      : "Execution: view-only · enable BINANCE_TESTNET_TRADING_ENABLED on server";
     const usdt = snap.usdt || {};
     const avail = usdt.availableBalance ?? usdt.available ?? usdt.balance;
     const wallet = usdt.walletBalance ?? usdt.balance;
@@ -133,11 +135,11 @@ window.TitanDemoTrading = (() => {
 
     mount.innerHTML = `
       <div class="demo-trading-summary">
-        <div class="stat-card"><span>Mode</span><strong>${escapeHtml(te)}</strong></div>
+        <div class="stat-card"><span>Status</span><strong>${escapeHtml(te)}</strong></div>
         <div class="stat-card"><span>USDT available</span><strong>${fmtUsd(avail)}</strong></div>
         <div class="stat-card"><span>Wallet (USDT)</span><strong>${fmtUsd(wallet)}</strong></div>
-        <div class="stat-card"><span>Unrealized (sum)</span><strong class="${Number(snap.unrealizedTotal) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.unrealizedTotal)}</strong></div>
-        <div class="stat-card"><span>Realized (recent rows sum)</span><strong class="${Number(snap.realizedRecentSum) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.realizedRecentSum)}</strong></div>
+        <div class="stat-card"><span>Unrealized PnL</span><strong class="${Number(snap.unrealizedTotal) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.unrealizedTotal)}</strong></div>
+        <div class="stat-card"><span>Realized PnL (recent)</span><strong class="${Number(snap.realizedRecentSum) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.realizedRecentSum)}</strong></div>
       </div>
       <h3 class="demo-trading-sub">Open positions</h3>
       <div class="table-wrap">
@@ -161,7 +163,7 @@ window.TitanDemoTrading = (() => {
           <tbody>${ooRows || `<tr><td colspan="6">No open orders</td></tr>`}</tbody>
         </table>
       </div>
-      <h3 class="demo-trading-sub">Recent orders (closed / filled history)</h3>
+      <h3 class="demo-trading-sub">Order history</h3>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -189,7 +191,7 @@ window.TitanDemoTrading = (() => {
   async function loadAccount(elements, appState) {
     if (!appState.loggedIn || !appState.authToken) {
       if (elements.demoAccountMount) {
-        elements.demoAccountMount.innerHTML = `<div class="stat-card"><span>Demo account</span><strong>Log in as owner to view testnet positions</strong></div>`;
+        elements.demoAccountMount.innerHTML = `<div class="stat-card"><span>Futures account</span><strong>Sign in as owner to load positions and balances</strong></div>`;
       }
       return;
     }
@@ -199,8 +201,8 @@ window.TitanDemoTrading = (() => {
       });
       if (elements.demoTradingStatus) {
         elements.demoTradingStatus.textContent = data.tradingEnabled
-          ? "Testnet execute: enabled"
-          : "Testnet execute: disabled (read-only)";
+          ? "Execution: active · Testnet"
+          : "Execution: view-only · orders disabled";
       }
       renderAccount(elements, data);
     } catch (err) {
@@ -215,7 +217,7 @@ window.TitanDemoTrading = (() => {
   async function runDecision(elements, appState) {
     if (!appState.authToken) return;
     if (elements.demoTradingStatus) {
-      elements.demoTradingStatus.textContent = "Requesting AI decision...";
+      elements.demoTradingStatus.textContent = "Fetching AI signal...";
     }
     try {
       const data = await apiPost(
@@ -228,7 +230,7 @@ window.TitanDemoTrading = (() => {
         elements.demoDecisionPreview.textContent = JSON.stringify(data.decision || {}, null, 2);
       }
       if (elements.demoTradingStatus) {
-        elements.demoTradingStatus.textContent = `Last decision: ${data.source || "?"} — ${data.decision?.action || "--"}`;
+        elements.demoTradingStatus.textContent = `Signal: ${data.source || "?"} — ${data.decision?.action || "--"}`;
       }
     } catch (err) {
       appState.demoLastDecision = null;
@@ -236,7 +238,7 @@ window.TitanDemoTrading = (() => {
         elements.demoDecisionPreview.textContent = err.message || "Failed";
       }
       if (elements.demoTradingStatus) {
-        elements.demoTradingStatus.textContent = "Decision failed";
+        elements.demoTradingStatus.textContent = "Signal request failed";
       }
     }
     syncAuth(elements, appState);
@@ -245,7 +247,7 @@ window.TitanDemoTrading = (() => {
   async function executeDecision(elements, appState) {
     if (!appState.authToken || !appState.demoLastDecision) return;
     if (elements.demoTradingStatus) {
-      elements.demoTradingStatus.textContent = "Sending testnet order...";
+      elements.demoTradingStatus.textContent = "Submitting order...";
     }
     try {
       await apiPost(
@@ -254,11 +256,11 @@ window.TitanDemoTrading = (() => {
         { Authorization: `Bearer ${appState.authToken}` }
       );
       if (elements.demoTradingStatus) {
-        elements.demoTradingStatus.textContent = "Order submitted. Refreshing account...";
+        elements.demoTradingStatus.textContent = "Order submitted. Refreshing...";
       }
     } catch (err) {
       if (elements.demoTradingStatus) {
-        elements.demoTradingStatus.textContent = err.message || "Execute failed";
+        elements.demoTradingStatus.textContent = err.message || "Order failed";
       }
     }
     await loadAccount(elements, appState);

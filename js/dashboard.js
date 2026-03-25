@@ -110,7 +110,7 @@ function bindTabs() {
     Flow: "whalesSection",
     Alerts: "alertsSection",
     Health: "healthSection",
-    "Demo Trade": "demoTradingSection",
+    Trading: "demoTradingSection",
     "AI Chat": "aiChatPanel"
   };
 
