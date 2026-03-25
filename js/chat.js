@@ -9,7 +9,17 @@ window.TitanChat = (() => {
 
     const bubble = document.createElement("div");
     bubble.className = `chat-bubble ${role === "user" ? "chat-bubble-user" : "chat-bubble-ai"}`;
-    bubble.textContent = String(message || "");
+    const bubbleText = document.createElement("div");
+    bubbleText.className = "chat-bubble-text";
+    bubbleText.textContent = String(message || "");
+
+    const meta = document.createElement("div");
+    meta.className = "chat-bubble-meta";
+    const ts = new Date();
+    meta.textContent = `${role === "user" ? "You" : "AI"} • ${ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+
+    bubble.appendChild(bubbleText);
+    bubble.appendChild(meta);
 
     row.appendChild(bubble);
     elements.chatMessages.appendChild(row);
@@ -18,13 +28,17 @@ window.TitanChat = (() => {
 
   function updateChatUi(elements, appState) {
     if (elements.chatStatus) {
-      elements.chatStatus.textContent = appState.loggedIn ? "Unlocked" : "Locked";
+      elements.chatStatus.textContent = appState.loggedIn ? (appState.authRole || "Unlocked") : "Locked";
       elements.chatStatus.classList.remove("locked", "unlocked");
       elements.chatStatus.classList.add(appState.loggedIn ? "unlocked" : "locked");
     }
 
     if (elements.loginState) {
-      elements.loginState.textContent = appState.loggedIn ? "Logged in" : "Owner-only analysis";
+      elements.loginState.textContent = appState.loggedIn
+        ? appState.authRole === "owner"
+          ? "Owner unlocked"
+          : "Unlocked"
+        : "Owner-only analysis";
     }
 
     if (elements.chatInput) {
@@ -54,13 +68,21 @@ window.TitanChat = (() => {
       const username = elements.username ? elements.username.value : "";
       const password = elements.password ? elements.password.value : "";
 
-      await apiPost("/login", { username, password });
+      const data = await apiPost("/login", { username, password });
+      const token = data?.token || null;
+      const role = data?.role || null;
+
+      if (!token) throw new Error(data?.message || "Login token missing.");
 
       appState.loggedIn = true;
+      appState.authToken = token;
+      appState.authRole = role;
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", "Login successful. AI chat unlocked.");
     } catch (err) {
       appState.loggedIn = false;
+      appState.authToken = null;
+      appState.authRole = null;
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", err.message || "Login failed.");
     }
@@ -82,10 +104,18 @@ window.TitanChat = (() => {
     }
 
     try {
-      const data = await apiPost("/chat", {
-        question,
-        snapshot: buildChatSnapshot(appState.snapshot)
-      });
+      if (!appState.authToken) throw new Error("Session expired. Please login again.");
+
+      const data = await apiPost(
+        "/chat",
+        {
+          question,
+          snapshot: buildChatSnapshot(appState.snapshot)
+        },
+        {
+          Authorization: `Bearer ${appState.authToken}`
+        }
+      );
 
       addChatMessage(elements, "ai", data?.reply || "No reply.");
     } catch (err) {

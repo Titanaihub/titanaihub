@@ -2,6 +2,8 @@ const REFRESH_MS = 30000;
 
 const appState = {
   loggedIn: false,
+  authToken: null,
+  authRole: null,
   snapshot: {
     overview: null,
     coins: {},

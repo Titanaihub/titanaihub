@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 
 const {
   loadMockOverviewData,
@@ -21,6 +22,44 @@ const { buildRealFlowPackage } = require("../services/real-flow-service.js");
 const { callDeepSeekChat, buildFallbackReply } = require("../services/ai-service.js");
 
 const router = express.Router();
+
+// In-memory token store (Render typically runs a single instance).
+// For multi-instance deployments, switch to signed JWT or server-side session storage.
+const authTokens = new Map(); // token -> { role, expiresAt }
+const OWNER_USERNAME = process.env.OWNER_USERNAME || "";
+const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "";
+const AUTH_TOKEN_TTL_MS = Number(process.env.AUTH_TOKEN_TTL_MS || 30 * 60 * 1000);
+
+function getBearerToken(req) {
+  const auth = String(req.headers.authorization || "");
+  if (!auth.toLowerCase().startsWith("bearer ")) return null;
+  const token = auth.slice(7).trim();
+  return token || null;
+}
+
+function verifyAuth(req) {
+  const token = getBearerToken(req);
+  if (!token) return null;
+
+  const rec = authTokens.get(token);
+  if (!rec) return null;
+
+  if (Date.now() > rec.expiresAt) {
+    authTokens.delete(token);
+    return null;
+  }
+
+  return rec;
+}
+
+function issueToken(role) {
+  const token = crypto.randomBytes(32).toString("hex");
+  authTokens.set(token, {
+    role,
+    expiresAt: Date.now() + AUTH_TOKEN_TTL_MS
+  });
+  return token;
+}
 
 router.get("/overview", async (req, res) => {
   try {
@@ -207,10 +246,25 @@ router.get("/debug-version", (req, res) => {
 router.post("/login", (req, res) => {
   const { username, password } = req.body || {};
 
-  if (username === "admin" && password === "1234") {
+  const u = String(username || "");
+  const p = String(password || "");
+
+  if (!OWNER_USERNAME || !OWNER_PASSWORD) {
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: "Owner credentials not configured on server"
+    });
+  }
+
+  if (u === OWNER_USERNAME && p === OWNER_PASSWORD) {
+    const token = issueToken("owner");
+
     return res.json({
       ok: true,
       success: true,
+      role: "owner",
+      token,
       message: "Login successful"
     });
   }
@@ -225,6 +279,15 @@ router.post("/login", (req, res) => {
 router.post("/chat", async (req, res) => {
   const { question, snapshot } = req.body || {};
   const qRaw = String(question || "").trim();
+
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
 
   let parsed = null;
   try {

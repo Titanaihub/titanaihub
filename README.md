@@ -1,16 +1,21 @@
-## Hi there 👋
+## Titan AI Hub
 
-<!--
-**Titanaihub/titanaihub** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+Dashboard + API สำหรับสรุปสภาวะตลาดคริปโต และใช้งาน AI Chat (เฟสนี้บังคับ owner login)
 
-Here are some ideas to get you started:
+### Features
+- Market Overview (fear & greed, dominance, market bias)
+- Coin Focus + Real Flow (Binance futures positioning/pressure/basis)
+- Alerts และ System Health
+- AI Chat วิเคราะห์จาก snapshot
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+### Deploy (Render)
+1. ตั้งค่า Environment Variables ตามไฟล์ `.env.example`
+2. Deploy แอป และรัน `npm start`
+
+### Local development
+1. ติดตั้ง dependency: `npm install`
+2. ตั้งค่า environment: ทำไฟล์ `.env` (อ้างอิง `.env.example`)
+3. รัน: `npm start`
+
+### Endpoint ที่ UI เรียก
+UI เรียกผ่าน `/api/*` (same-origin) ดังนั้นควรให้ frontend และ backend อยู่ที่โดเมนเดียวกันใน Render
