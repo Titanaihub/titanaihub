@@ -178,7 +178,7 @@ async function loadAllData() {
     apiGet("/coin/btc?v=2600"),
     apiGet("/coin/eth?v=2600"),
     apiGet("/coin/bnb?v=2600"),
-    apiGet("/coin-focus?limit=12&v=2600"),
+    apiGet("/coin-focus?limit=15&v=2600"),
     apiGet("/alerts?v=2600"),
     apiGet("/analysis/deep?v=2600")
   ]);

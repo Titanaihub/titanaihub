@@ -109,36 +109,88 @@ window.TitanRenderRealFlow = (() => {
   function renderLiquiditySummary(elements, snapshot) {
     if (!elements.stablecoinFlowGrid) return;
 
-    const item = snapshot?.stablecoinFlows || null;
+    const coins = Array.isArray(snapshot?.coinFocus) ? snapshot.coinFocus : [];
+    const stableFlows = snapshot?.stablecoinFlows || null;
 
-    if (!item || Array.isArray(item)) {
+    const regime = !stableFlows || Array.isArray(stableFlows) ? "--" : stableFlows?.summaryState || "--";
+    const stateClass = getBiasClass(regime);
+
+    if (!coins.length) {
       elements.stablecoinFlowGrid.innerHTML = `
-        <div class="stat-card">
-          <span>Liquidity summary unavailable</span>
-          <strong>--</strong>
-        </div>
+        <article class="summary-card">
+          <div class="summary-card-top">
+            <h3>Liquidity Summary</h3>
+            <strong class="${escapeHtml(stateClass)}">${escapeHtml(regime)}</strong>
+          </div>
+          <div class="table-wrap">
+            <div class="stat-card">
+              <span>No liquidity rows available</span>
+              <strong>--</strong>
+            </div>
+          </div>
+        </article>
       `;
       return;
     }
 
-    const stateClass = getBiasClass(item.summaryState || "");
+    const rowsHtml = coins
+      .slice(0, 15)
+      .map((coin) => {
+        const signal = coin.signal || "WAIT";
+
+        const pressureClass = getBiasClass(coin.flowPressure || "");
+        const crowdingClass = getBiasClass(coin.flowCrowding || "");
+        const oiClass = getBiasClass(coin.flowOIState || "");
+        const basisClass = getBiasClass(coin.flowBasisState || "");
+        // Sweep risk uses liquidationState per your request.
+        const sweepClass = getBiasClass(coin.liquidationState || "");
+
+        return `
+          <tr>
+            <td>${escapeHtml(coin.symbol || "--")}</td>
+            <td>${escapeHtml(signal)}</td>
+            <td class="${escapeHtml(pressureClass)}">${escapeHtml(coin.flowPressure || "--")}</td>
+            <td class="${escapeHtml(crowdingClass)}">${escapeHtml(coin.flowCrowding || "--")}</td>
+            <td class="${escapeHtml(oiClass)}">${escapeHtml(coin.flowOIState || "--")}</td>
+            <td class="${escapeHtml(basisClass)}">${escapeHtml(coin.flowBasisState || "--")}</td>
+            <td class="${escapeHtml(sweepClass)}">${escapeHtml(coin.liquidationState || "--")}</td>
+            <td>${escapeHtml(coin.entry || "--")}</td>
+            <td>${escapeHtml(coin.sl || "--")}</td>
+            <td>${escapeHtml(coin.tp || "--")}</td>
+            <td>${escapeHtml(coin.recommendedAction || coin.executionTier || "--")}</td>
+          </tr>
+        `;
+      })
+      .join("");
 
     elements.stablecoinFlowGrid.innerHTML = `
       <article class="summary-card">
         <div class="summary-card-top">
           <h3>Liquidity Summary</h3>
-          <strong class="${escapeHtml(stateClass)}">${escapeHtml(item.summaryState || "--")}</strong>
+          <strong class="${escapeHtml(stateClass)}">${escapeHtml(regime)}</strong>
         </div>
 
-        <div class="summary-card-grid">
-          ${buildMetricBox("Symbols", item.totalSymbols)}
-          ${buildMetricBox("Buy Pressure", item.buyPressureCount)}
-          ${buildMetricBox("Sell Pressure", item.sellPressureCount)}
-          ${buildMetricBox("Balanced", item.balancedCount)}
-          ${buildMetricBox("Long Crowded", item.longCrowdedCount)}
-          ${buildMetricBox("Short Crowded", item.shortCrowdedCount)}
-          ${buildMetricBox("Rich Premium", item.richPremiumCount)}
-          ${buildMetricBox("Discount", item.discountCount)}
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Signal</th>
+                <th>Pressure</th>
+                <th>Crowding</th>
+                <th>OI State</th>
+                <th>Basis</th>
+                <th>Sweep risk</th>
+                <th>Entry</th>
+                <th>SL</th>
+                <th>TP</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
         </div>
       </article>
     `;
