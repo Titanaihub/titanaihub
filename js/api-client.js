@@ -1,6 +1,13 @@
 window.TitanApi = (() => {
   // Use same-origin by default (ideal for Render deploy). You can override via `window.TitanConfig.API_BASE`.
-  const API_BASE = window.TitanConfig?.API_BASE || "api";
+  function normalizeApiBase(raw) {
+    const v = String(raw || "/api").trim();
+    // Ensure leading slash and no trailing slash.
+    const withSlash = v.startsWith("/") ? v : `/${v}`;
+    return withSlash.endsWith("/") ? withSlash.slice(0, -1) : withSlash;
+  }
+
+  const API_BASE = normalizeApiBase(window.TitanConfig?.API_BASE || "/api");
 
   function buildUrl(path) {
     if (!path) return API_BASE || "";
