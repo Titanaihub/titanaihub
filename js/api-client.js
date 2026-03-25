@@ -1,6 +1,6 @@
 window.TitanApi = (() => {
   // Use same-origin by default (ideal for Render deploy). You can override via `window.TitanConfig.API_BASE`.
-  const API_BASE = window.TitanConfig?.API_BASE || "/api";
+  const API_BASE = window.TitanConfig?.API_BASE || "api";
 
   function buildUrl(path) {
     if (!path) return API_BASE || "";
