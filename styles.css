@@ -36,7 +36,7 @@
 --radius-sm: 12px;
 }
 
-{
+* {
 box-sizing: border-box;
 }
 
@@ -317,10 +317,13 @@ color: #f4f8ff;
 
 .coin-price {
 margin: 14px 0 16px;
-font-size: 34px;
+font-size: clamp(20px, 1.8vw, 30px);
 font-weight: 800;
 color: var(--text-main);
-word-break: break-word;
+line-height: 1;
+white-space: nowrap;
+word-break: normal;
+overflow-wrap: normal;
 }
 
 .coin-metrics {
@@ -353,6 +356,21 @@ font-size: 13px;
 line-height: 1.25;
 color: var(--text-main);
 word-break: break-word;
+}
+
+.metric-box span.pos,
+.metric-box strong.pos {
+color: #57e38d !important;
+}
+
+.metric-box span.neg,
+.metric-box strong.neg {
+color: #ff7f8a !important;
+}
+
+.metric-box span.flat,
+.metric-box strong.flat {
+color: #d9e2f3 !important;
 }
 
 .signal-badge {
@@ -401,6 +419,8 @@ padding: 16px;
 
 .coin-focus-card-heading {
 min-width: 0;
+width: 58%;
+max-width: 58%;
 }
 
 .coin-focus-card-top {
@@ -425,16 +445,24 @@ opacity: 0.85;
 }
 
 .coin-focus-price-wrap {
-min-width: 96px;
+min-width: 0;
+width: 42%;
+max-width: 42%;
 text-align: right;
+display: flex;
+flex-direction: column;
+align-items: flex-end;
+justify-content: flex-start;
 }
 
 .coin-focus-price {
-font-size: 34px;
+font-size: clamp(20px, 1.8vw, 30px);
 font-weight: 800;
-line-height: 1.1;
+line-height: 1;
 color: var(--text-main);
-word-break: break-word;
+white-space: nowrap;
+word-break: normal;
+overflow-wrap: normal;
 }
 
 .coin-focus-tag {
@@ -653,22 +681,26 @@ font-size: 12px;
 .pos,
 .buy,
 .long,
-.bullish {
-color: var(--green) !important;
+.bullish,
+.tp,
+.take-profit {
+color: #57e38d !important;
 }
 
 .neg,
 .sell,
 .short,
-.bearish {
-color: var(--red) !important;
+.bearish,
+.sl,
+.stop-loss {
+color: #ff7f8a !important;
 }
 
 .flat,
 .neutral,
 .wait,
 .balanced {
-color: var(--neutral) !important;
+color: #d9e2f3 !important;
 }
 
 #systemStatus.pos,
