@@ -64,6 +64,29 @@ function buildMetricBox(label, value, valueClass = "") {
   `;
 }
 
+function setMetricTone(valueNode, toneClass = "") {
+  if (!valueNode) return;
+  const labelNode = valueNode.parentElement?.querySelector("span") || null;
+  const classes = ["pos", "neg", "flat"];
+
+  valueNode.classList.remove(...classes);
+  if (labelNode) labelNode.classList.remove(...classes);
+
+  if (toneClass) {
+    valueNode.classList.add(toneClass);
+    if (labelNode) labelNode.classList.add(toneClass);
+  }
+}
+
+function getRegimeBadgeClass(value = "") {
+  const v = String(value || "").toLowerCase().trim();
+  if (!v) return "flat";
+  if (v.includes("panic")) return "tier-panic";
+  if (v.includes("buy") || v.includes("long") || v.includes("bullish")) return "pos";
+  if (v.includes("sell") || v.includes("short") || v.includes("bearish")) return "neg";
+  return "flat";
+}
+
   function normalizeDisplayPrice(value) {
     const n = Number(value);
     if (Number.isFinite(n)) return formatPrice(n);
@@ -206,13 +229,13 @@ if (entryNode) {
 }
 
 if (slNode) {
-  slNode.classList.remove("pos", "neg", "flat");
-  slNode.classList.add("neg");
+  // SHORT => Stop Loss should be red (label + value)
+  setMetricTone(slNode, sideClass === "neg" ? "neg" : "");
 }
 
 if (tpNode) {
-  tpNode.classList.remove("pos", "neg", "flat");
-  tpNode.classList.add("pos");
+  // LONG => Take Profit should be green (label + value)
+  setMetricTone(tpNode, sideClass === "pos" ? "pos" : "");
 }
   }
 
@@ -251,7 +274,9 @@ if (tpNode) {
         const actionClass = getBiasClass(item.recommendedAction || item.setupDirection || "");
         const directionClass = semanticClass(`${item.recommendedAction || ""} ${item.setupDirection || ""} ${item.signal || ""}`);
         const tierText = String(item.executionTier || "");
-        const tierClass = tierText.includes("Panic")
+        const tierClass = tierText.includes("No Trade")
+          ? "tier-notrade"
+          : tierText.includes("Panic")
           ? "tier-panic"
           : tierText.includes("Tier 1")
           ? "tier-1"
@@ -283,7 +308,7 @@ if (tpNode) {
 
             <div class="coin-focus-badges">
               <span class="signal-badge ${escapeHtml(signalClass)}">${escapeHtml(item.signal || "WAIT")}</span>
-              <span class="mini-badge ${escapeHtml(getBiasClass(item.marketRegime || ""))}">${escapeHtml(item.marketRegime || "--")}</span>
+              <span class="mini-badge ${escapeHtml(getRegimeBadgeClass(item.marketRegime || ""))}">${escapeHtml(item.marketRegime || "--")}</span>
               <span class="mini-badge ${escapeHtml(tierClass)}">${escapeHtml(item.executionTier || "No Trade")}</span>
             </div>
 

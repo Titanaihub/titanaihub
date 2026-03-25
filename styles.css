@@ -685,9 +685,9 @@ background: rgba(107, 114, 128, 0.08) !important;
 
 /* Execution tier badge colors (user-specified) */
 .mini-badge.tier-panic {
-  color: #fb923c !important;
-  border-color: rgba(251, 146, 60, 0.45) !important;
-  background: rgba(251, 146, 60, 0.14) !important;
+  color: var(--red) !important;
+  border-color: rgba(220, 38, 38, 0.42) !important;
+  background: rgba(220, 38, 38, 0.12) !important;
 }
 
 .mini-badge.tier-1 {
@@ -703,6 +703,12 @@ background: rgba(107, 114, 128, 0.08) !important;
 }
 
 .mini-badge.tier-3 {
+  color: var(--red) !important;
+  border-color: rgba(220, 38, 38, 0.42) !important;
+  background: rgba(220, 38, 38, 0.12) !important;
+}
+
+.mini-badge.tier-notrade {
   color: var(--red) !important;
   border-color: rgba(220, 38, 38, 0.42) !important;
   background: rgba(220, 38, 38, 0.12) !important;
@@ -1914,8 +1920,26 @@ body {
   border-color: rgba(212, 175, 55, 0.4) !important;
 }
 
-/* Liquidity section title in gold */
+/* Liquidity section title in white */
 #liquiditySection .section-head h2,
 #liquiditySection .summary-card-top h3 {
-  color: #d4af37 !important;
+  color: #f4f8ff !important;
+}
+
+/* Positioning Summary title should remain white */
+#positioningSection .section-head h2 {
+  color: #f4f8ff !important;
+}
+
+/* Top Setup: color by directional words */
+#topSetup.pos {
+  color: var(--green) !important;
+}
+
+#topSetup.neg {
+  color: var(--red) !important;
+}
+
+#topSetup.flat {
+  color: var(--neutral) !important;
 }

@@ -53,6 +53,13 @@ if (!coinFocus.length) {
 const best = coinFocus[0];  
 
 setText(elements.topSetup, `${best.symbol} / ${best.setupDirection || "Watchlist"}`);  
+if (elements.topSetup) {
+  const setupClass = getBiasClass(
+    `${best.setupDirection || ""} ${best.recommendedAction || ""} ${best.signal || ""} ${best.bias || ""}`
+  );
+  elements.topSetup.classList.remove("pos", "neg", "flat");
+  elements.topSetup.classList.add(setupClass || "flat");
+}
 setText(  
   elements.summaryConfidence,  
   Number.isFinite(Number(best.confidenceScore))  

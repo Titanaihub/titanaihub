@@ -98,10 +98,11 @@ window.TitanRenderRealFlow = (() => {
     const html = items
       .map((item) => {
         const biasClass = getBiasClass(item.directionalBias || "");
+        const crowdingClass = getFlowTextClass(item.crowdingState || "");
         const symbolClass =
-          getFlowTextClass(
-            `${item.directionalBias || ""} ${item.pressureState || ""} ${item.crowdingState || ""}`
-          ) || "flow-flat";
+          crowdingClass !== "flow-flat"
+            ? crowdingClass
+            : getFlowTextClass(`${item.directionalBias || ""} ${item.pressureState || ""}`) || "flow-flat";
 
         return `
           <article class="summary-card">
