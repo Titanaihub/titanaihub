@@ -1913,3 +1913,9 @@ body {
   background: rgba(212, 175, 55, 0.18) !important;
   border-color: rgba(212, 175, 55, 0.4) !important;
 }
+
+/* Liquidity section title in gold */
+#liquiditySection .section-head h2,
+#liquiditySection .summary-card-top h3 {
+  color: #d4af37 !important;
+}

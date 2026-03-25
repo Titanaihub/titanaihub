@@ -7,6 +7,8 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Titan AI Hub</title>
+  <link rel="icon" type="image/png" href="./titan-logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
   <link rel="stylesheet" href="./styles.css?v=2500" />
 </head>
 <body>
@@ -226,7 +228,7 @@
         </div>
       </section>
 
-      <section class="panel panel-full">
+      <section class="panel panel-full" id="liquiditySection">
         <div class="section-head">
           <div>
             <h2>Positioning Summary</h2>
@@ -327,9 +329,6 @@
             autocomplete="current-password"
           />
           <button id="loginBtn" class="btn btn-primary" type="button">Login</button>
-          <div class="chat-login-hint">
-            Owner login is required to unlock AI Chat. (Set <code>OWNER_USERNAME</code> / <code>OWNER_PASSWORD</code> on Render.)
-          </div>
         </div>
 
         <div class="chat-status-row">
