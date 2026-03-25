@@ -247,9 +247,9 @@ if (tpNode) {
         return `
           <article class="coin-focus-card">
             <div class="coin-focus-card-top">
-              <div class="coin-focus-card-heading">
-                <h3>${escapeHtml(item.symbol)}</h3>
-                <div class="coin-focus-subtitle">${escapeHtml(item.setupDirection || "Watchlist")}</div>
+             <div class="coin-focus-card-heading">
+              <h3 class="${escapeHtml(signalClass === "signal-long" ? "pos" : signalClass === "signal-short" ? "neg" : "flat")}">${escapeHtml(item.symbol)}</h3>
+              <div class="coin-focus-subtitle ${escapeHtml(signalClass === "signal-long" ? "pos" : signalClass === "signal-short" ? "neg" : "flat")}">${escapeHtml(item.setupDirection || "Watchlist")}</div>
               </div>
 
               <div class="coin-focus-price-wrap">
