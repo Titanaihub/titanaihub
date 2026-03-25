@@ -315,6 +315,26 @@ font-size: 22px;
 color: #f4f8ff;
 }
 
+.coin-head h3.pos,
+.coin-head h3.long,
+.coin-head h3.buy,
+.coin-head h3.bullish {
+color: #57e38d !important;
+}
+
+.coin-head h3.neg,
+.coin-head h3.short,
+.coin-head h3.sell,
+.coin-head h3.bearish {
+color: #ff5f7a !important;
+}
+
+.coin-head h3.flat,
+.coin-head h3.wait,
+.coin-head h3.neutral {
+color: #d9e2f3 !important;
+}
+
 .coin-price {
 margin: 14px 0 16px;
 font-size: clamp(20px, 1.8vw, 30px);
@@ -361,16 +381,22 @@ word-break: break-word;
 .metric-box span.pos,
 .metric-box strong.pos {
 color: #57e38d !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .metric-box span.neg,
 .metric-box strong.neg {
-color: #ff7f8a !important;
+color: #ff5f7a !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .metric-box span.flat,
 .metric-box strong.flat {
 color: #d9e2f3 !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .signal-badge {
@@ -437,11 +463,54 @@ font-size: 20px;
 color: #f4f8ff;
 }
 
+.coin-focus-card-top h3.pos,
+.coin-focus-card-top h3.long,
+.coin-focus-card-top h3.buy,
+.coin-focus-card-top h3.bullish {
+color: #57e38d !important;
+text-shadow: 0 0 10px rgba(87, 227, 141, 0.18);
+}
+
+.coin-focus-card-top h3.neg,
+.coin-focus-card-top h3.short,
+.coin-focus-card-top h3.sell,
+.coin-focus-card-top h3.bearish {
+color: #ff5f7a !important;
+text-shadow: 0 0 10px rgba(255, 95, 122, 0.18);
+}
+
+.coin-focus-card-top h3.flat,
+.coin-focus-card-top h3.wait,
+.coin-focus-card-top h3.neutral {
+color: #d9e2f3 !important;
+}
+
 .coin-focus-subtitle {
 margin-top: 4px;
 font-size: 13px;
 color: var(--text-soft);
-opacity: 0.85;
+opacity: 0.95;
+font-weight: 600;
+}
+
+.coin-focus-subtitle.pos,
+.coin-focus-subtitle.long,
+.coin-focus-subtitle.buy,
+.coin-focus-subtitle.bullish {
+color: #57e38d !important;
+}
+
+.coin-focus-subtitle.neg,
+.coin-focus-subtitle.short,
+.coin-focus-subtitle.sell,
+.coin-focus-subtitle.bearish {
+color: #ff5f7a !important;
+}
+
+.coin-focus-subtitle.flat,
+.coin-focus-subtitle.wait,
+.coin-focus-subtitle.neutral {
+color: #d9e2f3 !important;
 }
 
 .coin-focus-price-wrap {
@@ -685,6 +754,8 @@ font-size: 12px;
 .tp,
 .take-profit {
 color: #57e38d !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .neg,
@@ -693,7 +764,9 @@ color: #57e38d !important;
 .bearish,
 .sl,
 .stop-loss {
-color: #ff7f8a !important;
+color: #ff5f7a !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .flat,
