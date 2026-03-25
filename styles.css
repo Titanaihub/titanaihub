@@ -381,21 +381,23 @@ word-break: break-word;
 .metric-box span.pos,
 .metric-box strong.pos {
 color: #57e38d !important;
-font-weight: 700;
+font-weight: 800;
 opacity: 1 !important;
+text-shadow: 0 0 8px rgba(87, 227, 141, 0.12);
 }
 
 .metric-box span.neg,
 .metric-box strong.neg {
 color: #ff5f7a !important;
-font-weight: 700;
+font-weight: 800;
 opacity: 1 !important;
+text-shadow: 0 0 8px rgba(255, 95, 122, 0.12);
 }
 
 .metric-box span.flat,
 .metric-box strong.flat {
 color: #d9e2f3 !important;
-font-weight: 700;
+font-weight: 800;
 opacity: 1 !important;
 }
 
@@ -412,21 +414,23 @@ opacity: 1 !important;
 }
 
 .signal-badge.signal-long {
-color: #dfffea;
-background: var(--green-soft);
-border-color: rgba(61, 220, 132, 0.35);
+color: #57e38d;
+background: rgba(87, 227, 141, 0.16);
+border-color: rgba(87, 227, 141, 0.45);
+box-shadow: 0 0 10px rgba(87, 227, 141, 0.12);
 }
 
 .signal-badge.signal-short {
-color: #ffe3e7;
-background: var(--red-soft);
-border-color: rgba(255, 95, 109, 0.35);
+color: #ff5f7a;
+background: rgba(255, 95, 122, 0.16);
+border-color: rgba(255, 95, 122, 0.45);
+box-shadow: 0 0 10px rgba(255, 95, 122, 0.12);
 }
 
 .signal-badge.signal-wait {
 color: #d9e2f3;
-background: var(--neutral-soft);
-border-color: rgba(168, 179, 199, 0.22);
+background: rgba(217, 226, 243, 0.08);
+border-color: rgba(217, 226, 243, 0.25);
 }
 
 .coin-focus-grid {
@@ -468,7 +472,8 @@ color: #f4f8ff;
 .coin-focus-card-top h3.buy,
 .coin-focus-card-top h3.bullish {
 color: #57e38d !important;
-text-shadow: 0 0 10px rgba(87, 227, 141, 0.18);
+font-weight: 800;
+text-shadow: 0 0 12px rgba(87, 227, 141, 0.22);
 }
 
 .coin-focus-card-top h3.neg,
@@ -476,7 +481,8 @@ text-shadow: 0 0 10px rgba(87, 227, 141, 0.18);
 .coin-focus-card-top h3.sell,
 .coin-focus-card-top h3.bearish {
 color: #ff5f7a !important;
-text-shadow: 0 0 10px rgba(255, 95, 122, 0.18);
+font-weight: 800;
+text-shadow: 0 0 12px rgba(255, 95, 122, 0.22);
 }
 
 .coin-focus-card-top h3.flat,
@@ -498,6 +504,8 @@ font-weight: 600;
 .coin-focus-subtitle.buy,
 .coin-focus-subtitle.bullish {
 color: #57e38d !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .coin-focus-subtitle.neg,
@@ -505,6 +513,8 @@ color: #57e38d !important;
 .coin-focus-subtitle.sell,
 .coin-focus-subtitle.bearish {
 color: #ff5f7a !important;
+font-weight: 700;
+opacity: 1 !important;
 }
 
 .coin-focus-subtitle.flat,
@@ -561,6 +571,41 @@ line-height: 1;
 background: rgba(255, 255, 255, 0.06);
 color: #d8dee9;
 border: 1px solid var(--line);
+font-weight: 700;
+opacity: 1;
+}
+
+.mini-badge.pos,
+.mini-badge.long,
+.mini-badge.buy,
+.mini-badge.bullish,
+.mini-badge.tp,
+.mini-badge.take-profit {
+color: #57e38d !important;
+border-color: rgba(87, 227, 141, 0.45) !important;
+background: rgba(87, 227, 141, 0.14) !important;
+box-shadow: 0 0 10px rgba(87, 227, 141, 0.12);
+}
+
+.mini-badge.neg,
+.mini-badge.short,
+.mini-badge.sell,
+.mini-badge.bearish,
+.mini-badge.sl,
+.mini-badge.stop-loss {
+color: #ff5f7a !important;
+border-color: rgba(255, 95, 122, 0.45) !important;
+background: rgba(255, 95, 122, 0.14) !important;
+box-shadow: 0 0 10px rgba(255, 95, 122, 0.12);
+}
+
+.mini-badge.flat,
+.mini-badge.wait,
+.mini-badge.neutral,
+.mini-badge.balanced {
+color: #d9e2f3 !important;
+border-color: rgba(217, 226, 243, 0.25) !important;
+background: rgba(217, 226, 243, 0.08) !important;
 }
 
 .coin-focus-grid-inner,
