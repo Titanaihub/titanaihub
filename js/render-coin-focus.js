@@ -232,13 +232,14 @@ if (tpNode) {
         const c1Class = getSignedClass(c1Value);
         const biasClass = getBiasClass(item.bias);
         const actionClass = getBiasClass(item.recommendedAction || item.setupDirection || "");
+        const directionClass = semanticClass(`${item.recommendedAction || ""} ${item.setupDirection || ""} ${item.signal || ""}`);
         const tierClass =
-          String(item.executionTier || "").includes("No Trade")
-            ? "neg"
-            : String(item.executionTier || "").includes("Tier 1") ||
-              String(item.executionTier || "").includes("Tier 2")
-            ? "pos"
-            : "flat";
+        String(item.executionTier || "").includes("No Trade")
+        ? "neg"
+        : String(item.executionTier || "").includes("Tier 1") ||
+        String(item.executionTier || "").includes("Tier 2")
+        ? "pos"
+    : "flat";
 
         const noTradeNote = item.noTradeReason
           ? `<div class="coin-focus-warning">No Trade: ${escapeHtml(item.noTradeReason)}</div>`
@@ -248,9 +249,9 @@ if (tpNode) {
           <article class="coin-focus-card">
             <div class="coin-focus-card-top">
              <div class="coin-focus-card-heading">
-              <h3 class="${escapeHtml(signalClass === "signal-long" ? "pos" : signalClass === "signal-short" ? "neg" : "flat")}">${escapeHtml(item.symbol)}</h3>
-              <div class="coin-focus-subtitle ${escapeHtml(signalClass === "signal-long" ? "pos" : signalClass === "signal-short" ? "neg" : "flat")}">${escapeHtml(item.setupDirection || "Watchlist")}</div>
-              </div>
+              <h3 class="${escapeHtml(directionClass)}">${escapeHtml(item.symbol)}</h3>
+              <div class="coin-focus-subtitle ${escapeHtml(directionClass)}">${escapeHtml(item.setupDirection || "Watchlist")}</div>
+            </div>
 
               <div class="coin-focus-price-wrap">
                 <div class="coin-focus-price">${escapeHtml(normalizeDisplayPrice(item.price || "--"))}</div>
@@ -260,7 +261,7 @@ if (tpNode) {
 
             <div class="coin-focus-badges">
               <span class="signal-badge ${escapeHtml(signalClass)}">${escapeHtml(item.signal || "WAIT")}</span>
-              <span class="mini-badge">${escapeHtml(item.marketRegime || "--")}</span>
+              <span class="mini-badge ${escapeHtml(getBiasClass(item.marketRegime || ""))}">${escapeHtml(item.marketRegime || "--")}</span>
               <span class="mini-badge ${escapeHtml(tierClass)}">${escapeHtml(item.executionTier || "No Trade")}</span>
             </div>
 
