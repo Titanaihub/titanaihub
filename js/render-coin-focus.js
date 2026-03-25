@@ -149,6 +149,12 @@ function buildMetricBox(label, value, valueClass = "") {
     const entryNode = elements[`${prefix}Entry`];
     const slNode = elements[`${prefix}SL`];
     const tpNode = elements[`${prefix}TP`];
+    const titleNode = signalNode?.closest(".coin-card")?.querySelector(".coin-head h3") || null;
+
+    const sideClass =
+      semanticClass(
+        `${data.signal || ""} ${data.setupDirection || ""} ${data.recommendedAction || ""} ${data.bias || ""}`
+      ) || getBiasClass(data.bias || "") || "flat";
 
     setText(priceNode, normalizeDisplayPrice(data.priceFormatted || data.priceText || data.price));
     setText(signalNode, data.signal || "WAIT");
@@ -162,6 +168,17 @@ function buildMetricBox(label, value, valueClass = "") {
     setText(entryNode, normalizeDisplayPrice(data.entry));
     setText(slNode, normalizeDisplayPrice(data.sl));
     setText(tpNode, normalizeDisplayPrice(data.tp));
+
+    // Keep coin name + price aligned to current Long/Short side.
+    if (titleNode) {
+      titleNode.classList.remove("pos", "neg", "flat");
+      titleNode.classList.add(sideClass);
+    }
+
+    if (priceNode) {
+      priceNode.classList.remove("pos", "neg", "flat");
+      priceNode.classList.add(sideClass);
+    }
 
     if (signalNode) {
       signalNode.className = `signal-badge ${getSignalClass(data.signal)}`;
@@ -233,13 +250,16 @@ if (tpNode) {
         const biasClass = getBiasClass(item.bias);
         const actionClass = getBiasClass(item.recommendedAction || item.setupDirection || "");
         const directionClass = semanticClass(`${item.recommendedAction || ""} ${item.setupDirection || ""} ${item.signal || ""}`);
-        const tierClass =
-        String(item.executionTier || "").includes("No Trade")
-        ? "neg"
-        : String(item.executionTier || "").includes("Tier 1") ||
-        String(item.executionTier || "").includes("Tier 2")
-        ? "pos"
-    : "flat";
+        const tierText = String(item.executionTier || "");
+        const tierClass = tierText.includes("Panic")
+          ? "tier-panic"
+          : tierText.includes("Tier 1")
+          ? "tier-1"
+          : tierText.includes("Tier 2")
+          ? "tier-2"
+          : tierText.includes("Tier 3")
+          ? "tier-3"
+          : "flat";
 
         const noTradeNote = item.noTradeReason
           ? `<div class="coin-focus-warning">No Trade: ${escapeHtml(item.noTradeReason)}</div>`
@@ -254,7 +274,9 @@ if (tpNode) {
             </div>
 
               <div class="coin-focus-price-wrap">
-                <div class="coin-focus-price">${escapeHtml(normalizeDisplayPrice(item.price || "--"))}</div>
+                <div class="coin-focus-price ${escapeHtml(directionClass)}">${escapeHtml(
+                  normalizeDisplayPrice(item.price || "--")
+                )}</div>
                 <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core")}</div>
               </div>
             </div>

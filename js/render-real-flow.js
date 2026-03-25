@@ -14,6 +14,26 @@ window.TitanRenderRealFlow = (() => {
     `;
   }
 
+  function getFlowTextClass(value) {
+    const text = String(value || "").toLowerCase().trim();
+    if (!text) return "flow-flat";
+    if (
+      text.includes("buy") ||
+      text.includes("long") ||
+      text.startsWith("+")
+    ) {
+      return "flow-pos";
+    }
+    if (
+      text.includes("sell") ||
+      text.includes("short") ||
+      text.startsWith("-")
+    ) {
+      return "flow-neg";
+    }
+    return "flow-flat";
+  }
+
   function renderFlowFeed(elements, snapshot) {
     if (!elements.whaleTableBody) return;
 
@@ -30,15 +50,17 @@ window.TitanRenderRealFlow = (() => {
 
     const html = rows
       .map((row) => {
-        const pressureClass = getBiasClass(row.pressureState || "");
-        const crowdingClass = getBiasClass(row.crowdingState || "");
-        const oiClass = getBiasClass(row.oiPressureState || "");
-        const basisClass = getBiasClass(row.basisState || "");
+        const pressureClass = getFlowTextClass(row.pressureState || "");
+        const crowdingClass = getFlowTextClass(row.crowdingState || "");
+        const oiClass = getFlowTextClass(row.oiPressureState || "");
+        const basisClass = getFlowTextClass(row.basisState || "");
+        const oiChangeClass = getFlowTextClass(row.openInterestChangePct || "");
+        const premiumClass = getFlowTextClass(row.premiumPct || "");
 
         return `
           <tr>
             <td>${escapeHtml(row.symbol || "--")}</td>
-            <td>${escapeHtml(row.futuresSymbol || "--")}</td>
+            <td class="futures-symbol">${escapeHtml(row.futuresSymbol || "--")}</td>
             <td class="${escapeHtml(pressureClass)}">${escapeHtml(row.pressureState || "--")}</td>
             <td class="${escapeHtml(crowdingClass)}">${escapeHtml(row.crowdingState || "--")}</td>
             <td class="${escapeHtml(oiClass)}">${escapeHtml(row.oiPressureState || "--")}</td>
@@ -48,8 +70,8 @@ window.TitanRenderRealFlow = (() => {
             <td>${escapeHtml(row.topPositionLongShortRatio || "--")}</td>
             <td>${escapeHtml(row.takerBuySellRatio || "--")}</td>
             <td>${escapeHtml(row.openInterestValue || "--")}</td>
-            <td>${escapeHtml(row.openInterestChangePct || "--")}</td>
-            <td>${escapeHtml(row.premiumPct || "--")}</td>
+            <td class="${escapeHtml(oiChangeClass)}">${escapeHtml(row.openInterestChangePct || "--")}</td>
+            <td class="${escapeHtml(premiumClass)}">${escapeHtml(row.premiumPct || "--")}</td>
           </tr>
         `;
       })
@@ -76,27 +98,31 @@ window.TitanRenderRealFlow = (() => {
     const html = items
       .map((item) => {
         const biasClass = getBiasClass(item.directionalBias || "");
+        const symbolClass =
+          getFlowTextClass(
+            `${item.directionalBias || ""} ${item.pressureState || ""} ${item.crowdingState || ""}`
+          ) || "flow-flat";
 
         return `
           <article class="summary-card">
             <div class="summary-card-top">
-              <h3>${escapeHtml(item.symbol || "--")}</h3>
+              <h3 class="${escapeHtml(symbolClass)}">${escapeHtml(item.symbol || "--")}</h3>
               <strong class="${escapeHtml(biasClass)}">${escapeHtml(item.directionalBias || "--")}</strong>
             </div>
 
             <div class="summary-card-grid">
               ${buildMetricBox("Composite", item.compositeScore)}
-              ${buildMetricBox("Pressure", item.pressureState)}
-              ${buildMetricBox("Crowding", item.crowdingState)}
-              ${buildMetricBox("OI State", item.oiPressureState)}
-              ${buildMetricBox("Basis", item.basisState)}
+              ${buildMetricBox("Pressure", item.pressureState, getFlowTextClass(item.pressureState))}
+              ${buildMetricBox("Crowding", item.crowdingState, getFlowTextClass(item.crowdingState))}
+              ${buildMetricBox("OI State", item.oiPressureState, getFlowTextClass(item.oiPressureState))}
+              ${buildMetricBox("Basis", item.basisState, getFlowTextClass(item.basisState))}
               ${buildMetricBox("Global L/S", item.globalLongShortRatio)}
               ${buildMetricBox("Top Acct L/S", item.topAccountLongShortRatio)}
               ${buildMetricBox("Top Pos L/S", item.topPositionLongShortRatio)}
               ${buildMetricBox("Taker Ratio", item.takerBuySellRatio)}
               ${buildMetricBox("OI Value", item.openInterestValue)}
-              ${buildMetricBox("OI Change", item.openInterestChangePct)}
-              ${buildMetricBox("Premium", item.premiumPct)}
+              ${buildMetricBox("OI Change", item.openInterestChangePct, getFlowTextClass(item.openInterestChangePct))}
+              ${buildMetricBox("Premium", item.premiumPct, getFlowTextClass(item.premiumPct))}
             </div>
           </article>
         `;
@@ -137,6 +163,9 @@ window.TitanRenderRealFlow = (() => {
       .slice(0, 15)
       .map((coin) => {
         const signal = coin.signal || "WAIT";
+        const sideClass = getFlowTextClass(
+          `${coin.signal || ""} ${coin.recommendedAction || ""} ${coin.setupDirection || ""}`
+        );
 
         const pressureClass = getBiasClass(coin.flowPressure || "");
         const crowdingClass = getBiasClass(coin.flowCrowding || "");
@@ -144,6 +173,8 @@ window.TitanRenderRealFlow = (() => {
         const basisClass = getBiasClass(coin.flowBasisState || "");
         // Sweep risk uses liquidationState per your request.
         const sweepClass = getBiasClass(coin.liquidationState || "");
+        const slClass = sideClass === "flow-neg" ? "flow-neg" : "";
+        const tpClass = sideClass === "flow-pos" ? "flow-pos" : "";
 
         return `
           <tr>
@@ -155,8 +186,8 @@ window.TitanRenderRealFlow = (() => {
             <td class="${escapeHtml(basisClass)}">${escapeHtml(coin.flowBasisState || "--")}</td>
             <td class="${escapeHtml(sweepClass)}">${escapeHtml(coin.liquidationState || "--")}</td>
             <td>${escapeHtml(coin.entry || "--")}</td>
-            <td>${escapeHtml(coin.sl || "--")}</td>
-            <td>${escapeHtml(coin.tp || "--")}</td>
+            <td class="${escapeHtml(slClass)}">${escapeHtml(coin.sl || "--")}</td>
+            <td class="${escapeHtml(tpClass)}">${escapeHtml(coin.tp || "--")}</td>
             <td>${escapeHtml(coin.recommendedAction || coin.executionTier || "--")}</td>
           </tr>
         `;

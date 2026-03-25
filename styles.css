@@ -391,6 +391,18 @@ word-break: normal;
 overflow-wrap: normal;
 }
 
+.coin-price.pos {
+  color: var(--green) !important;
+}
+
+.coin-price.neg {
+  color: var(--red) !important;
+}
+
+.coin-price.flat {
+  color: var(--neutral) !important;
+}
+
 .coin-metrics {
 display: grid;
 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -589,6 +601,24 @@ word-break: normal;
 overflow-wrap: normal;
 }
 
+.coin-focus-price.pos,
+.coin-focus-price.neg,
+.coin-focus-price.flat {
+  color: inherit;
+}
+
+.coin-focus-price.pos {
+  color: var(--green) !important;
+}
+
+.coin-focus-price.neg {
+  color: var(--red) !important;
+}
+
+.coin-focus-price.flat {
+  color: var(--neutral) !important;
+}
+
 .coin-focus-tag {
 margin-top: 4px;
 margin-left: auto;
@@ -651,6 +681,31 @@ box-shadow: 0 0 10px rgba(220, 38, 38, 0.10);
 color: var(--neutral) !important;
 border-color: rgba(107, 114, 128, 0.25) !important;
 background: rgba(107, 114, 128, 0.08) !important;
+}
+
+/* Execution tier badge colors (user-specified) */
+.mini-badge.tier-panic {
+  color: #fb923c !important;
+  border-color: rgba(251, 146, 60, 0.45) !important;
+  background: rgba(251, 146, 60, 0.14) !important;
+}
+
+.mini-badge.tier-1 {
+  color: var(--green) !important;
+  border-color: rgba(22, 163, 74, 0.40) !important;
+  background: rgba(22, 163, 74, 0.12) !important;
+}
+
+.mini-badge.tier-2 {
+  color: #facc15 !important;
+  border-color: rgba(250, 204, 21, 0.45) !important;
+  background: rgba(250, 204, 21, 0.14) !important;
+}
+
+.mini-badge.tier-3 {
+  color: var(--red) !important;
+  border-color: rgba(220, 38, 38, 0.42) !important;
+  background: rgba(220, 38, 38, 0.12) !important;
 }
 
 .coin-focus-grid-inner,
@@ -1703,4 +1758,158 @@ body {
 .top-tabs .tab-btn:hover,
 .top-tabs .tab-btn.active {
   color: #f4f8ff !important;
+}
+
+/* Sub-title under section headers (e.g., "Core macro snapshot...") */
+.section-head p {
+  color: rgba(244, 248, 255, 0.72) !important;
+}
+
+/* Improve readability of note/warning text inside coin cards */
+.coin-focus-note,
+.summary-card-note {
+  color: rgba(244, 248, 255, 0.9) !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.coin-focus-note strong,
+.summary-card-note strong {
+  color: #f4f8ff !important;
+}
+
+.coin-focus-warning {
+  color: #ffe3e7 !important;
+  background: rgba(255, 95, 109, 0.2) !important;
+  border-color: rgba(255, 95, 109, 0.45) !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+/* Real Flow Feed text colors */
+.data-table td.pos,
+.data-table td.flow-pos {
+  color: var(--green) !important;
+  font-weight: 700;
+}
+
+.data-table td.neg,
+.data-table td.flow-neg {
+  color: var(--red) !important;
+  font-weight: 700;
+}
+
+.data-table td.futures-symbol {
+  color: rgba(244, 248, 255, 0.66) !important;
+}
+
+/* Positioning Summary: symbol + values by flow status */
+.summary-card-top h3.flow-pos,
+.summary-card-grid .metric-box strong.flow-pos {
+  color: var(--green) !important;
+}
+
+.summary-card-top h3.flow-neg,
+.summary-card-grid .metric-box strong.flow-neg {
+  color: var(--red) !important;
+}
+
+/* System Health readability tuning */
+#healthSection .section-head p {
+  color: rgba(244, 248, 255, 0.84) !important;
+}
+
+#healthSection .health-mini span {
+  color: rgba(244, 248, 255, 0.78) !important;
+  font-weight: 700;
+}
+
+#healthSection .health-mini strong {
+  color: #f4f8ff !important;
+}
+
+#healthSection .health-card-top h3 {
+  color: #f4f8ff !important;
+  font-size: 18px !important;
+}
+
+#healthSection .health-card p {
+  color: rgba(244, 248, 255, 0.86) !important;
+  font-size: 13px !important;
+}
+
+#healthSection .health-meta-box span {
+  color: rgba(244, 248, 255, 0.76) !important;
+}
+
+#healthSection .health-meta-box strong {
+  color: #f4f8ff !important;
+}
+
+/* Private AI Chat readability tuning */
+#aiChatPanel .chat-login-hint {
+  color: rgba(244, 248, 255, 0.82) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+#aiChatPanel .chat-login-hint code {
+  color: #f4f8ff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(110, 180, 255, 0.25) !important;
+}
+
+#aiChatPanel .chat-state-text {
+  color: rgba(244, 248, 255, 0.9) !important;
+  font-weight: 600;
+}
+
+#aiChatPanel .input,
+#aiChatPanel .chat-textarea {
+  color: #f4f8ff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(110, 180, 255, 0.24) !important;
+}
+
+#aiChatPanel .input::placeholder,
+#aiChatPanel .chat-textarea::placeholder {
+  color: rgba(244, 248, 255, 0.58) !important;
+}
+
+#aiChatPanel .chat-messages {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(110, 180, 255, 0.20) !important;
+}
+
+#aiChatPanel .chat-bubble {
+  color: #f4f8ff !important;
+  border-color: rgba(110, 180, 255, 0.24) !important;
+}
+
+#aiChatPanel .chat-bubble-ai {
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+#aiChatPanel .chat-bubble-user {
+  background: rgba(212, 175, 55, 0.18) !important;
+  border-color: rgba(212, 175, 55, 0.36) !important;
+}
+
+#aiChatPanel .chat-bubble-meta {
+  color: rgba(244, 248, 255, 0.66) !important;
+}
+
+#aiChatPanel .chat-quick-actions .btn,
+#aiChatPanel #loginBtn,
+#aiChatPanel #sendChatBtn {
+  color: #f4f8ff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(110, 180, 255, 0.24) !important;
+}
+
+#aiChatPanel #loginBtn:hover,
+#aiChatPanel #sendChatBtn:hover,
+#aiChatPanel .chat-quick-actions .btn:hover {
+  background: rgba(212, 175, 55, 0.18) !important;
+  border-color: rgba(212, 175, 55, 0.4) !important;
 }
