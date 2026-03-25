@@ -174,9 +174,29 @@ function buildMetricBox(label, value, valueClass = "") {
     });
 
     if (biasNode) {
-      biasNode.classList.remove("pos", "neg", "flat");
-      biasNode.classList.add(getBiasClass(data.bias || ""));
-    }
+  biasNode.classList.remove("pos", "neg", "flat");
+  biasNode.classList.add(getBiasClass(data.bias || ""));
+}
+
+if (fundingNode) {
+  fundingNode.classList.remove("pos", "neg", "flat");
+  fundingNode.classList.add(getSignedClass(fundingNode.textContent));
+}
+
+if (entryNode) {
+  entryNode.classList.remove("pos", "neg", "flat");
+  entryNode.classList.add("flat");
+}
+
+if (slNode) {
+  slNode.classList.remove("pos", "neg", "flat");
+  slNode.classList.add("neg");
+}
+
+if (tpNode) {
+  tpNode.classList.remove("pos", "neg", "flat");
+  tpNode.classList.add("pos");
+}
   }
 
   function renderCoinSnapshots(elements, snapshot) {
