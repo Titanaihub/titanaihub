@@ -131,12 +131,17 @@ gap: 18px;
 margin-bottom: 18px;
 padding: 20px 22px;
 backdrop-filter: blur(10px);
-position: sticky;
-top: 14px;
+position: relative;
+top: auto;
 z-index: 20;
-background: rgba(9, 18, 44, 0.92);
-border: 1px solid rgba(212, 175, 55, 0.28);
+background: linear-gradient(180deg, rgba(255, 247, 222, 0.96), rgba(255, 240, 190, 0.86));
+border: 1px solid rgba(212, 175, 55, 0.55);
 border-radius: var(--radius-xl);
+
+/* Header is now light, so switch text tone to dark */
+--text-main: #0f172a;
+--text-soft: rgba(15, 23, 42, 0.68);
+--text-dim: rgba(15, 23, 42, 0.48);
 }
 
 .brand {
@@ -1599,4 +1604,73 @@ width: 100%;
   .liquidity-summary-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* === Dark bright background + white text override (requested) === */
+body {
+  background: #050815 !important;
+  color: #f4f8ff !important;
+}
+
+.app-shell {
+  background: rgba(5, 8, 21, 0.35) !important;
+}
+
+.topbar,
+.panel,
+.coin-card,
+.coin-focus-card,
+.summary-card,
+.alert-card,
+.stat-card,
+.mini-stat,
+.health-mini,
+.health-card,
+.summary-row,
+.liquidity-mini-card {
+  background: linear-gradient(180deg, rgba(19, 31, 68, 0.96), rgba(9, 18, 44, 0.96)) !important;
+  color: #f4f8ff !important;
+  border-color: rgba(212, 175, 55, 0.28) !important;
+}
+
+.metric-box,
+.health-meta-box,
+.signal-badge,
+.chat-bubble,
+.raw-box {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #f4f8ff !important;
+  border-color: rgba(110, 180, 255, 0.14) !important;
+}
+
+.section-head h2,
+.brand-text h1,
+.brand-text p,
+.topbar-metrics span,
+.mini-stat span,
+.mini-stat strong {
+  color: #f4f8ff !important;
+}
+
+.data-table th,
+.data-table td {
+  color: #f4f8ff !important;
+  border-bottom: 1px solid rgba(110, 180, 255, 0.10) !important;
+}
+
+.data-table th {
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.data-table tr:hover td {
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+.data-table tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.015) !important;
+}
+
+.liquidity-mini-card span,
+.liquidity-mini-card strong {
+  color: #f4f8ff !important;
 }
