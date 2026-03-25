@@ -9,7 +9,7 @@
   <title>Titan AI Hub</title>
   <link rel="icon" type="image/png" href="./titan-logo.png" />
   <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
-  <link rel="stylesheet" href="./styles.css?v=2500" />
+  <link rel="stylesheet" href="./styles.css?v=2606" />
 </head>
 <body>
   <div class="app-shell">
@@ -46,6 +46,7 @@
   <button class="tab-btn" type="button">Flow</button>
   <button class="tab-btn" type="button">Alerts</button>
   <button class="tab-btn" type="button">Health</button>
+  <button class="tab-btn" type="button">Demo Trade</button>
   <button class="tab-btn" type="button">AI Chat</button>
 </nav>
 
@@ -305,6 +306,37 @@
         <pre id="rawSnapshot" class="raw-box">Loading...</pre>
       </section>
 
+      <section class="panel panel-full" id="demoTradingSection">
+        <div class="section-head">
+          <div>
+            <h2>Demo Trading (Binance Futures Testnet)</h2>
+            <p>Owner-only: AI decision, optional testnet execution, positions and PnL</p>
+          </div>
+        </div>
+
+        <div class="demo-trading-toolbar">
+          <button id="demoRunDecision" class="btn btn-primary" type="button" disabled>
+            Run AI decision
+          </button>
+          <button id="demoExecute" class="btn btn-secondary" type="button" disabled>
+            Execute on testnet
+          </button>
+          <span id="demoTradingStatus" class="demo-trading-status">Log in as owner to use demo trading</span>
+        </div>
+
+        <div class="demo-trading-preview-wrap">
+          <span class="demo-trading-preview-label">Last decision (JSON)</span>
+          <pre id="demoDecisionPreview" class="raw-box demo-decision-preview">--</pre>
+        </div>
+
+        <div id="demoAccountMount" class="demo-account-mount">
+          <div class="stat-card">
+            <span>Demo account</span>
+            <strong>Log in as owner to view testnet positions</strong>
+          </div>
+        </div>
+      </section>
+
       <section class="panel chat-panel panel-full" id="aiChatPanel">
         <div class="section-head">
           <div>
@@ -372,7 +404,8 @@
 <script src="./js/render-real-flow.js?v=2600"></script>
 <script src="./js/render-alerts.js?v=2600"></script>
 <script src="./js/render-health.js?v=2600"></script>
-<script src="./js/chat.js?v=2605"></script>
-<script src="./js/dashboard.js?v=2600"></script>
+<script src="./js/demo-trading.js?v=2606"></script>
+<script src="./js/chat.js?v=2606"></script>
+<script src="./js/dashboard.js?v=2606"></script>
 </body>
 </html>

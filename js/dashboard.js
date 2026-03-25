@@ -4,6 +4,7 @@ const appState = {
   loggedIn: false,
   authToken: null,
   authRole: null,
+  demoLastDecision: null,
   snapshot: {
     overview: null,
     coins: {},
@@ -93,7 +94,13 @@ const elements = {
   bnbBias: document.getElementById("bnbBias"),
   bnbEntry: document.getElementById("bnbEntry"),
   bnbSL: document.getElementById("bnbSL"),
-  bnbTP: document.getElementById("bnbTP")
+  bnbTP: document.getElementById("bnbTP"),
+
+  demoRunDecision: document.getElementById("demoRunDecision"),
+  demoExecute: document.getElementById("demoExecute"),
+  demoTradingStatus: document.getElementById("demoTradingStatus"),
+  demoDecisionPreview: document.getElementById("demoDecisionPreview"),
+  demoAccountMount: document.getElementById("demoAccountMount")
 };
 
 function bindTabs() {
@@ -103,6 +110,7 @@ function bindTabs() {
     Flow: "whalesSection",
     Alerts: "alertsSection",
     Health: "healthSection",
+    "Demo Trade": "demoTradingSection",
     "AI Chat": "aiChatPanel"
   };
 
@@ -272,6 +280,10 @@ async function refreshDashboard() {
         elements.globalBias.classList.add("flat");
       }
     }
+
+    if (appState.loggedIn && window.TitanDemoTrading?.loadAccount) {
+      await window.TitanDemoTrading.loadAccount(elements, appState).catch(() => {});
+    }
   } catch (err) {
     console.error("refreshDashboard failed:", err);
 
@@ -304,6 +316,10 @@ function startAutoRefresh() {
 async function boot() {
   bindTabs();
   hideRawPanel();
+
+  if (window.TitanDemoTrading?.bindEvents) {
+    window.TitanDemoTrading.bindEvents(elements, appState);
+  }
 
   if (window.TitanChat?.bindChatEvents) {
     window.TitanChat.bindChatEvents(elements, appState);

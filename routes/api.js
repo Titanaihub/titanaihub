@@ -25,7 +25,7 @@ const {
   callDeepSeekTradeDecision,
   buildTradeDecisionFallback
 } = require("../services/ai-service.js");
-const { placeDemoEntryOrder } = require("../services/binance-testnet-trade-service.js");
+const { placeDemoEntryOrder, getFuturesAccountSnapshot } = require("../services/binance-testnet-trade-service.js");
 
 const router = express.Router();
 
@@ -498,6 +498,47 @@ router.post("/demo/execute-testnet", async (req, res) => {
       ok: false,
       error: true,
       message: err.message || "Failed to execute testnet order"
+    });
+  }
+});
+
+router.get("/demo/account", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  const hasKeys = Boolean(process.env.BINANCE_TESTNET_API_KEY && process.env.BINANCE_TESTNET_API_SECRET);
+  if (!hasKeys) {
+    return res.json({
+      ok: false,
+      needsKeys: true,
+      tradingEnabled: false,
+      message: "Configure BINANCE_TESTNET_API_KEY and BINANCE_TESTNET_API_SECRET on the server."
+    });
+  }
+
+  const tradingEnabled =
+    String(process.env.BINANCE_TESTNET_TRADING_ENABLED || "false").toLowerCase() === "true";
+
+  try {
+    const snapshot = await getFuturesAccountSnapshot();
+    return res.json({
+      ok: Boolean(snapshot.ok),
+      tradingEnabled,
+      snapshot,
+      message: snapshot.ok ? undefined : snapshot.message
+    });
+  } catch (err) {
+    console.error("GET /api/demo/account failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      tradingEnabled,
+      message: err.message || "Failed to load testnet account"
     });
   }
 });

@@ -1943,3 +1943,53 @@ body {
 #topSetup.flat {
   color: var(--neutral) !important;
 }
+
+/* Demo trading (testnet) */
+.demo-trading-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.demo-trading-status {
+  font-size: 0.85rem;
+  color: rgba(244, 248, 255, 0.72);
+}
+
+.demo-trading-preview-wrap {
+  margin-bottom: 1rem;
+}
+
+.demo-trading-preview-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(244, 248, 255, 0.55);
+  margin-bottom: 0.35rem;
+}
+
+.demo-decision-preview {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+}
+
+.demo-account-mount {
+  margin-top: 0.5rem;
+}
+
+.demo-trading-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.demo-trading-sub {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+  color: rgba(244, 248, 255, 0.92);
+}

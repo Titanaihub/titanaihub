@@ -147,6 +147,86 @@ async function getMarkPrice(symbol) {
   return markPrice;
 }
 
+async function getFuturesAccountSnapshot() {
+  if (!API_KEY || !API_SECRET) {
+    return { ok: false, error: "missing_keys", message: "Testnet API keys not configured" };
+  }
+
+  try {
+    const [balance, positions, openOrders] = await Promise.all([
+      requestSigned("GET", "/fapi/v2/balance", {}),
+      requestSigned("GET", "/fapi/v2/positionRisk", {}),
+      requestSigned("GET", "/fapi/v1/openOrders", {})
+    ]);
+
+    const income = await requestSigned("GET", "/fapi/v1/income", {
+      incomeType: "REALIZED_PNL",
+      limit: "50"
+    }).catch(() => []);
+
+    const symbols = new Set();
+    for (const p of positions || []) {
+      if (Math.abs(Number(p.positionAmt || 0)) > 1e-12) {
+        symbols.add(String(p.symbol || "").toUpperCase());
+      }
+    }
+    for (const o of openOrders || []) {
+      symbols.add(String(o.symbol || "").toUpperCase());
+    }
+    if (symbols.size === 0) {
+      symbols.add("BTCUSDT");
+    }
+
+    const orderRows = [];
+    for (const sym of symbols) {
+      const orders = await requestSigned("GET", "/fapi/v1/allOrders", {
+        symbol: sym,
+        limit: "25"
+      }).catch(() => []);
+      if (Array.isArray(orders)) {
+        orderRows.push(...orders);
+      }
+    }
+
+    orderRows.sort((a, b) => (b.updateTime || b.time || 0) - (a.updateTime || a.time || 0));
+    const recentOrders = orderRows.slice(0, 40);
+
+    const usdt = Array.isArray(balance)
+      ? balance.find((a) => String(a.asset || "").toUpperCase() === "USDT")
+      : null;
+
+    let unrealizedTotal = 0;
+    for (const p of positions || []) {
+      unrealizedTotal += Number(p.unRealizedProfit || 0);
+    }
+
+    let realizedRecent = 0;
+    const incArr = Array.isArray(income) ? income : [];
+    for (const row of incArr) {
+      realizedRecent += Number(row.income || 0);
+    }
+
+    return {
+      ok: true,
+      testnetBaseUrl: TESTNET_BASE_URL,
+      usdt,
+      unrealizedTotal,
+      realizedRecentSum: realizedRecent,
+      balance,
+      positions: Array.isArray(positions) ? positions : [],
+      openOrders: Array.isArray(openOrders) ? openOrders : [],
+      realizedPnlRows: incArr,
+      recentOrders
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: "fetch_failed",
+      message: String(err?.message || err)
+    };
+  }
+}
+
 async function placeDemoEntryOrder({ symbol, action, usdtNotional }) {
   const side = action === "OPEN_LONG" ? "BUY" : action === "OPEN_SHORT" ? "SELL" : null;
   if (!side) throw new Error("Action must be OPEN_LONG or OPEN_SHORT");
@@ -175,6 +255,7 @@ async function placeDemoEntryOrder({ symbol, action, usdtNotional }) {
 }
 
 module.exports = {
-  placeDemoEntryOrder
+  placeDemoEntryOrder,
+  getFuturesAccountSnapshot
 };
 

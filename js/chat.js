@@ -109,12 +109,19 @@ window.TitanChat = (() => {
       appState.authRole = role;
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", "Login successful. AI chat unlocked.");
+      if (window.TitanDemoTrading?.onLoginStateChange) {
+        window.TitanDemoTrading.onLoginStateChange(elements, appState);
+      }
     } catch (err) {
       appState.loggedIn = false;
       appState.authToken = null;
       appState.authRole = null;
+      appState.demoLastDecision = null;
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", humanizeLoginError(err));
+      if (window.TitanDemoTrading?.onLoginStateChange) {
+        window.TitanDemoTrading.onLoginStateChange(elements, appState);
+      }
     }
   }
 
