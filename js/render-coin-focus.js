@@ -16,14 +16,53 @@ window.TitanRenderCoinFocus = (() => {
     node.textContent = formatMaybe(value);
   }
 
-  function buildMetricBox(label, value, valueClass = "") {
-    return `
-      <div class="metric-box">
-        <span>${escapeHtml(label)}</span>
-        <strong class="${escapeHtml(valueClass)}">${escapeHtml(formatMaybe(value))}</strong>
-      </div>
-    `;
+  function semanticClass(value = "") {
+  const v = String(value || "").toLowerCase().trim();
+
+  if (
+    v.includes("buy") ||
+    v.includes("long") ||
+    v.includes("bullish") ||
+    v.includes("take profit") ||
+    v === "tp" ||
+    v.startsWith("+")
+  ) {
+    return "pos";
   }
+
+  if (
+    v.includes("sell") ||
+    v.includes("short") ||
+    v.includes("bearish") ||
+    v.includes("stop loss") ||
+    v === "sl" ||
+    v.startsWith("-")
+  ) {
+    return "neg";
+  }
+
+  if (
+    v.includes("wait") ||
+    v.includes("neutral") ||
+    v.includes("balanced")
+  ) {
+    return "flat";
+  }
+
+  return "";
+}
+
+function buildMetricBox(label, value, valueClass = "") {
+  const autoLabelClass = semanticClass(label);
+  const autoValueClass = valueClass || semanticClass(value);
+
+  return `
+    <div class="metric-box">
+      <span class="${escapeHtml(autoLabelClass)}">${escapeHtml(label)}</span>
+      <strong class="${escapeHtml(autoValueClass)}">${escapeHtml(formatMaybe(value))}</strong>
+    </div>
+  `;
+}
 
   function normalizeDisplayPrice(value) {
     const n = Number(value);
@@ -194,7 +233,7 @@ window.TitanRenderCoinFocus = (() => {
               </div>
 
               <div class="coin-focus-price-wrap">
-                <div class="coin-focus-price">${escapeHtml(formatMaybe(item.price || "--"))}</div>
+                <div class="coin-focus-price">${escapeHtml(normalizeDisplayPrice(item.price || "--"))}</div>
                 <div class="coin-focus-tag">${escapeHtml(item.model || "real-data-flow-core")}</div>
               </div>
             </div>
@@ -224,8 +263,8 @@ window.TitanRenderCoinFocus = (() => {
               ${buildMetricBox("5m", c5Value, c5Class)}
               ${buildMetricBox("1h", c1Value, c1Class)}
               ${buildMetricBox("Entry", normalizeDisplayPrice(item.entry))}
-              ${buildMetricBox("SL", normalizeDisplayPrice(item.sl))}
-              ${buildMetricBox("TP", normalizeDisplayPrice(item.tp))}
+              ${buildMetricBox("SL", normalizeDisplayPrice(item.sl), "neg")}
+              ${buildMetricBox("TP", normalizeDisplayPrice(item.tp), "pos")}
               ${buildMetricBox("OI", normalizeOi(item.oi))}
             </div>
 
