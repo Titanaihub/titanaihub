@@ -219,6 +219,65 @@ function buildSystemPrompt(language) {
   ].join("\n");
 }
 
+function extractJsonObject(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+
+  const fenced = raw.match(/```json\s*([\s\S]*?)```/i) || raw.match(/```\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1].trim() : raw;
+
+  try {
+    return JSON.parse(candidate);
+  } catch (_) {
+    // Attempt to parse first object-like block.
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(candidate.slice(start, end + 1));
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function buildTradeDecisionFallback(snapshot = {}) {
+  const coinFocus = Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus : [];
+  const best = coinFocus[0] || null;
+  if (!best) {
+    return {
+      action: "WAIT",
+      symbol: "BTCUSDT",
+      confidence: 0.3,
+      rationale: "No coinFocus data available",
+      entry: null,
+      sl: null,
+      tp: null,
+      usdtNotional: 20
+    };
+  }
+
+  const signal = String(best.signal || "").toUpperCase();
+  let action = "WAIT";
+  if (signal.includes("LONG") || signal.includes("BUY")) action = "OPEN_LONG";
+  if (signal.includes("SHORT") || signal.includes("SELL")) action = "OPEN_SHORT";
+
+  return {
+    action,
+    symbol: String(best.futuresSymbol || `${best.symbol || "BTC"}USDT`).toUpperCase(),
+    confidence: Number.isFinite(Number(best.decisionScore))
+      ? Math.max(0, Math.min(1, Number(best.decisionScore) / 100))
+      : 0.5,
+    rationale: `Fallback from coinFocus signal=${best.signal || "--"} bias=${best.bias || "--"}`,
+    entry: best.entry ?? null,
+    sl: best.sl ?? null,
+    tp: best.tp ?? null,
+    usdtNotional: 20
+  };
+}
+
 async function callDeepSeekChat({ question, overview, btc, eth, bnb, whales, coinFocus, alerts }) {
   const apiKey = process.env.DEEPSEEK_API_KEY || "";
   if (!apiKey) {
@@ -279,9 +338,91 @@ Reply in English only.`;
   return String(content).trim();
 }
 
+async function callDeepSeekTradeDecision(snapshot = {}) {
+  const apiKey = process.env.DEEPSEEK_API_KEY || "";
+  if (!apiKey) {
+    throw new Error("Missing DEEPSEEK_API_KEY");
+  }
+
+  const systemPrompt = [
+    "You are a crypto trading decision assistant for TESTNET DEMO only.",
+    "Respond with JSON only (no markdown).",
+    "Use only the provided snapshot data.",
+    "Allowed action: WAIT, OPEN_LONG, OPEN_SHORT.",
+    "Pick one symbol only, preferably from coinFocus/futures symbols.",
+    "Set conservative confidence from 0 to 1.",
+    "Do not invent unsupported values."
+  ].join("\n");
+
+  const payloadSnapshot = {
+    overview: snapshot.overview || null,
+    coinFocus: Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus.slice(0, 15) : [],
+    whales: Array.isArray(snapshot.whales) ? snapshot.whales.slice(0, 25) : [],
+    alerts: Array.isArray(snapshot.alerts) ? snapshot.alerts.slice(0, 12) : []
+  };
+
+  const userPrompt = [
+    "Return this JSON schema exactly:",
+    "{",
+    '  "action": "WAIT | OPEN_LONG | OPEN_SHORT",',
+    '  "symbol": "e.g. BTCUSDT",',
+    '  "confidence": 0.0,',
+    '  "rationale": "short reason",',
+    '  "entry": 0,',
+    '  "sl": 0,',
+    '  "tp": 0,',
+    '  "usdtNotional": 20',
+    "}",
+    "",
+    `Snapshot: ${JSON.stringify(payloadSnapshot)}`
+  ].join("\n");
+
+  const payload = {
+    model: DEEPSEEK_MODEL,
+    stream: false,
+    temperature: 0.1,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ]
+  };
+
+  const json = await postJson("https://api.deepseek.com/chat/completions", payload, {
+    Authorization: `Bearer ${apiKey}`
+  });
+
+  const content = json?.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("DeepSeek returned empty trade decision");
+  }
+
+  const parsed = extractJsonObject(content);
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("DeepSeek trade decision is not valid JSON");
+  }
+
+  const action = String(parsed.action || "WAIT").toUpperCase();
+  const symbol = String(parsed.symbol || "BTCUSDT").toUpperCase();
+  const confidenceNum = Number(parsed.confidence);
+
+  return {
+    action: ["WAIT", "OPEN_LONG", "OPEN_SHORT"].includes(action) ? action : "WAIT",
+    symbol,
+    confidence: Number.isFinite(confidenceNum) ? Math.max(0, Math.min(1, confidenceNum)) : 0,
+    rationale: String(parsed.rationale || "").slice(0, 500),
+    entry: Number(parsed.entry) || null,
+    sl: Number(parsed.sl) || null,
+    tp: Number(parsed.tp) || null,
+    usdtNotional: Number(parsed.usdtNotional) > 0 ? Number(parsed.usdtNotional) : 20,
+    raw: String(content).slice(0, 2000)
+  };
+}
+
 module.exports = {
   buildFallbackReply,
+  buildTradeDecisionFallback,
   postJson,
   buildSystemPrompt,
-  callDeepSeekChat
+  callDeepSeekChat,
+  callDeepSeekTradeDecision
 };

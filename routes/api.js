@@ -19,7 +19,13 @@ const { buildAlertPackage } = require("../services/alert-service.js");
 const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
 const { buildBinanceCoverageReport } = require("../services/data/data-quality-service.js");
 const { buildRealFlowPackage } = require("../services/real-flow-service.js");
-const { callDeepSeekChat, buildFallbackReply } = require("../services/ai-service.js");
+const {
+  callDeepSeekChat,
+  buildFallbackReply,
+  callDeepSeekTradeDecision,
+  buildTradeDecisionFallback
+} = require("../services/ai-service.js");
+const { placeDemoEntryOrder } = require("../services/binance-testnet-trade-service.js");
 
 const router = express.Router();
 
@@ -59,6 +65,28 @@ function issueToken(role) {
     expiresAt: Date.now() + AUTH_TOKEN_TTL_MS
   });
   return token;
+}
+
+async function buildLiveSnapshot() {
+  const overview = await getStableOverview();
+  const coins = {
+    btc: await getStableCoin("btc"),
+    eth: await getStableCoin("eth"),
+    bnb: await getStableCoin("bnb")
+  };
+  const coinFocus = await buildCoinFocusPackage();
+  const alerts = await buildAlertPackage();
+  const flowPkg = await buildRealFlowPackage();
+
+  return {
+    overview,
+    coins,
+    coinFocus,
+    alerts,
+    whales: flowPkg.flowFeed.slice(0, 30),
+    positioningSummary: flowPkg.positioningSummary,
+    liquiditySummary: flowPkg.liquiditySummary
+  };
 }
 
 router.get("/overview", async (req, res) => {
@@ -355,6 +383,121 @@ router.post("/chat", async (req, res) => {
       source: "fallback",
       language: detectReplyLanguage(qRaw),
       reply
+    });
+  }
+});
+
+router.post("/demo/decision", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  try {
+    const snapshot = await buildLiveSnapshot();
+    try {
+      const decision = await callDeepSeekTradeDecision(snapshot);
+      return res.json({
+        ok: true,
+        source: "deepseek",
+        mode: "demo",
+        snapshotTs: new Date().toISOString(),
+        decision
+      });
+    } catch (err) {
+      console.error("demo decision deepseek fallback:", err.message);
+      return res.json({
+        ok: true,
+        source: "fallback",
+        mode: "demo",
+        snapshotTs: new Date().toISOString(),
+        decision: buildTradeDecisionFallback(snapshot)
+      });
+    }
+  } catch (err) {
+    console.error("POST /api/demo/decision failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: true,
+      message: err.message || "Failed to build demo decision"
+    });
+  }
+});
+
+router.post("/demo/execute-testnet", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  const enabled = String(process.env.BINANCE_TESTNET_TRADING_ENABLED || "false").toLowerCase() === "true";
+  if (!enabled) {
+    return res.status(400).json({
+      ok: false,
+      error: true,
+      message: "Testnet trading is disabled. Set BINANCE_TESTNET_TRADING_ENABLED=true"
+    });
+  }
+
+  const decision = req.body?.decision || {};
+  const action = String(decision.action || "WAIT").toUpperCase();
+  const symbol = String(decision.symbol || "BTCUSDT").toUpperCase();
+  const usdtNotional = Number(
+    req.body?.usdtNotional || decision.usdtNotional || process.env.DEMO_DEFAULT_USDT_NOTIONAL || 20
+  );
+
+  if (action === "WAIT") {
+    return res.json({
+      ok: true,
+      mode: "demo",
+      skipped: true,
+      message: "Decision is WAIT, no order sent"
+    });
+  }
+
+  if (!["OPEN_LONG", "OPEN_SHORT"].includes(action)) {
+    return res.status(400).json({
+      ok: false,
+      error: true,
+      message: "Invalid action. Must be WAIT, OPEN_LONG, or OPEN_SHORT"
+    });
+  }
+
+  if (!Number.isFinite(usdtNotional) || usdtNotional <= 0) {
+    return res.status(400).json({
+      ok: false,
+      error: true,
+      message: "Invalid usdtNotional"
+    });
+  }
+
+  try {
+    const result = await placeDemoEntryOrder({
+      symbol,
+      action,
+      usdtNotional
+    });
+
+    return res.json({
+      ok: true,
+      mode: "demo",
+      exchange: "binance-futures-testnet",
+      result
+    });
+  } catch (err) {
+    console.error("POST /api/demo/execute-testnet failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: true,
+      message: err.message || "Failed to execute testnet order"
     });
   }
 });
