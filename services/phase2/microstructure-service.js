@@ -72,11 +72,86 @@ function buildMicrostructureScore({ orderBookScore, volatilityScore, liquidation
 }
 
 async function getMicrostructureProfile(symbol) {
-  const [volatility, orderBook, liquidation] = await Promise.all([
-    getVolatilityProfile(symbol),
-    getOrderBookProfile(symbol),
-    getLiquidationProfile(symbol)
-  ]);
+  let volatility = null;
+  let orderBook = null;
+  let liquidation = null;
+
+  try {
+    [volatility, orderBook, liquidation] = await Promise.all([
+      getVolatilityProfile(symbol),
+      getOrderBookProfile(symbol),
+      getLiquidationProfile(symbol)
+    ]);
+  } catch (err) {
+    // On production networks (Render/free tiers), Binance endpoints can be blocked or rate-limited.
+    // Fallback with conservative defaults so /analysis/deep can still return partial data.
+    console.error("microstructure profile fallback:", String(err?.message || err));
+
+    const sym = String(symbol || "").trim().toUpperCase();
+    const fallbackSpreadState = "Wide Spread";
+    const fallbackBookPressureState = "Balanced";
+    const fallbackVolState = "Extreme";
+    const fallbackLiqState = "Balanced Liquidation Pressure";
+
+    return {
+      symbol: sym,
+      futuresSymbol: "",
+      volatility: {
+        symbol: sym,
+        futuresSymbol: "",
+        state: fallbackVolState,
+        score: 45,
+        composite: 0
+      },
+      orderBook: {
+        symbol: sym,
+        futuresSymbol: "",
+        bestBid: 0,
+        bestAsk: 0,
+        midPrice: 0,
+        spread: 0,
+        spreadPct: 0,
+        bidNotionalTop5: 0,
+        askNotionalTop5: 0,
+        bidNotionalTop10: 0,
+        askNotionalTop10: 0,
+        bidNotionalTop20: 0,
+        askNotionalTop20: 0,
+        top5ImbalancePct: 0,
+        top10ImbalancePct: 0,
+        top20ImbalancePct: 0,
+        wapBidTop10: 0,
+        wapAskTop10: 0,
+        imbalanceState: "Balanced Book",
+        spreadState: fallbackSpreadState,
+        bookPressureState: fallbackBookPressureState
+      },
+      liquidation: {
+        symbol: sym,
+        futuresSymbol: "",
+        lastPrice: 0,
+        priceChangePct: 0,
+        oiChangePctAvg: 0,
+        rangeHigh: 0,
+        rangeLow: 0,
+        rangeMid: 0,
+        shortLiqNear: 0,
+        shortLiqFar: 0,
+        longLiqNear: 0,
+        longLiqFar: 0,
+        liquidationState: fallbackLiqState,
+        liquidationScore: 45
+      },
+
+      orderBookScore: 50,
+      volatilityScore: 50,
+      liquidationScore: 50,
+      microstructureScore: 50,
+
+      tradeabilityState: "Low Tradeability",
+      microstructureBias: "Balanced"
+    };
+  }
 
   const orderBookScore = scoreOrderBook(orderBook);
   const volatilityScore = scoreVolatility(volatility);
