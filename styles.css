@@ -239,15 +239,15 @@ gap: 10px;
 flex-wrap: wrap;
 margin-bottom: 18px;
 padding: 12px 14px;
-background: rgba(255, 255, 255, 0.82);
-border: 1px solid rgba(212, 175, 55, 0.18);
+background: rgba(5, 8, 21, 0.62);
+border: 1px solid rgba(212, 175, 55, 0.28);
 border-radius: var(--radius-xl);
 }
 
 .tab-btn {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  background: #ffffff;
-  color: rgba(15, 23, 42, 0.68);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  background: rgba(19, 31, 68, 0.82);
+  color: rgba(244, 248, 255, 0.78);
   padding: 11px 16px;
   border-radius: 12px;
   cursor: pointer;
@@ -256,13 +256,17 @@ border-radius: var(--radius-xl);
 
 .tab-btn:hover,
 .tab-btn.active {
-  color: #0f172a;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.26), rgba(22, 163, 74, 0.10));
-  border-color: rgba(212, 175, 55, 0.42);
+  color: #f4f8ff;
+  background: linear-gradient(
+    135deg,
+    rgba(212, 175, 55, 0.28),
+    rgba(22, 163, 74, 0.08)
+  );
+  border-color: rgba(212, 175, 55, 0.55);
   box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.10),
-    0 0 0 1px rgba(212, 175, 55, 0.18),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    0 10px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(212, 175, 55, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .main-grid {
