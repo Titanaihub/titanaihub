@@ -42,16 +42,25 @@ window.TitanDemoTrading = (() => {
     const ok = Boolean(appState.loggedIn && appState.authToken);
     if (elements.demoRunDecision) elements.demoRunDecision.disabled = !ok;
     const d = appState.demoLastDecision;
+    const actionStr = d ? String(d.action || "").toUpperCase() : "";
     const canExec =
-      ok &&
-      d &&
-      ["OPEN_LONG", "OPEN_SHORT"].includes(String(d.action || "").toUpperCase());
+      ok && d && ["OPEN_LONG", "OPEN_SHORT"].includes(actionStr);
     if (elements.demoExecute) {
       elements.demoExecute.disabled = !canExec;
       elements.demoExecute.title = canExec
         ? "Submit a market order on Binance Futures Testnet"
         : "Only enabled when the latest AI signal action is OPEN_LONG or OPEN_SHORT";
     }
+
+    if (elements.demoRunDecision) {
+      elements.demoRunDecision.classList.toggle("btn-primary", !canExec);
+      elements.demoRunDecision.classList.toggle("btn-secondary", !!canExec);
+    }
+    if (elements.demoExecute) {
+      elements.demoExecute.classList.toggle("btn-primary", !!canExec);
+      elements.demoExecute.classList.toggle("btn-secondary", !canExec);
+    }
+
     updatePlaceOrderHint(elements, appState);
   }
 

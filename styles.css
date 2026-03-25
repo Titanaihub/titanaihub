@@ -1985,6 +1985,15 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.demo-trading-toolbar .btn:not(:disabled) {
+  cursor: pointer;
+}
+
+.demo-trading-toolbar .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .demo-place-order-hint {
   margin: 0 0 1rem;
   font-size: 0.85rem;
