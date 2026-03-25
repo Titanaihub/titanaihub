@@ -9,7 +9,7 @@
   <title>Titan AI Hub</title>
   <link rel="icon" type="image/png" href="./titan-logo.png" />
   <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
-  <link rel="stylesheet" href="./styles.css?v=2606" />
+  <link rel="stylesheet" href="./styles.css?v=2608" />
 </head>
 <body>
   <div class="app-shell">
@@ -318,11 +318,12 @@
           <button id="demoRunDecision" class="btn btn-primary" type="button" disabled>
             Get AI signal
           </button>
-          <button id="demoExecute" class="btn btn-secondary" type="button" disabled>
+          <button id="demoExecute" class="btn btn-secondary" type="button" disabled title="">
             Place order
           </button>
           <span id="demoTradingStatus" class="demo-trading-status">Sign in as owner to open the trading desk</span>
         </div>
+        <p id="demoPlaceOrderHint" class="demo-place-order-hint" aria-live="polite"></p>
 
         <div class="demo-trading-preview-wrap">
           <span class="demo-trading-preview-label">AI signal (JSON)</span>
@@ -404,8 +405,8 @@
 <script src="./js/render-real-flow.js?v=2600"></script>
 <script src="./js/render-alerts.js?v=2600"></script>
 <script src="./js/render-health.js?v=2600"></script>
-<script src="./js/demo-trading.js?v=2607"></script>
+<script src="./js/demo-trading.js?v=2608"></script>
 <script src="./js/chat.js?v=2606"></script>
-<script src="./js/dashboard.js?v=2607"></script>
+<script src="./js/dashboard.js?v=2608"></script>
 </body>
 </html>

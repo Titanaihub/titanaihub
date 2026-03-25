@@ -16,6 +16,28 @@ window.TitanDemoTrading = (() => {
     return `${sign}$${Math.abs(x).toFixed(2)}`;
   }
 
+  function updatePlaceOrderHint(elements, appState) {
+    const el = elements.demoPlaceOrderHint;
+    if (!el) return;
+    const ok = Boolean(appState.loggedIn && appState.authToken);
+    if (!ok) {
+      el.textContent = "";
+      return;
+    }
+    const d = appState.demoLastDecision;
+    const action = d ? String(d.action || "").toUpperCase() : "";
+    if (!d) {
+      el.textContent =
+        "Place order stays off until you run Get AI signal. It only turns on when the signal action is OPEN_LONG or OPEN_SHORT (not WAIT).";
+      return;
+    }
+    if (["OPEN_LONG", "OPEN_SHORT"].includes(action)) {
+      el.textContent = "You can place the order — signal allows a market entry on Testnet.";
+      return;
+    }
+    el.textContent = `Place order is off because the signal is ${action || "WAIT"}. Wait for OPEN_LONG or OPEN_SHORT, or run Get AI signal again later.`;
+  }
+
   function syncAuth(elements, appState) {
     const ok = Boolean(appState.loggedIn && appState.authToken);
     if (elements.demoRunDecision) elements.demoRunDecision.disabled = !ok;
@@ -24,7 +46,13 @@ window.TitanDemoTrading = (() => {
       ok &&
       d &&
       ["OPEN_LONG", "OPEN_SHORT"].includes(String(d.action || "").toUpperCase());
-    if (elements.demoExecute) elements.demoExecute.disabled = !canExec;
+    if (elements.demoExecute) {
+      elements.demoExecute.disabled = !canExec;
+      elements.demoExecute.title = canExec
+        ? "Submit a market order on Binance Futures Testnet"
+        : "Only enabled when the latest AI signal action is OPEN_LONG or OPEN_SHORT";
+    }
+    updatePlaceOrderHint(elements, appState);
   }
 
   function renderAccount(elements, payload) {

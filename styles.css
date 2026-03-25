@@ -1950,7 +1950,15 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.demo-place-order-hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: rgba(244, 248, 255, 0.62);
+  max-width: 52rem;
 }
 
 .demo-trading-status {

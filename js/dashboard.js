@@ -100,7 +100,8 @@ const elements = {
   demoExecute: document.getElementById("demoExecute"),
   demoTradingStatus: document.getElementById("demoTradingStatus"),
   demoDecisionPreview: document.getElementById("demoDecisionPreview"),
-  demoAccountMount: document.getElementById("demoAccountMount")
+  demoAccountMount: document.getElementById("demoAccountMount"),
+  demoPlaceOrderHint: document.getElementById("demoPlaceOrderHint")
 };
 
 function bindTabs() {
