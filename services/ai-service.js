@@ -243,9 +243,27 @@ function extractJsonObject(text) {
   }
 }
 
+function pickBestCoinFocusItem(coinFocus) {
+  const list = Array.isArray(coinFocus) ? [...coinFocus] : [];
+  if (!list.length) return null;
+  list.sort((a, b) => Number(b.confidenceScore || 0) - Number(a.confidenceScore || 0));
+  for (const c of list) {
+    const sig = String(c.signal || "").toUpperCase();
+    if (
+      sig.includes("LONG") ||
+      sig.includes("SHORT") ||
+      sig.includes("BUY") ||
+      sig.includes("SELL")
+    ) {
+      return c;
+    }
+  }
+  return list[0];
+}
+
 function buildTradeDecisionFallback(snapshot = {}) {
   const coinFocus = Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus : [];
-  const best = coinFocus[0] || null;
+  const best = pickBestCoinFocusItem(coinFocus);
   if (!best) {
     return {
       action: "WAIT",
@@ -345,23 +363,26 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
   }
 
   const systemPrompt = [
-    "You are a crypto trading decision assistant for TESTNET DEMO only.",
+    "You are a crypto futures trading decision assistant for Binance USDT-M TESTNET only (not real money).",
     "Respond with JSON only (no markdown).",
     "Use only the provided snapshot data.",
     "Allowed action: WAIT, OPEN_LONG, OPEN_SHORT.",
-    "Pick one symbol only, preferably from coinFocus/futures symbols.",
+    "Scan the entire coinFocus list (multiple symbols). Compare setups and pick the single best symbol to trade,",
+    "or WAIT if no setup is acceptable. Do not fixate on one asset — choose by evidence in the snapshot.",
+    "Symbols must be valid USDT perpetual form e.g. BTCUSDT, ETHUSDT.",
     "Set conservative confidence from 0 to 1.",
-    "Do not invent unsupported values."
+    "Do not invent prices or facts not implied by the snapshot."
   ].join("\n");
 
   const payloadSnapshot = {
     overview: snapshot.overview || null,
-    coinFocus: Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus.slice(0, 15) : [],
+    coinFocus: Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus.slice(0, 20) : [],
     whales: Array.isArray(snapshot.whales) ? snapshot.whales.slice(0, 25) : [],
     alerts: Array.isArray(snapshot.alerts) ? snapshot.alerts.slice(0, 12) : []
   };
 
   const userPrompt = [
+    "Review all coinFocus rows; pick the best one symbol or WAIT.",
     "Return this JSON schema exactly:",
     "{",
     '  "action": "WAIT | OPEN_LONG | OPEN_SHORT",',

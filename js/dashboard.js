@@ -101,7 +101,11 @@ const elements = {
   demoTradingStatus: document.getElementById("demoTradingStatus"),
   demoDecisionPreview: document.getElementById("demoDecisionPreview"),
   demoAccountMount: document.getElementById("demoAccountMount"),
-  demoPlaceOrderHint: document.getElementById("demoPlaceOrderHint")
+  demoPlaceOrderHint: document.getElementById("demoPlaceOrderHint"),
+  demoAutoIntervalMs: document.getElementById("demoAutoIntervalMs"),
+  demoAutoStart: document.getElementById("demoAutoStart"),
+  demoAutoStop: document.getElementById("demoAutoStop"),
+  demoAutoStatusLine: document.getElementById("demoAutoStatusLine")
 };
 
 function bindTabs() {

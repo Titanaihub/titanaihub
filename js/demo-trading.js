@@ -55,6 +55,118 @@ window.TitanDemoTrading = (() => {
     updatePlaceOrderHint(elements, appState);
   }
 
+  function formatAutoStatus(data) {
+    if (!data || data.ok === false) return "";
+    const bits = [];
+    if (!data.autoFeatureEnabled) {
+      return "Auto mode blocked on server (DEMO_AUTO_TRADING_ENABLED=false).";
+    }
+    if (!data.tradingEnabled) {
+      bits.push("Enable BINANCE_TESTNET_TRADING_ENABLED for auto orders.");
+    }
+    if (data.running) {
+      bits.push(
+        `Auto: ON · every ${Math.round(data.intervalMs / 60000)} min · cycles ${data.ticks}`
+      );
+      if (data.lastTickAt) {
+        bits.push(`Last cycle ${data.lastTickAt.replace("T", " ").slice(0, 19)} UTC`);
+      }
+      if (data.lastDecision?.decision) {
+        const d = data.lastDecision.decision;
+        bits.push(
+          `Last AI ${d.action} ${d.symbol || ""} (${data.lastDecision.source}) · min conf ${data.minConfidence ?? "?"}`
+        );
+      }
+      if (data.lastExecute?.skipped) {
+        bits.push(`Execution: skipped (${data.lastExecute.reason})`);
+      } else if (data.lastExecute?.ok === true) {
+        bits.push("Execution: order sent");
+      } else if (data.lastExecute?.ok === false) {
+        bits.push(`Execution error: ${data.lastExecute.error || "?"}`);
+      }
+    } else {
+      bits.push(
+        "Auto: OFF — Start once: server scans all Coin Focus symbols each cycle and places orders when signal & confidence allow (no extra clicks)."
+      );
+    }
+    if (data.lastError) {
+      bits.push(`Note: ${data.lastError}`);
+    }
+    return bits.join(" · ");
+  }
+
+  function syncAutoUi(elements, appState, data) {
+    const ok = Boolean(appState.loggedIn && appState.authToken);
+    if (elements.demoAutoIntervalMs) {
+      elements.demoAutoIntervalMs.disabled = !ok;
+    }
+    const canStart =
+      ok && data && data.autoFeatureEnabled !== false && data.tradingEnabled === true;
+    if (elements.demoAutoStart) {
+      elements.demoAutoStart.disabled = !canStart || Boolean(data && data.running);
+    }
+    if (elements.demoAutoStop) {
+      elements.demoAutoStop.disabled = !ok || !data || !data.running;
+    }
+  }
+
+  async function loadAutoStatus(elements, appState) {
+    if (!appState.loggedIn || !appState.authToken) {
+      if (elements.demoAutoStatusLine) elements.demoAutoStatusLine.textContent = "";
+      syncAutoUi(elements, appState, null);
+      return;
+    }
+    try {
+      const data = await apiGet("/demo/auto-trading/status", {
+        headers: { Authorization: `Bearer ${appState.authToken}` }
+      });
+      if (elements.demoAutoStatusLine) {
+        elements.demoAutoStatusLine.textContent = formatAutoStatus(data);
+      }
+      syncAutoUi(elements, appState, data);
+    } catch (err) {
+      if (elements.demoAutoStatusLine) {
+        elements.demoAutoStatusLine.textContent = err.message || "Auto status failed";
+      }
+      syncAutoUi(elements, appState, null);
+    }
+  }
+
+  async function startAutoTrading(elements, appState) {
+    if (!appState.authToken) return;
+    const intervalMs = elements.demoAutoIntervalMs
+      ? Number(elements.demoAutoIntervalMs.value)
+      : 300000;
+    try {
+      await apiPost(
+        "/demo/auto-trading/start",
+        { intervalMs: Number.isFinite(intervalMs) ? intervalMs : 300000 },
+        { Authorization: `Bearer ${appState.authToken}` }
+      );
+    } catch (err) {
+      if (elements.demoAutoStatusLine) {
+        elements.demoAutoStatusLine.textContent = err.message || "Start failed";
+      }
+    }
+    await loadAccount(elements, appState);
+  }
+
+  async function stopAutoTrading(elements, appState) {
+    if (!appState.authToken) return;
+    try {
+      await apiPost(
+        "/demo/auto-trading/stop",
+        {},
+        { Authorization: `Bearer ${appState.authToken}` }
+      );
+    } catch (err) {
+      if (elements.demoAutoStatusLine) {
+        elements.demoAutoStatusLine.textContent = err.message || "Stop failed";
+      }
+    }
+    await loadAccount(elements, appState);
+  }
+
   function renderAccount(elements, payload) {
     const mount = elements.demoAccountMount;
     if (!mount) return;
@@ -221,6 +333,7 @@ window.TitanDemoTrading = (() => {
       if (elements.demoAccountMount) {
         elements.demoAccountMount.innerHTML = `<div class="stat-card"><span>Futures account</span><strong>Sign in as owner to load positions and balances</strong></div>`;
       }
+      await loadAutoStatus(elements, appState);
       return;
     }
     try {
@@ -240,6 +353,7 @@ window.TitanDemoTrading = (() => {
         )}</strong></div>`;
       }
     }
+    await loadAutoStatus(elements, appState);
   }
 
   async function runDecision(elements, appState) {
@@ -305,6 +419,12 @@ window.TitanDemoTrading = (() => {
     if (elements.demoExecute) {
       elements.demoExecute.addEventListener("click", () => executeDecision(elements, appState));
     }
+    if (elements.demoAutoStart) {
+      elements.demoAutoStart.addEventListener("click", () => startAutoTrading(elements, appState));
+    }
+    if (elements.demoAutoStop) {
+      elements.demoAutoStop.addEventListener("click", () => stopAutoTrading(elements, appState));
+    }
     syncAuth(elements, appState);
   }
 
@@ -316,6 +436,7 @@ window.TitanDemoTrading = (() => {
   return {
     bindEvents,
     loadAccount,
+    loadAutoStatus,
     syncAuth,
     onLoginStateChange
   };

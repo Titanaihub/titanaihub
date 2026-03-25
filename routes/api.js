@@ -26,6 +26,12 @@ const {
   buildTradeDecisionFallback
 } = require("../services/ai-service.js");
 const { placeDemoEntryOrder, getFuturesAccountSnapshot } = require("../services/binance-testnet-trade-service.js");
+const { buildLiveSnapshot } = require("../services/live-snapshot-service.js");
+const {
+  startAutoTrading,
+  stopAutoTrading,
+  getAutoTradingStatus
+} = require("../services/demo-auto-trading-service.js");
 
 const router = express.Router();
 
@@ -65,28 +71,6 @@ function issueToken(role) {
     expiresAt: Date.now() + AUTH_TOKEN_TTL_MS
   });
   return token;
-}
-
-async function buildLiveSnapshot() {
-  const overview = await getStableOverview();
-  const coins = {
-    btc: await getStableCoin("btc"),
-    eth: await getStableCoin("eth"),
-    bnb: await getStableCoin("bnb")
-  };
-  const coinFocus = await buildCoinFocusPackage();
-  const alerts = await buildAlertPackage();
-  const flowPkg = await buildRealFlowPackage();
-
-  return {
-    overview,
-    coins,
-    coinFocus,
-    alerts,
-    whales: flowPkg.flowFeed.slice(0, 30),
-    positioningSummary: flowPkg.positioningSummary,
-    liquiditySummary: flowPkg.liquiditySummary
-  };
 }
 
 router.get("/overview", async (req, res) => {
@@ -541,6 +525,78 @@ router.get("/demo/account", async (req, res) => {
       message: err.message || "Failed to load testnet account"
     });
   }
+});
+
+router.get("/demo/auto-trading/status", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  const tradingEnabled =
+    String(process.env.BINANCE_TESTNET_TRADING_ENABLED || "false").toLowerCase() === "true";
+  const autoFeatureEnabled =
+    String(process.env.DEMO_AUTO_TRADING_ENABLED || "true").toLowerCase() === "true";
+
+  return res.json({
+    ok: true,
+    tradingEnabled,
+    autoFeatureEnabled,
+    ...getAutoTradingStatus()
+  });
+});
+
+router.post("/demo/auto-trading/start", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  const intervalMs = req.body?.intervalMs;
+  const r = startAutoTrading(intervalMs);
+  if (!r.ok) {
+    return res.status(400).json({
+      ok: false,
+      message: r.message,
+      status: r.status || null
+    });
+  }
+  return res.json({
+    ok: true,
+    ...r.status
+  });
+});
+
+router.post("/demo/auto-trading/stop", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+
+  const r = stopAutoTrading();
+  if (!r.ok) {
+    return res.status(400).json({
+      ok: false,
+      message: r.message,
+      status: r.status || null
+    });
+  }
+  return res.json({
+    ok: true,
+    ...r.status
+  });
 });
 
 module.exports = router;
