@@ -143,19 +143,31 @@ window.TitanChat = (() => {
 
     if (elements.askAnalyzeBTC) {
       elements.askAnalyzeBTC.addEventListener("click", () => {
-        handleSendChat(elements, appState, "ช่วยวิเคราะห์ BTC แบบลึกจากข้อมูลจริงตอนนี้");
+        handleSendChat(
+          elements,
+          appState,
+          "Analyze BTC in depth using the current live snapshot data only."
+        );
       });
     }
 
     if (elements.askCompareCoins) {
       elements.askCompareCoins.addEventListener("click", () => {
-        handleSendChat(elements, appState, "ช่วยเปรียบเทียบ BTC ETH และ BNB ตอนนี้ เหรียญไหนน่าสนใจกว่า");
+        handleSendChat(
+          elements,
+          appState,
+          "Compare BTC, ETH, and BNB right now: which setup looks strongest and why?"
+        );
       });
     }
 
     if (elements.askRisk) {
       elements.askRisk.addEventListener("click", () => {
-        handleSendChat(elements, appState, "ช่วยสรุประดับความเสี่ยงของตลาดตอนนี้");
+        handleSendChat(
+          elements,
+          appState,
+          "Summarize current market risk using the snapshot: key risks and how to manage size."
+        );
       });
     }
 
