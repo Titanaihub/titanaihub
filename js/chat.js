@@ -63,6 +63,26 @@ window.TitanChat = (() => {
     });
   }
 
+  function humanizeLoginError(err) {
+    const raw = String(err?.message || "");
+    const lower = raw.toLowerCase();
+
+    if (raw.includes("401") && (lower.includes("invalid username") || lower.includes("password"))) {
+      return "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง";
+    }
+    if (lower.includes("owner credentials not configured")) {
+      return "ระบบยังไม่ได้ตั้งค่าเจ้าของระบบบนเซิร์ฟเวอร์ (OWNER_USERNAME / OWNER_PASSWORD)";
+    }
+    if (lower.includes("login token missing")) {
+      return "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+    }
+    // Avoid showing raw POST/URL details to end users.
+    if (raw.includes("POST /login") || raw.includes("@")) {
+      return "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง";
+    }
+    return raw || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+  }
+
   async function handleLogin(elements, appState) {
     try {
       const username = elements.username ? elements.username.value : "";
@@ -84,7 +104,7 @@ window.TitanChat = (() => {
       appState.authToken = null;
       appState.authRole = null;
       updateChatUi(elements, appState);
-      addChatMessage(elements, "ai", err.message || "Login failed.");
+      addChatMessage(elements, "ai", humanizeLoginError(err));
     }
   }
 
