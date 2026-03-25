@@ -2,8 +2,8 @@ window.TitanConfig = {
   // Same-origin for Render apps: endpoints are mounted under `/api`
   // Use relative path to be robust with potential path prefixes.
   API_BASE: "/api",
-  // Fallback to the previously-working backend domain (keeps app working
-  // even if frontend and backend are deployed as separate Render services).
-  API_BASE_FALLBACK: "https://titan-ai-api.onrender.com/api",
+  // Leave empty for unified deploy (recommended). Only set this if you split
+  // frontend/backend into two Render services — wrong fallback breaks login.
+  API_BASE_FALLBACK: "",
   REFRESH_MS: 30000
 };

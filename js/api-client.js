@@ -72,9 +72,13 @@ window.TitanApi = (() => {
 
         const parsed = await parseJsonSafe(res);
         if (!res.ok) {
-          throw new Error(
-            `POST ${path} failed @${base}: ${res.status} (${parsed.raw || "bad json"})`
-          );
+          const detail =
+            parsed.ok && parsed.data?.message
+              ? parsed.data.message
+              : parsed.raw
+                ? `non-JSON body: ${parsed.raw.slice(0, 120)}`
+                : "bad json";
+          throw new Error(`POST ${path} failed @${base}: ${res.status} (${detail})`);
         }
         if (!parsed.ok) {
           throw new Error(`POST ${path} invalid JSON @${base}: ${parsed.raw}`);
