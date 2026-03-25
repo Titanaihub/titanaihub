@@ -68,19 +68,29 @@ window.TitanChat = (() => {
     const lower = raw.toLowerCase();
 
     if (raw.includes("401") && (lower.includes("invalid username") || lower.includes("password"))) {
-      return "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง";
+      return "Invalid username or password. Please check and try again.";
     }
     if (lower.includes("owner credentials not configured")) {
-      return "ระบบยังไม่ได้ตั้งค่าเจ้าของระบบบนเซิร์ฟเวอร์ (OWNER_USERNAME / OWNER_PASSWORD)";
+      return "Server is not configured for owner login yet (OWNER_USERNAME / OWNER_PASSWORD).";
     }
     if (lower.includes("login token missing")) {
-      return "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+      return "Login failed. Please try again.";
     }
-    // Avoid showing raw POST/URL details to end users.
     if (raw.includes("POST /login") || raw.includes("@")) {
-      return "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง";
+      return "Login failed. Check your connection and try again.";
     }
-    return raw || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+    return raw || "Login failed. Please try again.";
+  }
+
+  function humanizeChatRequestError(err) {
+    const raw = String(err?.message || "");
+    if (raw.includes("401") || raw.toLowerCase().includes("unauthorized")) {
+      return "Session expired or unauthorized. Please log in again.";
+    }
+    if (raw.includes("POST /chat") || raw.includes("@")) {
+      return "Could not reach the chat service. Please try again.";
+    }
+    return raw || "Chat request failed.";
   }
 
   async function handleLogin(elements, appState) {
@@ -139,7 +149,7 @@ window.TitanChat = (() => {
 
       addChatMessage(elements, "ai", data?.reply || "No reply.");
     } catch (err) {
-      addChatMessage(elements, "ai", err.message || "Chat request failed.");
+      addChatMessage(elements, "ai", humanizeChatRequestError(err));
     }
   }
 
