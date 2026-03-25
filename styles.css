@@ -1678,3 +1678,29 @@ body {
 .liquidity-mini-card strong {
   color: #f4f8ff !important;
 }
+
+/* Extra readability overrides for the rest of the UI (menu + data text) */
+.stat-card span,
+.stat-card strong,
+.summary-row span,
+.summary-row strong,
+.alert-card p,
+.health-card p,
+.health-meta-box span,
+.health-meta-box strong,
+.metric-box span,
+.metric-box strong,
+.coin-focus-subtitle,
+.coin-focus-card-top h3,
+.coin-head h3,
+.coin-price,
+.coin-metrics .metric-box span,
+.coin-metrics .metric-box strong {
+  color: #f4f8ff !important;
+}
+
+.top-tabs .tab-btn,
+.top-tabs .tab-btn:hover,
+.top-tabs .tab-btn.active {
+  color: #f4f8ff !important;
+}
