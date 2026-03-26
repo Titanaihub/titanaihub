@@ -113,6 +113,13 @@ window.TitanDemoTrading = (() => {
       ok && data && data.autoFeatureEnabled !== false && data.tradingEnabled === true;
     if (elements.demoAutoStart) {
       elements.demoAutoStart.disabled = !canStart || Boolean(data && data.running);
+      if (data && data.running) {
+        elements.demoAutoStart.classList.add("btn-trading-online");
+        elements.demoAutoStart.title = "Auto trading is on (online)";
+      } else {
+        elements.demoAutoStart.classList.remove("btn-trading-online");
+        elements.demoAutoStart.title = "";
+      }
     }
     if (elements.demoAutoStop) {
       elements.demoAutoStop.disabled = !ok || !data || !data.running;
@@ -122,6 +129,14 @@ window.TitanDemoTrading = (() => {
   async function loadAutoStatus(elements, appState) {
     if (!appState.loggedIn || !appState.authToken) {
       if (elements.demoAutoStatusLine) elements.demoAutoStatusLine.textContent = "";
+      if (elements.demoRunDecision) {
+        elements.demoRunDecision.classList.remove("btn-trading-online");
+        elements.demoRunDecision.title = "";
+      }
+      if (elements.demoAutoStart) {
+        elements.demoAutoStart.classList.remove("btn-trading-online");
+        elements.demoAutoStart.title = "";
+      }
       syncAutoUi(elements, appState, null);
       return;
     }
@@ -367,6 +382,10 @@ window.TitanDemoTrading = (() => {
 
   async function runDecision(elements, appState) {
     if (!appState.authToken) return;
+    if (elements.demoRunDecision) {
+      elements.demoRunDecision.classList.remove("btn-trading-online");
+      elements.demoRunDecision.title = "";
+    }
     if (elements.demoTradingStatus) {
       elements.demoTradingStatus.textContent = "Fetching AI signal...";
     }
@@ -383,8 +402,15 @@ window.TitanDemoTrading = (() => {
       if (elements.demoTradingStatus) {
         elements.demoTradingStatus.textContent = `Signal: ${data.source || "?"} — ${data.decision?.action || "--"}`;
       }
+      if (elements.demoRunDecision) {
+        elements.demoRunDecision.classList.add("btn-trading-online");
+        elements.demoRunDecision.title = "Signal loaded — online (click to refresh)";
+      }
     } catch (err) {
       appState.demoLastDecision = null;
+      if (elements.demoRunDecision) {
+        elements.demoRunDecision.classList.remove("btn-trading-online");
+      }
       if (elements.demoDecisionPreview) {
         elements.demoDecisionPreview.textContent = err.message || "Failed";
       }

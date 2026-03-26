@@ -1944,7 +1944,59 @@ body {
   color: var(--neutral) !important;
 }
 
-/* Demo trading (testnet) */
+/* Demo trading (testnet) — high-contrast CTAs + green "online" state */
+#demoTradingSection .btn-trading-cta.btn-primary {
+  background: linear-gradient(135deg, #ca8a04 0%, #15803d 100%);
+  color: #f8fafc !important;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+}
+
+#demoTradingSection .btn-trading-cta.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.09);
+}
+
+#demoTradingSection .btn-trading-cta.btn-trading-online,
+#demoTradingSection .btn-trading-cta.btn-trading-online:disabled {
+  background: linear-gradient(135deg, #4ade80 0%, #16a34a 45%, #14532d 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(110, 231, 183, 0.9) !important;
+  box-shadow:
+    0 0 20px rgba(34, 197, 94, 0.5),
+    0 2px 10px rgba(0, 0, 0, 0.22);
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+#demoTradingSection .btn-trading-cta.btn-trading-online:not(:disabled) {
+  cursor: pointer;
+}
+
+#demoTradingSection .btn-trading-cta.btn-secondary {
+  background: rgba(248, 250, 252, 0.98) !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.14);
+  text-shadow: none;
+  font-weight: 600;
+}
+
+#demoTradingSection .btn-trading-cta.btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.03);
+}
+
+#demoTradingSection .btn-trading-cta.btn-secondary.btn-trading-online {
+  background: linear-gradient(135deg, #4ade80 0%, #15803d 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(74, 222, 128, 0.95);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.42);
+}
+
+#demoTradingSection .btn:disabled:not(.btn-trading-online) {
+  opacity: 0.55;
+}
+
 .demo-auto-panel {
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
@@ -1991,7 +2043,6 @@ body {
 
 .demo-trading-toolbar .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .demo-place-order-hint {
