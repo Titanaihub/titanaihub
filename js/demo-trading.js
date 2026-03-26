@@ -167,12 +167,12 @@ window.TitanDemoTrading = (() => {
       bits.push(`Note: ${data.lastError}`);
     }
     const te = data.tradeEnv;
-    if (te && !te.aggressiveOnWait) {
+    if (te && te.aggressiveOnWait) {
       bits.push(
-        "Aggressive rules: OFF (set DEMO_AGGRESSIVE_ON_WAIT=true on server when AI always says WAIT)"
+        `EA overlay on WAIT: ON (min setup ${te.aggressiveMinSetupScore}) — overrides AI when it waits`
       );
-    } else if (te && te.aggressiveOnWait) {
-      bits.push(`Aggressive rules: ON (min setup ${te.aggressiveMinSetupScore})`);
+    } else if (te) {
+      bits.push("EA overlay: OFF · trade signals from DeepSeek only");
     }
     return bits.join(" · ");
   }

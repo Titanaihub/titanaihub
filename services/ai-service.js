@@ -262,6 +262,20 @@ function pickBestCoinFocusItem(coinFocus) {
 }
 
 function buildTradeDecisionFallback(snapshot = {}) {
+  if (!tradeEnvBool("DEMO_RULE_FALLBACK_ON_DEEPSEEK_ERROR", false)) {
+    return {
+      action: "WAIT",
+      symbol: "BTCUSDT",
+      confidence: 0,
+      rationale:
+        "DeepSeek call failed or API key missing — standing aside (no EA-style rule fallback). Set DEMO_RULE_FALLBACK_ON_DEEPSEEK_ERROR=true only if you want legacy score/signal rules.",
+      entry: null,
+      sl: null,
+      tp: null,
+      usdtNotional: 20
+    };
+  }
+
   const coinFocus = Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus : [];
   const best = pickBestCoinFocusItem(coinFocus);
   if (!best) {
@@ -288,7 +302,7 @@ function buildTradeDecisionFallback(snapshot = {}) {
     confidence: Number.isFinite(Number(best.decisionScore))
       ? Math.max(0, Math.min(1, Number(best.decisionScore) / 100))
       : 0.5,
-    rationale: `Fallback from coinFocus signal=${best.signal || "--"} bias=${best.bias || "--"}`,
+    rationale: `Legacy rule fallback: coinFocus signal=${best.signal || "--"} bias=${best.bias || "--"}`,
     entry: best.entry ?? null,
     sl: best.sl ?? null,
     tp: best.tp ?? null,
@@ -362,19 +376,24 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     throw new Error("Missing DEEPSEEK_API_KEY");
   }
 
-  const relaxed = tradeEnvBool("DEMO_RELAXED_AI_PROMPT", true);
+  const relaxed = tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false);
+  const tempRaw = Number(process.env.DEMO_TRADE_AI_TEMPERATURE);
+  const temperature =
+    Number.isFinite(tempRaw) && tempRaw >= 0 && tempRaw <= 1.2 ? tempRaw : 0.42;
+
   const systemPrompt = [
-    "You are a crypto futures trading decision assistant for Binance USDT-M TESTNET only (not real money).",
-    "Respond with JSON only (no markdown).",
-    "Use only the provided snapshot data.",
-    "Allowed action: WAIT, OPEN_LONG, OPEN_SHORT.",
-    "Scan the entire coinFocus list (multiple symbols). Compare setups and pick the single best symbol to trade,",
-    "or WAIT if no setup is acceptable. Do not fixate on one asset — choose by evidence in the snapshot.",
-    "Symbols must be valid USDT perpetual form e.g. BTCUSDT, ETHUSDT.",
-    "Set conservative confidence from 0 to 1.",
-    "Do not invent prices or facts not implied by the snapshot.",
+    "You are a discretionary crypto futures assistant for Binance USDT-M TESTNET only (not real money).",
+    "You must reason like a trader: weigh conflicting signals, regime, and risk — do NOT mimic a fixed rule engine (e.g. do not open a trade only because finalSetupScore is highest).",
+    "Respond with JSON only (no markdown, no code fences).",
+    "Use only fields present in the snapshot. Do not invent prices, news, or facts.",
+    "Allowed actions: WAIT, OPEN_LONG, OPEN_SHORT.",
+    "Scan the full coinFocus list; compare symbols holistically. Choose at most one symbol to trade, or WAIT.",
+    "Symbols must be valid USDT-M perpetual form (e.g. BTCUSDT).",
+    "Prefer WAIT when: setups disagree, evidence is weak, volatility/whale/alerts suggest elevated risk, or edge is unclear.",
+    "Use OPEN_LONG or OPEN_SHORT only when your rationale explicitly states why expected edge outweighs risk for that symbol.",
+    "confidence is your subjective probability the chosen action is appropriate given the snapshot (0–1).",
     relaxed
-      ? "TESTNET MODE: If one coin clearly leads by finalSetupScore and has directional alignment (bias/signal), prefer OPEN_LONG or OPEN_SHORT over WAIT unless contradictions are strong."
+      ? "Optional testnet bias: if one coin clearly leads by score AND bias/signal align without strong contradictions, you may lean toward a directional action — still explain why in rationale."
       : ""
   ]
     .filter(Boolean)
@@ -388,13 +407,14 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
   };
 
   const userPrompt = [
-    "Review all coinFocus rows; pick the best one symbol or WAIT.",
+    "Decide whether to trade one contract or WAIT.",
+    "In rationale, give 2–4 sentences: key evidence, main risk, why WAIT vs directional.",
     "Return this JSON schema exactly:",
     "{",
     '  "action": "WAIT | OPEN_LONG | OPEN_SHORT",',
     '  "symbol": "e.g. BTCUSDT",',
     '  "confidence": 0.0,',
-    '  "rationale": "short reason",',
+    '  "rationale": "your reasoning",',
     '  "entry": 0,',
     '  "sl": 0,',
     '  "tp": 0,',
@@ -407,7 +427,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
   const payload = {
     model: DEEPSEEK_MODEL,
     stream: false,
-    temperature: 0.1,
+    temperature,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
@@ -436,7 +456,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     action: ["WAIT", "OPEN_LONG", "OPEN_SHORT"].includes(action) ? action : "WAIT",
     symbol,
     confidence: Number.isFinite(confidenceNum) ? Math.max(0, Math.min(1, confidenceNum)) : 0,
-    rationale: String(parsed.rationale || "").slice(0, 500),
+    rationale: String(parsed.rationale || "").slice(0, 900),
     entry: Number(parsed.entry) || null,
     sl: Number(parsed.sl) || null,
     tp: Number(parsed.tp) || null,
@@ -457,11 +477,11 @@ function tradeEnvNum(name, defaultValue) {
 }
 
 /**
- * When AI returns WAIT, optionally derive OPEN_LONG/SHORT from Coin Focus scores (testnet practice only).
- * Enable with DEMO_AGGRESSIVE_ON_WAIT=true on the server.
+ * Optional EA-style overlay: when AI returns WAIT, derive OPEN_LONG/SHORT from scores/signals.
+ * Off by default — set DEMO_AGGRESSIVE_ON_WAIT=true to enable (testnet only).
  */
 function buildAggressiveTestnetDecision(snapshot = {}) {
-  if (!tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", true)) return null;
+  if (!tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false)) return null;
 
   const minScore = tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 48);
   const coinFocus = Array.isArray(snapshot.coinFocus) ? [...snapshot.coinFocus] : [];
@@ -524,9 +544,15 @@ function mergeTradeDecisionWithAggressive(snapshot, decision, source) {
 
 function getDemoTradeEnvInfo() {
   return {
-    aggressiveOnWait: tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", true),
+    aggressiveOnWait: tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false),
     aggressiveMinSetupScore: tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 48),
-    relaxedAiPrompt: tradeEnvBool("DEMO_RELAXED_AI_PROMPT", true)
+    relaxedAiPrompt: tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false),
+    ruleFallbackOnDeepSeekError: tradeEnvBool("DEMO_RULE_FALLBACK_ON_DEEPSEEK_ERROR", false),
+    tradeAiTemperature:
+      Number.isFinite(Number(process.env.DEMO_TRADE_AI_TEMPERATURE)) &&
+      Number(process.env.DEMO_TRADE_AI_TEMPERATURE) >= 0
+        ? Number(process.env.DEMO_TRADE_AI_TEMPERATURE)
+        : 0.42
   };
 }
 
