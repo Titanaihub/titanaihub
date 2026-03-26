@@ -38,9 +38,9 @@ function autoFeatureEnabled() {
 
 function getMinConfidence() {
   const raw = process.env.DEMO_AUTO_MIN_CONFIDENCE;
-  if (raw === undefined || raw === "") return 0.55;
+  if (raw === undefined || raw === "") return 0.45;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.55;
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.45;
 }
 
 function defaultIntervalMs() {

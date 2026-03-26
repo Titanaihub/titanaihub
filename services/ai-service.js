@@ -362,7 +362,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     throw new Error("Missing DEEPSEEK_API_KEY");
   }
 
-  const relaxed = tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false);
+  const relaxed = tradeEnvBool("DEMO_RELAXED_AI_PROMPT", true);
   const systemPrompt = [
     "You are a crypto futures trading decision assistant for Binance USDT-M TESTNET only (not real money).",
     "Respond with JSON only (no markdown).",
@@ -461,9 +461,9 @@ function tradeEnvNum(name, defaultValue) {
  * Enable with DEMO_AGGRESSIVE_ON_WAIT=true on the server.
  */
 function buildAggressiveTestnetDecision(snapshot = {}) {
-  if (!tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false)) return null;
+  if (!tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", true)) return null;
 
-  const minScore = tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 52);
+  const minScore = tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 48);
   const coinFocus = Array.isArray(snapshot.coinFocus) ? [...snapshot.coinFocus] : [];
   if (!coinFocus.length) return null;
 
@@ -524,9 +524,9 @@ function mergeTradeDecisionWithAggressive(snapshot, decision, source) {
 
 function getDemoTradeEnvInfo() {
   return {
-    aggressiveOnWait: tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false),
-    aggressiveMinSetupScore: tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 52),
-    relaxedAiPrompt: tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false)
+    aggressiveOnWait: tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", true),
+    aggressiveMinSetupScore: tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 48),
+    relaxedAiPrompt: tradeEnvBool("DEMO_RELAXED_AI_PROMPT", true)
   };
 }
 
