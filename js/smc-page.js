@@ -12,7 +12,8 @@
     smcConsensusCards: document.getElementById("smcConsensusCards"),
     smcOrderMetricsCards: document.getElementById("smcOrderMetricsCards"),
     smcNotesBody: document.getElementById("smcNotesBody"),
-    smcSrBody: document.getElementById("smcSrBody")
+    smcSrBody: document.getElementById("smcSrBody"),
+    smcTfSummaryBody: document.getElementById("smcTfSummaryBody")
   };
 
   const state = {
@@ -25,13 +26,30 @@
     ws: null,
     liveSymbol: null,
     liveInterval: null,
-    runInFlight: false
+    runInFlight: false,
+    tfSummaryRows: [],
+    tfSummaryKey: "",
+    tfSummaryAt: 0
   };
 
   function fmt(n) {
     const x = Number(n);
     if (!Number.isFinite(x)) return "--";
     return x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtPrice(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "--";
+    const ax = Math.abs(x);
+    let maxDigits = 2;
+    if (ax < 100) maxDigits = 4;
+    if (ax < 1) maxDigits = 6;
+    if (ax < 0.01) maxDigits = 8;
+    return x.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: maxDigits
+    });
   }
 
   function getAuthHeader() {
@@ -122,7 +140,7 @@
   function renderOrderMetrics(payload) {
     if (!elements.smcOrderMetricsCards) return;
     const a = payload?.averages || {};
-    const fmtPx = (v) => (Number.isFinite(Number(v)) ? fmt(v) : "--");
+    const fmtPx = (v) => (Number.isFinite(Number(v)) ? fmtPrice(v) : "--");
     elements.smcOrderMetricsCards.innerHTML = `
       <div class="stat-card"><span>TP Buy avg</span><strong class="pos">${fmtPx(a.tpBuy)}</strong></div>
       <div class="stat-card"><span>SL Buy avg</span><strong class="neg">${fmtPx(a.slBuy)}</strong></div>
@@ -162,14 +180,14 @@
     const sweepLow = Number.isFinite(refLow) ? refLow * 0.999 : NaN;
 
     elements.smcPriceLevelsCards.innerHTML = `
-      <div class="stat-card"><span>Last Price</span><strong>${fmt(lastClose)}</strong></div>
-      <div class="stat-card"><span>Ref High</span><strong class="neg">${fmt(refHigh)}</strong></div>
-      <div class="stat-card"><span>Ref Low</span><strong class="pos">${fmt(refLow)}</strong></div>
-      <div class="stat-card"><span>ATR</span><strong>${fmt(atr)}</strong></div>
-      <div class="stat-card"><span>Nearest Resistance</span><strong class="neg">${fmt(nearestResistance?.price)}</strong></div>
-      <div class="stat-card"><span>Nearest Support</span><strong class="pos">${fmt(nearestSupport?.price)}</strong></div>
-      <div class="stat-card"><span>Sweep High Zone (SL hunt)</span><strong class="neg">${fmt(sweepHigh)}</strong></div>
-      <div class="stat-card"><span>Sweep Low Zone (SL hunt)</span><strong class="pos">${fmt(sweepLow)}</strong></div>
+      <div class="stat-card"><span>Last Price</span><strong>${fmtPrice(lastClose)}</strong></div>
+      <div class="stat-card"><span>Ref High</span><strong class="neg">${fmtPrice(refHigh)}</strong></div>
+      <div class="stat-card"><span>Ref Low</span><strong class="pos">${fmtPrice(refLow)}</strong></div>
+      <div class="stat-card"><span>ATR</span><strong>${fmtPrice(atr)}</strong></div>
+      <div class="stat-card"><span>Nearest Resistance</span><strong class="neg">${fmtPrice(nearestResistance?.price)}</strong></div>
+      <div class="stat-card"><span>Nearest Support</span><strong class="pos">${fmtPrice(nearestSupport?.price)}</strong></div>
+      <div class="stat-card"><span>Sweep High Zone (SL hunt)</span><strong class="neg">${fmtPrice(sweepHigh)}</strong></div>
+      <div class="stat-card"><span>Sweep Low Zone (SL hunt)</span><strong class="pos">${fmtPrice(sweepLow)}</strong></div>
     `;
   }
 
@@ -236,12 +254,111 @@
       .map(
         (lv, i) => `<tr>
           <td>SR-${i + 1}</td>
-          <td class="${lv.side === "support" ? "pos" : "neg"}">${fmt(lv.price)}</td>
+          <td class="${lv.side === "support" ? "pos" : "neg"}">${fmtPrice(lv.price)}</td>
           <td>${lv.count}</td>
           <td class="${lv.side === "support" ? "pos" : "neg"}">${lv.side === "support" ? "Support" : "Resistance"}</td>
         </tr>`
       )
       .join("");
+  }
+
+  function renderTfSummaryTable(rows) {
+    const body = elements.smcTfSummaryBody;
+    if (!body) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      body.innerHTML = `<tr><td colspan="5">No strong multi-timeframe confluence found</td></tr>`;
+      return;
+    }
+    body.innerHTML = rows
+      .map(
+        (r, i) => `<tr>
+          <td>C-${i + 1}</td>
+          <td class="${r.side === "support" ? "pos" : "neg"}">${fmtPrice(r.price)}</td>
+          <td>${r.timeframes.join(", ")}</td>
+          <td class="${r.side === "support" ? "pos" : "neg"}">${r.side === "support" ? "Support" : "Resistance"}</td>
+          <td>${fmt(r.totalTouches)}</td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  function buildTfConfluence(rows, lastClose) {
+    if (!Array.isArray(rows) || !rows.length) return [];
+    const px = Number(lastClose);
+    const mergeTol = Number.isFinite(px) && px > 0 ? px * 0.0025 : 0.5; // 0.25%
+    const nearBand = Number.isFinite(px) && px > 0 ? px * 0.2 : Number.POSITIVE_INFINITY;
+    const buckets = [];
+    for (const row of rows) {
+      if (!Number.isFinite(row.price)) continue;
+      if (Math.abs(row.price - px) > nearBand) continue;
+      const found = buckets.find((b) => b.side === row.side && Math.abs(b.price - row.price) <= mergeTol);
+      if (found) {
+        found.count += 1;
+        found.price = (found.price * (found.count - 1) + row.price) / found.count;
+        found.totalTouches += Number(row.touches || 0);
+        found.tfSet.add(row.interval);
+      } else {
+        buckets.push({
+          side: row.side,
+          price: row.price,
+          count: 1,
+          totalTouches: Number(row.touches || 0),
+          tfSet: new Set([row.interval])
+        });
+      }
+    }
+    return buckets
+      .map((b) => ({
+        side: b.side,
+        price: b.price,
+        totalTouches: b.totalTouches,
+        timeframes: [...b.tfSet].sort((a, b2) => a.localeCompare(b2))
+      }))
+      .filter((x) => x.timeframes.length >= 2)
+      .sort((a, b) => b.timeframes.length - a.timeframes.length || b.totalTouches - a.totalTouches)
+      .slice(0, 10);
+  }
+
+  async function loadTfSummary(symbol, lastClose, force = false) {
+    const key = `${symbol}`;
+    const now = Date.now();
+    if (!force && state.tfSummaryKey === key && now - state.tfSummaryAt < 180000 && state.tfSummaryRows.length) {
+      renderTfSummaryTable(state.tfSummaryRows);
+      return;
+    }
+    const body = elements.smcTfSummaryBody;
+    if (body) body.innerHTML = `<tr><td colspan="5">Loading multi-timeframe confluence...</td></tr>`;
+    const tfPlan = [
+      { interval: "1m", limit: 1600 },
+      { interval: "5m", limit: 1400 },
+      { interval: "15m", limit: 1200 },
+      { interval: "1h", limit: 1000 },
+      { interval: "4h", limit: 900 },
+      { interval: "1d", limit: 700 }
+    ];
+    try {
+      const { apiGet } = window.TitanApi;
+      const tasks = tfPlan.map(async (p) => {
+        const qs = new URLSearchParams({ symbol, interval: p.interval, limit: String(p.limit) });
+        const payload = await apiGet(`/smc/scan?${qs.toString()}`);
+        const lv = Array.isArray(payload?.srLevels) ? payload.srLevels : [];
+        return lv.map((x) => ({
+          interval: p.interval,
+          side: String(x.side || "").toLowerCase() === "support" ? "support" : "resistance",
+          price: Number(x.price),
+          touches: Number(x.count || 0)
+        }));
+      });
+      const packs = await Promise.all(tasks);
+      const merged = packs.flat();
+      const summary = buildTfConfluence(merged, lastClose);
+      state.tfSummaryRows = summary;
+      state.tfSummaryKey = key;
+      state.tfSummaryAt = Date.now();
+      renderTfSummaryTable(summary);
+    } catch (_) {
+      if (body) body.innerHTML = `<tr><td colspan="5">Cannot load multi-timeframe summary now</td></tr>`;
+    }
   }
 
   function closeLiveStream() {
@@ -341,6 +458,11 @@
       const srLevels = sanitizeSrLevels(payload?.srLevels || computeHistoricalSrLevels(rows), lastClose);
       renderSrTable(srLevels);
       renderPriceLevels(payload);
+      if (!opts.fromStream) {
+        await loadTfSummary(symbol, lastClose, true);
+      } else {
+        renderTfSummaryTable(state.tfSummaryRows);
+      }
       if (elements.smcStatus) {
         const start = rows.length ? new Date(rows[0].openTime).toISOString().slice(0, 16).replace("T", " ") : "--";
         const end = rows.length
