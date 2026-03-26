@@ -20,6 +20,7 @@ const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
 const { buildBinanceCoverageReport } = require("../services/data/data-quality-service.js");
 const { buildRealFlowPackage } = require("../services/real-flow-service.js");
 const { getMultiCoinHistory } = require("../services/coingecko-history-service.js");
+const { runSmcScan } = require("../services/smc-analysis-service.js");
 const {
   callDeepSeekChat,
   buildFallbackReply,
@@ -288,6 +289,28 @@ router.get("/market-history", async (req, res) => {
       days: 30,
       rows: [],
       errors: [{ symbol: "*", message: err.message || "Failed to load market history" }]
+    });
+  }
+});
+
+router.get("/smc/scan", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol || "BTCUSDT").toUpperCase();
+    const interval = String(req.query.interval || "15m");
+    const limit = sanitizeInt(req.query.limit, 220);
+
+    const data = await runSmcScan({
+      symbol,
+      interval,
+      limit: Math.max(60, Math.min(limit, 1000))
+    });
+    return res.json(data);
+  } catch (err) {
+    console.error("smc scan failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "SMC scan failed",
+      source: "binance-futures"
     });
   }
 });

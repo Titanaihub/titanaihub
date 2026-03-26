@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMC Lab · Titan AI Hub</title>
+  <link rel="icon" type="image/png" href="./titan-logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
+  <link rel="stylesheet" href="./styles.css?v=2617" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark brand-mark-image">
+          <img src="./titan-logo.png" alt="Titan AI Hub Logo" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Titan AI Hub</h1>
+          <p>SMC Lab · Liquidity / Sweep / BOS / CHoCH Scanner</p>
+        </div>
+      </div>
+      <div class="topbar-metrics">
+        <a class="tab-btn active" href="./smc.html?v=1">SMC Lab</a>
+        <a class="tab-btn" href="./index.html?v=1">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>SMC Scan</h2>
+            <p>Scan possible liquidity pools, sweeps, structure shifts, and displacement from Binance Futures candles</p>
+          </div>
+        </div>
+
+        <div class="history-toolbar">
+          <label for="smcSymbolSelect" class="history-toolbar-label">Symbol</label>
+          <select id="smcSymbolSelect" class="input input-inline history-symbol-select">
+            <option value="BTCUSDT" selected>BTCUSDT</option>
+            <option value="ETHUSDT">ETHUSDT</option>
+            <option value="BNBUSDT">BNBUSDT</option>
+            <option value="SOLUSDT">SOLUSDT</option>
+            <option value="XRPUSDT">XRPUSDT</option>
+            <option value="DOGEUSDT">DOGEUSDT</option>
+            <option value="ADAUSDT">ADAUSDT</option>
+          </select>
+          <label for="smcIntervalSelect" class="history-toolbar-label">Interval</label>
+          <select id="smcIntervalSelect" class="input input-inline history-symbol-select">
+            <option value="5m">5m</option>
+            <option value="15m" selected>15m</option>
+            <option value="1h">1h</option>
+            <option value="4h">4h</option>
+          </select>
+          <button id="smcRunBtn" class="btn btn-secondary" type="button">Run SMC scan</button>
+          <span id="smcStatus" class="demo-trading-status">Waiting...</span>
+        </div>
+
+        <div id="smcSummaryCards" class="demo-trading-summary">
+          <div class="stat-card"><span>Signal</span><strong>--</strong></div>
+          <div class="stat-card"><span>Liquidity Pool Score</span><strong>--</strong></div>
+          <div class="stat-card"><span>Sweep Score</span><strong>--</strong></div>
+          <div class="stat-card"><span>Displacement Score</span><strong>--</strong></div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>SMC Notes</th>
+              </tr>
+            </thead>
+            <tbody id="smcNotesBody">
+              <tr><td>Run scan to see notes</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap demo-trading-trade-history-wrap">
+          <table class="data-table demo-trading-trade-table">
+            <thead>
+              <tr>
+                <th>Open Time (UTC)</th>
+                <th>Open</th>
+                <th>High</th>
+                <th>Low</th>
+                <th>Close</th>
+                <th>Volume</th>
+              </tr>
+            </thead>
+            <tbody id="smcCandlesBody">
+              <tr><td colspan="6">Run scan to load candles</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/config.js?v=2602"></script>
+  <script src="./js/api-client.js?v=2602"></script>
+  <script src="./js/smc-page.js?v=1"></script>
+</body>
+</html>
