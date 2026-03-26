@@ -379,6 +379,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
 
   const systemPrompt = [
     "You are a discretionary crypto futures assistant for Binance USDT-M TESTNET only (not real money).",
+    "Primary mode is short-term trading (scalp/intraday). Prefer setups that complete within short windows and avoid late chasing after a daily directional move is already extended.",
     "You must reason like a trader: weigh conflicting signals, regime, and risk — do NOT mimic a fixed rule engine (e.g. do not open a trade only because finalSetupScore is highest).",
     "Respond with JSON only (no markdown, no code fences).",
     "Use only fields present in the snapshot. Do not invent prices, news, or facts.",
@@ -387,6 +388,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     "Symbols must be valid USDT-M perpetual form (e.g. BTCUSDT).",
     "Prefer WAIT when: setups disagree, evidence is weak, volatility/whale/alerts suggest elevated risk, or edge is unclear.",
     "Use OPEN_LONG or OPEN_SHORT only when your rationale explicitly states why expected edge outweighs risk for that symbol.",
+    "Use shortTermContext when available: daily average move profiles (open->high/open->low etc.) and M5/M15 SMC. If buyExhausted is true, avoid OPEN_LONG unless very strong contrary evidence. If sellExhausted is true, avoid OPEN_SHORT unless very strong contrary evidence.",
     "confidence is your subjective probability the chosen action is appropriate given the snapshot (0–1).",
     relaxed
       ? "Optional testnet bias: if one coin clearly leads by score AND bias/signal align without strong contradictions, you may lean toward a directional action — still explain why in rationale."
@@ -399,7 +401,8 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     overview: snapshot.overview || null,
     coinFocus: Array.isArray(snapshot.coinFocus) ? snapshot.coinFocus.slice(0, 20) : [],
     whales: Array.isArray(snapshot.whales) ? snapshot.whales.slice(0, 25) : [],
-    alerts: Array.isArray(snapshot.alerts) ? snapshot.alerts.slice(0, 12) : []
+    alerts: Array.isArray(snapshot.alerts) ? snapshot.alerts.slice(0, 12) : [],
+    shortTermContext: snapshot.shortTermContext || null
   };
 
   const userPrompt = [
@@ -548,7 +551,16 @@ function getDemoTradeEnvInfo() {
       Number.isFinite(Number(process.env.DEMO_TRADE_AI_TEMPERATURE)) &&
       Number(process.env.DEMO_TRADE_AI_TEMPERATURE) >= 0
         ? Number(process.env.DEMO_TRADE_AI_TEMPERATURE)
-        : 0.42
+        : 0.42,
+    historyProfileDays: Number.isFinite(Number(process.env.DEMO_HISTORY_PROFILE_DAYS))
+      ? Number(process.env.DEMO_HISTORY_PROFILE_DAYS)
+      : 365,
+    shortTermBuyExhaustMult: Number.isFinite(Number(process.env.DEMO_SHORT_TERM_BUY_EXHAUST_MULT))
+      ? Number(process.env.DEMO_SHORT_TERM_BUY_EXHAUST_MULT)
+      : 1,
+    shortTermSellExhaustMult: Number.isFinite(Number(process.env.DEMO_SHORT_TERM_SELL_EXHAUST_MULT))
+      ? Number(process.env.DEMO_SHORT_TERM_SELL_EXHAUST_MULT)
+      : 1
   };
 }
 

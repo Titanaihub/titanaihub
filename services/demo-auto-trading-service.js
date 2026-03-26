@@ -5,7 +5,13 @@ const {
   mergeTradeDecisionWithAggressive,
   getDemoTradeEnvInfo
 } = require("./ai-service.js");
-const { placeDemoEntryOrder } = require("./binance-testnet-trade-service.js");
+const {
+  placeDemoEntryOrder,
+  getOpenTestnetPositions,
+  closeTestnetPosition
+} = require("./binance-testnet-trade-service.js");
+const { getHistoryBehaviorStats } = require("./coingecko-history-service.js");
+const { runSmcScan } = require("./smc-analysis-service.js");
 
 const state = {
   running: false,
@@ -47,7 +53,84 @@ function defaultIntervalMs() {
   const raw = process.env.DEMO_AUTO_TRADING_INTERVAL_MS;
   const n = Number(raw);
   if (Number.isFinite(n) && n >= 60000) return Math.min(n, 3600000);
-  return 300000;
+  return 120000;
+}
+
+function topSymbolsFromSnapshot(snapshot, limit = 6) {
+  const list = Array.isArray(snapshot?.coinFocus) ? snapshot.coinFocus : [];
+  return list
+    .slice(0, limit)
+    .map((c) => String(c?.futuresSymbol || `${c?.symbol || ""}USDT`).toUpperCase())
+    .filter((s) => /^[A-Z0-9]+USDT$/.test(s));
+}
+
+function envNum(name, fallback) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+async function buildShortTermContext(snapshot) {
+  const symbols = topSymbolsFromSnapshot(snapshot, 6);
+  const historyDays = Math.max(60, Math.min(envNum("DEMO_HISTORY_PROFILE_DAYS", 365), 1825));
+  const buyExhaustMult = Math.max(0.6, Math.min(envNum("DEMO_SHORT_TERM_BUY_EXHAUST_MULT", 1), 1.8));
+  const sellExhaustMult = Math.max(0.6, Math.min(envNum("DEMO_SHORT_TERM_SELL_EXHAUST_MULT", 1), 1.8));
+  const out = {};
+  await Promise.all(
+    symbols.map(async (futSym) => {
+      const base = futSym.replace(/USDT$/i, "");
+      try {
+        const [hist, smc5, smc15] = await Promise.all([
+          getHistoryBehaviorStats({ symbol: base, days: historyDays, source: "binance" }),
+          runSmcScan({ symbol: futSym, interval: "5m", limit: 360 }).catch(() => null),
+          runSmcScan({ symbol: futSym, interval: "15m", limit: 260 }).catch(() => null)
+        ]);
+        if (!hist?.ok) return;
+        const buyExhausted = Number(hist.today?.openHighPct || 0) >= Number(hist.averages?.openHighPct || 0) * buyExhaustMult;
+        const sellExhausted = Number(hist.today?.openLowPct || 0) >= Number(hist.averages?.openLowPct || 0) * sellExhaustMult;
+        out[futSym] = {
+          history: hist,
+          shortSmc: {
+            m5: smc5?.smc || null,
+            m15: smc15?.smc || null
+          },
+          gates: {
+            buyExhausted,
+            sellExhausted,
+            preferShortAfterExhaustedBuy:
+              buyExhausted && Number(hist.today?.openClosePct || 0) < Number(hist.averages?.openClosePct || 0),
+            preferLongAfterExhaustedSell:
+              sellExhausted && Number(hist.today?.openClosePct || 0) > Number(hist.averages?.openClosePct || 0)
+          }
+        };
+      } catch (_) {}
+    })
+  );
+  return out;
+}
+
+function applyShortTermGate(decision, shortTermContext) {
+  const action = String(decision?.action || "WAIT").toUpperCase();
+  const symbol = String(decision?.symbol || "").toUpperCase();
+  if (!["OPEN_LONG", "OPEN_SHORT"].includes(action) || !symbol) return decision;
+  const ctx = shortTermContext?.[symbol];
+  if (!ctx?.gates) return decision;
+  if (action === "OPEN_LONG" && ctx.gates.buyExhausted) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence || 0), 0.45),
+      rationale: `${decision.rationale || ""} | blocked: daily open->high already reached historical average threshold`
+    };
+  }
+  if (action === "OPEN_SHORT" && ctx.gates.sellExhausted) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence || 0), 0.45),
+      rationale: `${decision.rationale || ""} | blocked: daily open->low already reached historical average threshold`
+    };
+  }
+  return decision;
 }
 
 function pushDecisionLog(entry) {
@@ -63,6 +146,19 @@ function summarizeExecute(ex) {
   if (ex.ok === true) return "order_sent";
   if (ex.ok === false) return `error:${ex.error}`;
   return "?";
+}
+
+function actionToDirection(action) {
+  const a = String(action || "").toUpperCase();
+  if (a === "OPEN_LONG") return "LONG";
+  if (a === "OPEN_SHORT") return "SHORT";
+  return "FLAT";
+}
+
+function positionDirection(p) {
+  const amt = Number(p?.positionAmt || 0);
+  if (!Number.isFinite(amt) || Math.abs(amt) < 1e-12) return "FLAT";
+  return amt > 0 ? "LONG" : "SHORT";
 }
 
 function getAutoTradingStatus() {
@@ -101,6 +197,8 @@ async function runTick() {
     }
 
     const snapshot = await buildLiveSnapshot();
+    const shortTermContext = await buildShortTermContext(snapshot);
+    snapshot.shortTermContext = shortTermContext;
     let decision;
     let source = "deepseek";
     try {
@@ -113,6 +211,7 @@ async function runTick() {
     const merged = mergeTradeDecisionWithAggressive(snapshot, decision, source);
     decision = merged.decision;
     source = merged.source;
+    decision = applyShortTermGate(decision, shortTermContext);
 
     state.lastDecision = {
       ts: new Date().toISOString(),
@@ -155,6 +254,33 @@ async function runTick() {
 
     const symbol = String(decision.symbol || "BTCUSDT").toUpperCase();
     const usdtNotional = Number(decision.usdtNotional) > 0 ? Number(decision.usdtNotional) : 20;
+    const desiredDir = actionToDirection(action);
+    const openPos = await getOpenTestnetPositions(symbol);
+    const sameDir = openPos.find((p) => positionDirection(p) === desiredDir);
+    const opposite = openPos.filter((p) => {
+      const dir = positionDirection(p);
+      return dir !== "FLAT" && dir !== desiredDir;
+    });
+
+    if (sameDir && opposite.length === 0) {
+      state.lastExecute = {
+        ts: new Date().toISOString(),
+        skipped: true,
+        reason: `already has ${desiredDir} position on ${symbol}`
+      };
+      return;
+    }
+
+    const closed = [];
+    for (const p of opposite) {
+      const res = await closeTestnetPosition(p, "signal_flip");
+      closed.push({
+        symbol: res.symbol,
+        side: res.side,
+        qty: res.quantity,
+        positionSide: res.positionSide
+      });
+    }
 
     const result = await placeDemoEntryOrder({
       symbol,
@@ -167,6 +293,7 @@ async function runTick() {
       ok: true,
       symbol,
       action,
+      closedOpposite: closed,
       result
     };
   } catch (err) {

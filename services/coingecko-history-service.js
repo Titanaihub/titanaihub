@@ -372,6 +372,67 @@ async function getMultiCoinHistory({ symbols = [], days = 30, limitPerCoin = 30,
   };
 }
 
+async function getHistoryBehaviorStats({ symbol = "BTC", days = 365, source = "binance" } = {}) {
+  const sym = String(symbol || "BTC").toUpperCase().replace(/USDT$/i, "");
+  const src = String(source || "binance").toLowerCase() === "coingecko" ? "coingecko" : "binance";
+  const safeDays = Math.max(45, Math.min(Number(days) || 365, 1825));
+  const rows =
+    src === "binance" ? await fetchBinanceHistory(sym, safeDays) : await fetchCoinHistory(sym, safeDays);
+  const desc = Array.isArray(rows) ? rows : [];
+  if (!desc.length) {
+    return { ok: false, symbol: sym, source: src, message: "No history rows" };
+  }
+
+  const latest = desc[0];
+  const past = desc.slice(1).filter((r) => Number(r.open) > 0 && Number(r.high) > 0 && Number(r.low) > 0);
+  if (!past.length) {
+    return { ok: false, symbol: sym, source: src, message: "Insufficient history rows" };
+  }
+
+  const pct = {
+    openHigh: (r) => ((Number(r.high) - Number(r.open)) / Number(r.open)) * 100,
+    openLow: (r) => ((Number(r.open) - Number(r.low)) / Number(r.open)) * 100,
+    lowHigh: (r) => ((Number(r.high) - Number(r.low)) / Math.max(Number(r.low), 1e-12)) * 100,
+    highLow: (r) => ((Number(r.high) - Number(r.low)) / Math.max(Number(r.high), 1e-12)) * 100,
+    openClose: (r) => ((Number(r.close) - Number(r.open)) / Number(r.open)) * 100
+  };
+  const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+
+  const avg = {
+    openHighPct: mean(past.map(pct.openHigh)),
+    openLowPct: mean(past.map(pct.openLow)),
+    lowHighPct: mean(past.map(pct.lowHigh)),
+    highLowPct: mean(past.map(pct.highLow)),
+    openClosePct: mean(past.map(pct.openClose)),
+    absOpenClosePct: mean(past.map((r) => Math.abs(pct.openClose(r))))
+  };
+  const today = {
+    openHighPct: pct.openHigh(latest),
+    openLowPct: pct.openLow(latest),
+    lowHighPct: pct.lowHigh(latest),
+    highLowPct: pct.highLow(latest),
+    openClosePct: pct.openClose(latest)
+  };
+
+  return {
+    ok: true,
+    source: src,
+    symbol: sym,
+    daysUsed: past.length,
+    date: latest.date,
+    latest: {
+      open: Number(latest.open),
+      high: Number(latest.high),
+      low: Number(latest.low),
+      close: Number(latest.close),
+      price: Number(latest.price)
+    },
+    averages: avg,
+    today
+  };
+}
+
 module.exports = {
-  getMultiCoinHistory
+  getMultiCoinHistory,
+  getHistoryBehaviorStats
 };

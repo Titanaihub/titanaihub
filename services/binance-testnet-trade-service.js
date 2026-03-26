@@ -328,8 +328,64 @@ async function placeDemoEntryOrder({ symbol, action, usdtNotional }) {
   };
 }
 
+function positionDirection(p) {
+  const amt = Number(p?.positionAmt || 0);
+  if (!Number.isFinite(amt) || Math.abs(amt) < 1e-12) return "FLAT";
+  return amt > 0 ? "LONG" : "SHORT";
+}
+
+async function getOpenTestnetPositions(symbol) {
+  if (!API_KEY || !API_SECRET) {
+    return [];
+  }
+  const positions = await requestSigned("GET", "/fapi/v2/positionRisk", {}).catch(() => []);
+  const rows = Array.isArray(positions) ? positions : [];
+  const filtered = rows.filter((p) => Math.abs(Number(p?.positionAmt || 0)) > 1e-12);
+  if (!symbol) return filtered;
+  const sym = String(symbol).toUpperCase();
+  return filtered.filter((p) => String(p?.symbol || "").toUpperCase() === sym);
+}
+
+async function closeTestnetPosition(position, reason = "signal_flip") {
+  const symbol = String(position?.symbol || "").toUpperCase();
+  if (!symbol) throw new Error("Invalid position symbol");
+  const amt = Number(position?.positionAmt || 0);
+  if (!Number.isFinite(amt) || Math.abs(amt) < 1e-12) {
+    return { ok: true, skipped: true, reason: "position already flat", symbol };
+  }
+  const side = amt > 0 ? "SELL" : "BUY";
+  const rawQty = Math.abs(amt);
+  const quantity = await normalizeOrderQuantity(symbol, rawQty);
+  const posSide = String(position?.positionSide || "BOTH").toUpperCase();
+  const params = {
+    symbol,
+    side,
+    type: "MARKET",
+    quantity: String(quantity),
+    newOrderRespType: "RESULT"
+  };
+  // One-way mode: enforce reduce-only. Hedge mode: specify positionSide for safe close.
+  if (posSide === "LONG" || posSide === "SHORT") {
+    params.positionSide = posSide;
+  } else {
+    params.reduceOnly = "true";
+  }
+  const order = await requestSigned("POST", "/fapi/v1/order", params);
+  return {
+    ok: true,
+    symbol,
+    side,
+    quantity,
+    positionSide: posSide,
+    reason,
+    order
+  };
+}
+
 module.exports = {
   placeDemoEntryOrder,
+  getOpenTestnetPositions,
+  closeTestnetPosition,
   getFuturesAccountSnapshot,
   getTestnetOrderMetrics
 };
