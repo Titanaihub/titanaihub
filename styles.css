@@ -2160,3 +2160,32 @@ body {
 .demo-trading-tab-hint + .demo-trading-history-section-title {
   margin-top: 0.35rem;
 }
+
+.demo-trading-trade-history-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.demo-trading-trade-table {
+  min-width: 920px;
+  font-size: 0.8rem;
+}
+
+.demo-trading-trade-table th,
+.demo-trading-trade-table td {
+  white-space: nowrap;
+}
+
+.demo-trading-symbol-cell .demo-trading-perp {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(244, 248, 255, 0.55);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 4px;
+  vertical-align: middle;
+}

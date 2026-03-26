@@ -164,6 +164,8 @@ async function getFuturesAccountSnapshot() {
       limit: "50"
     }).catch(() => []);
 
+    const incArr = Array.isArray(income) ? income : [];
+
     const symbols = new Set();
     for (const p of positions || []) {
       if (Math.abs(Number(p.positionAmt || 0)) > 1e-12) {
@@ -173,23 +175,36 @@ async function getFuturesAccountSnapshot() {
     for (const o of openOrders || []) {
       symbols.add(String(o.symbol || "").toUpperCase());
     }
+    for (const row of incArr) {
+      if (row.symbol) {
+        symbols.add(String(row.symbol).toUpperCase());
+      }
+    }
     if (symbols.size === 0) {
       symbols.add("BTCUSDT");
     }
 
-    const orderRows = [];
+    /** USDT-M user fills — same source as Binance UI "Trade History" (all trades, not only closes). */
+    const tradeRows = [];
     for (const sym of symbols) {
-      const orders = await requestSigned("GET", "/fapi/v1/allOrders", {
+      const trades = await requestSigned("GET", "/fapi/v1/userTrades", {
         symbol: sym,
-        limit: "25"
+        limit: "100"
       }).catch(() => []);
-      if (Array.isArray(orders)) {
-        orderRows.push(...orders);
+      if (Array.isArray(trades)) {
+        tradeRows.push(...trades);
       }
     }
 
-    orderRows.sort((a, b) => (b.updateTime || b.time || 0) - (a.updateTime || a.time || 0));
-    const recentOrders = orderRows.slice(0, 40);
+    tradeRows.sort((a, b) => (b.time || 0) - (a.time || 0));
+    const seenTradeIds = new Set();
+    const uniqueTrades = [];
+    for (const t of tradeRows) {
+      const id = t.id;
+      if (id == null || seenTradeIds.has(id)) continue;
+      seenTradeIds.add(id);
+      uniqueTrades.push(t);
+    }
 
     const usdt = Array.isArray(balance)
       ? balance.find((a) => String(a.asset || "").toUpperCase() === "USDT")
@@ -201,7 +216,6 @@ async function getFuturesAccountSnapshot() {
     }
 
     let realizedRecent = 0;
-    const incArr = Array.isArray(income) ? income : [];
     for (const row of incArr) {
       realizedRecent += Number(row.income || 0);
     }
@@ -216,7 +230,7 @@ async function getFuturesAccountSnapshot() {
       positions: Array.isArray(positions) ? positions : [],
       openOrders: Array.isArray(openOrders) ? openOrders : [],
       realizedPnlRows: incArr,
-      recentOrders
+      tradeHistory: uniqueTrades.slice(0, 100)
     };
   } catch (err) {
     return {

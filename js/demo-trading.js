@@ -32,6 +32,28 @@ window.TitanDemoTrading = (() => {
     return `<span class="${cls}">${label}</span>`;
   }
 
+  function orderSideBuySellHtml(side) {
+    const s = String(side || "").toUpperCase();
+    if (s === "BUY") return `<span class="buy">Buy</span>`;
+    if (s === "SELL") return `<span class="sell">Sell</span>`;
+    return escapeHtml(side || "--");
+  }
+
+  function baseAssetFromSymbol(sym) {
+    const s = String(sym || "").toUpperCase();
+    if (s.endsWith("USDT")) return s.slice(0, -4);
+    if (s.endsWith("USDC")) return s.slice(0, -4);
+    if (s.endsWith("BUSD")) return s.slice(0, -4);
+    return s;
+  }
+
+  /** Binance-style: 8 decimals + USDT suffix */
+  function fmtRealizedProfitBinance(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "--";
+    return `${x.toFixed(8)} USDT`;
+  }
+
   function bindDemoTradingAccountTabs(mount) {
     const root = mount.querySelector(".demo-trading-account-tabs");
     if (!root) return;
@@ -331,20 +353,39 @@ window.TitanDemoTrading = (() => {
     const unrealizedFootClass =
       !Number.isFinite(unrealizedTotal) ? "" : unrealizedTotal >= 0 ? "pos" : "neg";
 
-    const ordRows = (snap.recentOrders || [])
-      .slice(0, 25)
-      .map(
-        (o) => `
+    const tradeList = Array.isArray(snap.tradeHistory)
+      ? snap.tradeHistory
+      : Array.isArray(snap.closedTrades)
+        ? snap.closedTrades
+        : [];
+    const tradeHistoryRows = tradeList
+      .map((t) => {
+        const rp = Number(t.realizedPnl);
+        const rpCls = !Number.isFinite(rp) ? "" : rp >= 0 ? "pos" : "neg";
+        const base = baseAssetFromSymbol(t.symbol);
+        const qtyStr = `${escapeHtml(t.qty)} ${escapeHtml(base)}`;
+        const feeStr =
+          t.commission !== undefined && t.commission !== null && String(t.commission) !== ""
+            ? `${escapeHtml(String(t.commission))} ${escapeHtml(
+                t.commissionAsset != null ? String(t.commissionAsset) : "USDT"
+              )}`
+            : "--";
+        const roleStr = t.maker === true ? "Maker" : t.maker === false ? "Taker" : "--";
+        const orderNo =
+          t.orderId != null ? t.orderId : t.id != null ? t.id : "--";
+        return `
       <tr>
-        <td>${escapeHtml(o.symbol)}</td>
-        <td>${escapeHtml(o.side)}</td>
-        <td>${escapeHtml(o.type)}</td>
-        <td>${escapeHtml(o.status)}</td>
-        <td>${escapeHtml(o.executedQty)} / ${escapeHtml(o.origQty)}</td>
-        <td>${escapeHtml(o.avgPrice || o.price || "--")}</td>
-        <td>${o.updateTime ? new Date(o.updateTime).toISOString().slice(0, 19).replace("T", " ") : "--"}</td>
-      </tr>`
-      )
+        <td>${escapeHtml(String(orderNo))}</td>
+        <td>${t.time ? new Date(t.time).toISOString().slice(0, 19).replace("T", " ") : "--"}</td>
+        <td class="demo-trading-symbol-cell">${escapeHtml(t.symbol)} <span class="demo-trading-perp">Perp</span></td>
+        <td>${orderSideBuySellHtml(t.side)}</td>
+        <td>${escapeHtml(t.price)}</td>
+        <td>${qtyStr}</td>
+        <td>${feeStr}</td>
+        <td>${roleStr}</td>
+        <td class="${rpCls}">${fmtRealizedProfitBinance(t.realizedPnl)}</td>
+      </tr>`;
+      })
       .join("");
 
     const pnlRows = (snap.realizedPnlRows || [])
@@ -381,7 +422,7 @@ window.TitanDemoTrading = (() => {
       </div>
       <div class="demo-trading-account-tabs top-tabs demo-trading-two-tabs" role="tablist" aria-label="Futures account tables">
         <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-demo-tab="positions">Positions</button>
-        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-demo-tab="orderHistory">History</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-demo-tab="orderHistory">Trade history</button>
       </div>
       <div class="demo-trading-tab-panel" role="tabpanel" data-demo-tab-panel="positions">
         <p class="demo-trading-tab-hint">Open positions — trades not yet closed.</p>
@@ -407,16 +448,24 @@ window.TitanDemoTrading = (() => {
         </div>
       </div>
       <div class="demo-trading-tab-panel" role="tabpanel" data-demo-tab-panel="orderHistory" hidden>
-        <p class="demo-trading-tab-hint">Closed trades — history and realized P&amp;L.</p>
-        <h4 class="demo-trading-sub demo-trading-history-section-title">Recent fills</h4>
-        <div class="table-wrap">
-          <table class="data-table">
+        <p class="demo-trading-tab-hint">Futures USDT-M (Testnet) — same data source as Binance <strong>Trade History</strong>: every fill (open, add, reduce, close).</p>
+        <h4 class="demo-trading-sub demo-trading-history-section-title">Trade history</h4>
+        <div class="table-wrap demo-trading-trade-history-wrap">
+          <table class="data-table demo-trading-trade-table">
             <thead>
               <tr>
-                <th>Symbol</th><th>Side</th><th>Type</th><th>Status</th><th>Filled</th><th>Avg</th><th>Updated</th>
+                <th>Order No.</th>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Fee</th>
+                <th>Role</th>
+                <th>Realized profit</th>
               </tr>
             </thead>
-            <tbody>${ordRows || `<tr><td colspan="7">No recent orders</td></tr>`}</tbody>
+            <tbody>${tradeHistoryRows || `<tr><td colspan="9">No trades yet</td></tr>`}</tbody>
           </table>
         </div>
         <h4 class="demo-trading-sub demo-trading-history-section-title">Realized PnL (income detail)</h4>
