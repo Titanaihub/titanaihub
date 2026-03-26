@@ -21,6 +21,7 @@ const { buildBinanceCoverageReport } = require("../services/data/data-quality-se
 const { buildRealFlowPackage } = require("../services/real-flow-service.js");
 const { getMultiCoinHistory } = require("../services/coingecko-history-service.js");
 const { runSmcScan } = require("../services/smc-analysis-service.js");
+const { buildMultiSourceAnalysis } = require("../services/multi-source-analysis-service.js");
 const {
   callDeepSeekChat,
   buildFallbackReply,
@@ -311,6 +312,26 @@ router.get("/smc/scan", async (req, res) => {
       ok: false,
       message: err.message || "SMC scan failed",
       source: "binance-futures"
+    });
+  }
+});
+
+router.get("/multi-source/analysis", async (req, res) => {
+  try {
+    const symbol = String(req.query.symbol || "BTCUSDT").toUpperCase();
+    const interval = String(req.query.interval || "15m");
+    const limit = sanitizeInt(req.query.limit, 500);
+    const data = await buildMultiSourceAnalysis({
+      symbol,
+      interval,
+      limit: Math.max(120, Math.min(limit, 1000))
+    });
+    return res.json(data);
+  } catch (err) {
+    console.error("multi-source analysis failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "multi-source analysis failed"
     });
   }
 });

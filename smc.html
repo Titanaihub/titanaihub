@@ -53,7 +53,15 @@
             <option value="1h">1h</option>
             <option value="4h">4h</option>
           </select>
+          <label for="smcLookbackSelect" class="history-toolbar-label">Lookback</label>
+          <select id="smcLookbackSelect" class="input input-inline history-symbol-select">
+            <option value="240">Short (240 bars)</option>
+            <option value="500">Medium (500 bars)</option>
+            <option value="1000" selected>Long (1000 bars)</option>
+            <option value="1500">Extended (1500 bars)</option>
+          </select>
           <button id="smcRunBtn" class="btn btn-secondary" type="button">Run SMC scan</button>
+          <button id="smcLiveToggleBtn" class="btn btn-secondary" type="button">Live: ON</button>
           <span id="smcStatus" class="demo-trading-status">Waiting...</span>
         </div>
 
@@ -62,6 +70,19 @@
           <div class="stat-card"><span>Liquidity Pool Score</span><strong>--</strong></div>
           <div class="stat-card"><span>Sweep Score</span><strong>--</strong></div>
           <div class="stat-card"><span>Displacement Score</span><strong>--</strong></div>
+        </div>
+
+        <div class="section-head" style="margin: 0.4rem 0 0.3rem;">
+          <div>
+            <h3 style="margin: 0; font-size: 1rem;">Multi-Source Consensus</h3>
+            <p style="margin: 0.25rem 0 0; font-size: 0.8rem;">Binance flow/orderbook/funding + CoinGecko trend combined</p>
+          </div>
+        </div>
+        <div id="smcConsensusCards" class="demo-trading-summary">
+          <div class="stat-card"><span>Bias</span><strong>--</strong></div>
+          <div class="stat-card"><span>Score</span><strong>--</strong></div>
+          <div class="stat-card"><span>Confidence</span><strong>--</strong></div>
+          <div class="stat-card"><span>Buy Ratio</span><strong>--</strong></div>
         </div>
 
         <div class="table-wrap">
@@ -85,6 +106,22 @@
             </thead>
             <tbody id="smcNotesBody">
               <tr><td>Run scan to see notes</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Historical SR</th>
+                <th>Price</th>
+                <th>Touches</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody id="smcSrBody">
+              <tr><td colspan="4">Run scan to compute support/resistance</td></tr>
             </tbody>
           </table>
         </div>
@@ -113,6 +150,6 @@
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="./js/smc-page.js?v=2"></script>
+  <script src="./js/smc-page.js?v=4"></script>
 </body>
 </html>
