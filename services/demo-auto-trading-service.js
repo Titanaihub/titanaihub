@@ -1,7 +1,9 @@
 const { buildLiveSnapshot } = require("./live-snapshot-service.js");
 const {
   callDeepSeekTradeDecision,
-  buildTradeDecisionFallback
+  buildTradeDecisionFallback,
+  mergeTradeDecisionWithAggressive,
+  getDemoTradeEnvInfo
 } = require("./ai-service.js");
 const { placeDemoEntryOrder } = require("./binance-testnet-trade-service.js");
 
@@ -14,7 +16,8 @@ const state = {
   lastDecision: null,
   lastExecute: null,
   lastError: null,
-  ticks: 0
+  ticks: 0,
+  decisionLog: []
 };
 
 let tickInProgress = false;
@@ -47,6 +50,21 @@ function defaultIntervalMs() {
   return 300000;
 }
 
+function pushDecisionLog(entry) {
+  state.decisionLog.push(entry);
+  if (state.decisionLog.length > 20) {
+    state.decisionLog.shift();
+  }
+}
+
+function summarizeExecute(ex) {
+  if (!ex) return "none";
+  if (ex.skipped) return `skipped:${ex.reason}`;
+  if (ex.ok === true) return "order_sent";
+  if (ex.ok === false) return `error:${ex.error}`;
+  return "?";
+}
+
 function getAutoTradingStatus() {
   return {
     running: state.running,
@@ -57,7 +75,9 @@ function getAutoTradingStatus() {
     lastExecute: state.lastExecute,
     lastError: state.lastError,
     ticks: state.ticks,
-    minConfidence: getMinConfidence()
+    minConfidence: getMinConfidence(),
+    decisionLog: state.decisionLog.slice(-15),
+    tradeEnv: getDemoTradeEnvInfo()
   };
 }
 
@@ -65,6 +85,8 @@ async function runTick() {
   if (tickInProgress) return;
   tickInProgress = true;
   state.lastError = null;
+
+  let logThisTick = false;
 
   try {
     if (!tradingEnabled()) {
@@ -87,11 +109,16 @@ async function runTick() {
       source = "fallback";
     }
 
+    const merged = mergeTradeDecisionWithAggressive(snapshot, decision, source);
+    decision = merged.decision;
+    source = merged.source;
+
     state.lastDecision = {
       ts: new Date().toISOString(),
       source,
       decision
     };
+    logThisTick = true;
 
     const action = String(decision.action || "WAIT").toUpperCase();
     const confidence = Number(decision.confidence) || 0;
@@ -152,6 +179,17 @@ async function runTick() {
   } finally {
     state.lastTickAt = new Date().toISOString();
     state.ticks += 1;
+    if (logThisTick && state.lastDecision) {
+      pushDecisionLog({
+        ts: state.lastTickAt,
+        source: state.lastDecision.source,
+        action: state.lastDecision.decision?.action,
+        symbol: state.lastDecision.decision?.symbol,
+        confidence: state.lastDecision.decision?.confidence,
+        rationale: String(state.lastDecision.decision?.rationale || "").slice(0, 160),
+        result: summarizeExecute(state.lastExecute)
+      });
+    }
     tickInProgress = false;
   }
 }

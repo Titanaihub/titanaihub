@@ -105,7 +105,8 @@ const elements = {
   demoAutoIntervalMs: document.getElementById("demoAutoIntervalMs"),
   demoAutoStart: document.getElementById("demoAutoStart"),
   demoAutoStop: document.getElementById("demoAutoStop"),
-  demoAutoStatusLine: document.getElementById("demoAutoStatusLine")
+  demoAutoStatusLine: document.getElementById("demoAutoStatusLine"),
+  demoDecisionLog: document.getElementById("demoDecisionLog")
 };
 
 function bindTabs() {

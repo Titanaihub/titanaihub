@@ -23,7 +23,9 @@ const {
   callDeepSeekChat,
   buildFallbackReply,
   callDeepSeekTradeDecision,
-  buildTradeDecisionFallback
+  buildTradeDecisionFallback,
+  mergeTradeDecisionWithAggressive,
+  getDemoTradeEnvInfo
 } = require("../services/ai-service.js");
 const { placeDemoEntryOrder, getFuturesAccountSnapshot } = require("../services/binance-testnet-trade-service.js");
 const { buildLiveSnapshot } = require("../services/live-snapshot-service.js");
@@ -384,22 +386,33 @@ router.post("/demo/decision", async (req, res) => {
   try {
     const snapshot = await buildLiveSnapshot();
     try {
-      const decision = await callDeepSeekTradeDecision(snapshot);
+      let decision = await callDeepSeekTradeDecision(snapshot);
+      let source = "deepseek";
+      const merged = mergeTradeDecisionWithAggressive(snapshot, decision, source);
+      decision = merged.decision;
+      source = merged.source;
       return res.json({
         ok: true,
-        source: "deepseek",
+        source,
         mode: "demo",
         snapshotTs: new Date().toISOString(),
-        decision
+        decision,
+        tradeEnv: getDemoTradeEnvInfo()
       });
     } catch (err) {
       console.error("demo decision deepseek fallback:", err.message);
+      let decision = buildTradeDecisionFallback(snapshot);
+      let source = "fallback";
+      const merged = mergeTradeDecisionWithAggressive(snapshot, decision, source);
+      decision = merged.decision;
+      source = merged.source;
       return res.json({
         ok: true,
-        source: "fallback",
+        source,
         mode: "demo",
         snapshotTs: new Date().toISOString(),
-        decision: buildTradeDecisionFallback(snapshot)
+        decision,
+        tradeEnv: getDemoTradeEnvInfo()
       });
     }
   } catch (err) {

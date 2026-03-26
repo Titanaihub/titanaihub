@@ -9,7 +9,7 @@
   <title>Titan AI Hub</title>
   <link rel="icon" type="image/png" href="./titan-logo.png" />
   <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
-  <link rel="stylesheet" href="./styles.css?v=2611" />
+  <link rel="stylesheet" href="./styles.css?v=2612" />
 </head>
 <body>
   <div class="app-shell">
@@ -331,6 +331,10 @@
             <button id="demoAutoStop" class="btn btn-secondary" type="button" disabled>Stop auto</button>
           </div>
           <p id="demoAutoStatusLine" class="demo-auto-status-line" aria-live="polite"></p>
+          <div class="demo-decision-log-wrap">
+            <span class="demo-trading-preview-label">Recent auto cycles (verify AI)</span>
+            <pre id="demoDecisionLog" class="raw-box demo-decision-log">--</pre>
+          </div>
         </div>
 
         <div class="demo-trading-toolbar">
@@ -424,8 +428,8 @@
 <script src="./js/render-real-flow.js?v=2600"></script>
 <script src="./js/render-alerts.js?v=2600"></script>
 <script src="./js/render-health.js?v=2600"></script>
-<script src="./js/demo-trading.js?v=2611"></script>
+<script src="./js/demo-trading.js?v=2612"></script>
 <script src="./js/chat.js?v=2606"></script>
-<script src="./js/dashboard.js?v=2609"></script>
+<script src="./js/dashboard.js?v=2612"></script>
 </body>
 </html>

@@ -362,6 +362,7 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     throw new Error("Missing DEEPSEEK_API_KEY");
   }
 
+  const relaxed = tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false);
   const systemPrompt = [
     "You are a crypto futures trading decision assistant for Binance USDT-M TESTNET only (not real money).",
     "Respond with JSON only (no markdown).",
@@ -371,8 +372,13 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     "or WAIT if no setup is acceptable. Do not fixate on one asset — choose by evidence in the snapshot.",
     "Symbols must be valid USDT perpetual form e.g. BTCUSDT, ETHUSDT.",
     "Set conservative confidence from 0 to 1.",
-    "Do not invent prices or facts not implied by the snapshot."
-  ].join("\n");
+    "Do not invent prices or facts not implied by the snapshot.",
+    relaxed
+      ? "TESTNET MODE: If one coin clearly leads by finalSetupScore and has directional alignment (bias/signal), prefer OPEN_LONG or OPEN_SHORT over WAIT unless contradictions are strong."
+      : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const payloadSnapshot = {
     overview: snapshot.overview || null,
@@ -439,9 +445,97 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
   };
 }
 
+function tradeEnvBool(name, defaultValue) {
+  const v = process.env[name];
+  if (v === undefined || v === "") return defaultValue;
+  return String(v).toLowerCase() === "true";
+}
+
+function tradeEnvNum(name, defaultValue) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) ? n : defaultValue;
+}
+
+/**
+ * When AI returns WAIT, optionally derive OPEN_LONG/SHORT from Coin Focus scores (testnet practice only).
+ * Enable with DEMO_AGGRESSIVE_ON_WAIT=true on the server.
+ */
+function buildAggressiveTestnetDecision(snapshot = {}) {
+  if (!tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false)) return null;
+
+  const minScore = tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 52);
+  const coinFocus = Array.isArray(snapshot.coinFocus) ? [...snapshot.coinFocus] : [];
+  if (!coinFocus.length) return null;
+
+  coinFocus.sort((a, b) => Number(b.finalSetupScore || 0) - Number(a.finalSetupScore || 0));
+
+  for (const c of coinFocus) {
+    const fs = Number(c.finalSetupScore || 0);
+    if (fs < minScore) continue;
+
+    const sig = String(c.signal || "").toUpperCase();
+    let action = "WAIT";
+    if (sig.includes("LONG") || sig.includes("BUY")) action = "OPEN_LONG";
+    else if (sig.includes("SHORT") || sig.includes("SELL")) action = "OPEN_SHORT";
+
+    if (action === "WAIT") {
+      const bias = String(c.bias || "").toUpperCase();
+      const dir = String(c.setupDirection || "").toUpperCase();
+      if (bias.includes("BULL") || bias.includes("LONG") || dir.includes("LONG")) action = "OPEN_LONG";
+      else if (bias.includes("BEAR") || bias.includes("SHORT") || dir.includes("SHORT")) {
+        action = "OPEN_SHORT";
+      }
+    }
+
+    if (action === "WAIT") continue;
+
+    const symbol = String(c.futuresSymbol || `${c.symbol || "BTC"}USDT`).toUpperCase();
+    const conf = Math.max(0.56, Math.min(0.82, fs / 100));
+
+    return {
+      action,
+      symbol,
+      confidence: conf,
+      rationale: `Aggressive testnet rule: ${c.symbol} finalSetupScore=${Math.round(fs)} signal=${c.signal} bias=${c.bias} (used because AI chose WAIT)`,
+      entry: c.entry ?? null,
+      sl: c.sl ?? null,
+      tp: c.tp ?? null,
+      usdtNotional: 20
+    };
+  }
+
+  return null;
+}
+
+function mergeTradeDecisionWithAggressive(snapshot, decision, source) {
+  const a = String(decision.action || "").toUpperCase();
+  if (a !== "WAIT") {
+    return { decision, source };
+  }
+  const agg = buildAggressiveTestnetDecision(snapshot);
+  if (!agg || String(agg.action || "").toUpperCase() === "WAIT") {
+    return { decision, source };
+  }
+  return {
+    decision: agg,
+    source: `${source}+aggressive_rules`
+  };
+}
+
+function getDemoTradeEnvInfo() {
+  return {
+    aggressiveOnWait: tradeEnvBool("DEMO_AGGRESSIVE_ON_WAIT", false),
+    aggressiveMinSetupScore: tradeEnvNum("DEMO_AGGRESSIVE_MIN_SETUP_SCORE", 52),
+    relaxedAiPrompt: tradeEnvBool("DEMO_RELAXED_AI_PROMPT", false)
+  };
+}
+
 module.exports = {
   buildFallbackReply,
   buildTradeDecisionFallback,
+  buildAggressiveTestnetDecision,
+  mergeTradeDecisionWithAggressive,
+  getDemoTradeEnvInfo,
   postJson,
   buildSystemPrompt,
   callDeepSeekChat,

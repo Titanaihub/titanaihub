@@ -101,7 +101,29 @@ window.TitanDemoTrading = (() => {
     if (data.lastError) {
       bits.push(`Note: ${data.lastError}`);
     }
+    const te = data.tradeEnv;
+    if (te && !te.aggressiveOnWait) {
+      bits.push(
+        "Aggressive rules: OFF (set DEMO_AGGRESSIVE_ON_WAIT=true on server when AI always says WAIT)"
+      );
+    } else if (te && te.aggressiveOnWait) {
+      bits.push(`Aggressive rules: ON (min setup ${te.aggressiveMinSetupScore})`);
+    }
     return bits.join(" · ");
+  }
+
+  function renderDecisionLog(elements, data) {
+    const pre = elements.demoDecisionLog;
+    if (!pre) return;
+    if (!data || data.ok === false) {
+      pre.textContent = "--";
+      return;
+    }
+    const payload = {
+      tradeEnv: data.tradeEnv || null,
+      recentCycles: data.decisionLog || []
+    };
+    pre.textContent = JSON.stringify(payload, null, 2);
   }
 
   function syncAutoUi(elements, appState, data) {
@@ -129,6 +151,7 @@ window.TitanDemoTrading = (() => {
   async function loadAutoStatus(elements, appState) {
     if (!appState.loggedIn || !appState.authToken) {
       if (elements.demoAutoStatusLine) elements.demoAutoStatusLine.textContent = "";
+      renderDecisionLog(elements, null);
       if (elements.demoRunDecision) {
         elements.demoRunDecision.classList.remove("btn-trading-online");
         elements.demoRunDecision.title = "";
@@ -147,11 +170,13 @@ window.TitanDemoTrading = (() => {
       if (elements.demoAutoStatusLine) {
         elements.demoAutoStatusLine.textContent = formatAutoStatus(data);
       }
+      renderDecisionLog(elements, data);
       syncAutoUi(elements, appState, data);
     } catch (err) {
       if (elements.demoAutoStatusLine) {
         elements.demoAutoStatusLine.textContent = err.message || "Auto status failed";
       }
+      renderDecisionLog(elements, null);
       syncAutoUi(elements, appState, null);
     }
   }
@@ -397,7 +422,10 @@ window.TitanDemoTrading = (() => {
       );
       appState.demoLastDecision = data.decision || null;
       if (elements.demoDecisionPreview) {
-        elements.demoDecisionPreview.textContent = JSON.stringify(data.decision || {}, null, 2);
+        const out = data.tradeEnv
+          ? { tradeEnv: data.tradeEnv, decision: data.decision || {} }
+          : data.decision || {};
+        elements.demoDecisionPreview.textContent = JSON.stringify(out, null, 2);
       }
       if (elements.demoTradingStatus) {
         elements.demoTradingStatus.textContent = `Signal: ${data.source || "?"} — ${data.decision?.action || "--"}`;

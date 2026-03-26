@@ -2024,6 +2024,17 @@ body {
   color: rgba(244, 248, 255, 0.68);
 }
 
+.demo-decision-log-wrap {
+  margin-top: 0.75rem;
+}
+
+.demo-decision-log {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
 .input-inline {
   width: auto;
   min-width: 7rem;
