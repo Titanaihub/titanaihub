@@ -2210,3 +2210,39 @@ body {
 .history-symbol-select {
   min-width: 10rem;
 }
+
+.smc-interval-hidden {
+  display: none !important;
+}
+
+.smc-chart-tf-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 6;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 180, 255, 0.22);
+  background: rgba(6, 12, 31, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.smc-tf-btn {
+  border: 1px solid rgba(212, 175, 55, 0.26);
+  background: rgba(19, 31, 68, 0.82);
+  color: rgba(244, 248, 255, 0.76);
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.smc-tf-btn:hover,
+.smc-tf-btn.active {
+  color: #f4f8ff;
+  border-color: rgba(212, 175, 55, 0.56);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.28), rgba(22, 163, 74, 0.08));
+}

@@ -60,8 +60,7 @@
           </select>
           <input id="smcCustomSymbolInput" class="input input-inline history-symbol-input" type="text" placeholder="Custom pair e.g. SUIUSDT" />
           <button id="smcApplyCustomBtn" class="btn btn-secondary" type="button">Use pair</button>
-          <label for="smcIntervalSelect" class="history-toolbar-label">Interval</label>
-          <select id="smcIntervalSelect" class="input input-inline history-symbol-select">
+          <select id="smcIntervalSelect" class="input input-inline history-symbol-select smc-interval-hidden" aria-label="Interval">
             <option value="1m">1m (90d)</option>
             <option value="5m">5m</option>
             <option value="15m" selected>15m</option>
@@ -117,6 +116,14 @@
             </div>
           </div>
           <div id="smcChartWrap" style="width: 100%; height: 640px; border: 1px solid rgba(212,175,55,0.22); border-radius: 10px; overflow: hidden;">
+            <div id="smcChartTfControls" class="smc-chart-tf-controls" aria-label="Chart timeframe controls">
+              <button class="smc-tf-btn active" data-interval="1m" type="button">1m</button>
+              <button class="smc-tf-btn" data-interval="5m" type="button">5m</button>
+              <button class="smc-tf-btn" data-interval="15m" type="button">15m</button>
+              <button class="smc-tf-btn" data-interval="1h" type="button">1h</button>
+              <button class="smc-tf-btn" data-interval="4h" type="button">4h</button>
+              <button class="smc-tf-btn" data-interval="1d" type="button">1d</button>
+            </div>
             <div id="smcChart" style="width: 100%; height: 100%;"></div>
           </div>
         </div>
@@ -158,6 +165,6 @@
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="./js/smc-page.js?v=10"></script>
+  <script src="./js/smc-page.js?v=12"></script>
 </body>
 </html>

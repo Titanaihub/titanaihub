@@ -85,6 +85,55 @@ function detectEqualLevels(candles, lookback = 30, toleranceRatio = 0.0006) {
   };
 }
 
+function intervalAnalysisBars(interval) {
+  const i = String(interval || "").toLowerCase();
+  if (i === "1m") return 3000;
+  if (i === "5m") return 3000;
+  if (i === "1h") return 2500;
+  if (i === "4h") return 1800;
+  if (i === "1d") return 1200;
+  return 2200;
+}
+
+function computeHistoricalSrLevels(candles) {
+  if (!Array.isArray(candles) || candles.length < 40) return [];
+  const highs = [];
+  const lows = [];
+  const wing = 2;
+  for (let i = wing; i < candles.length - wing; i += 1) {
+    const cur = candles[i];
+    const prev = candles.slice(i - wing, i);
+    const next = candles.slice(i + 1, i + wing + 1);
+    const highIsPivot = prev.every((x) => Number(cur.high) > Number(x.high)) && next.every((x) => Number(cur.high) >= Number(x.high));
+    const lowIsPivot = prev.every((x) => Number(cur.low) < Number(x.low)) && next.every((x) => Number(cur.low) <= Number(x.low));
+    if (highIsPivot) highs.push(Number(cur.high));
+    if (lowIsPivot) lows.push(Number(cur.low));
+  }
+
+  const lastClose = Number(candles[candles.length - 1]?.close || 0);
+  const mergeTolerance = Math.max(lastClose * 0.0012, 1e-9);
+  const nearBand = Math.max(lastClose * 0.35, 1e-9); // Keep SR levels relevant to current regime
+
+  function cluster(values, side) {
+    const sorted = [...values].sort((a, b) => a - b);
+    const clusters = [];
+    for (const v of sorted) {
+      const c = clusters.find((x) => Math.abs(x.price - v) <= mergeTolerance);
+      if (c) {
+        c.count += 1;
+        c.price = (c.price * (c.count - 1) + v) / c.count;
+      } else {
+        clusters.push({ price: v, count: 1, side });
+      }
+    }
+    return clusters.filter((c) => c.count >= 2 && Math.abs(c.price - lastClose) <= nearBand);
+  }
+
+  return [...cluster(highs, "resistance"), ...cluster(lows, "support")]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+}
+
 function analyzeSmc(candles) {
   const n = candles.length;
   if (n < 30) {
@@ -229,7 +278,10 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
     .sort((a, b) => a.openTime - b.openTime)
     .slice(-safeLimit);
 
-  const smc = analyzeSmc(candles.slice(-5000));
+  const analysisBars = intervalAnalysisBars(intv);
+  const analysisCandles = candles.slice(-analysisBars);
+  const smc = analyzeSmc(analysisCandles);
+  const srLevels = computeHistoricalSrLevels(analysisCandles);
 
   const maxChartBars = 12000;
   let chartCandles = candles;
@@ -266,7 +318,9 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
     candlesCount: chartCandles.length,
     rawCandlesCount: candles.length,
     compressed,
+    analysisBarsUsed: analysisCandles.length,
     smc,
+    srLevels,
     candles: chartCandles
   };
 }

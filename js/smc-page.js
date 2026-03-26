@@ -14,7 +14,8 @@
     smcSrBody: document.getElementById("smcSrBody"),
     smcCandlesBody: document.getElementById("smcCandlesBody"),
     smcChartWrap: document.getElementById("smcChartWrap"),
-    smcChart: document.getElementById("smcChart")
+    smcChart: document.getElementById("smcChart"),
+    smcChartTfControls: document.getElementById("smcChartTfControls")
   };
 
   const state = {
@@ -65,6 +66,48 @@
     if (i === "4h") return 5 * 365 * 6; // 5 years
     if (i === "1d") return 8 * 365; // 8 years
     return 2000;
+  }
+
+  function syncChartTfButtons(activeInterval) {
+    if (!elements.smcChartTfControls) return;
+    const active = String(activeInterval || "").toLowerCase();
+    const buttons = elements.smcChartTfControls.querySelectorAll(".smc-tf-btn[data-interval]");
+    buttons.forEach((btn) => {
+      const intv = String(btn.getAttribute("data-interval") || "").toLowerCase();
+      btn.classList.toggle("active", intv === active);
+    });
+  }
+
+  function bindChartTfButtons() {
+    if (!elements.smcChartTfControls || !elements.smcIntervalSelect) return;
+    const buttons = elements.smcChartTfControls.querySelectorAll(".smc-tf-btn[data-interval]");
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const intv = String(btn.getAttribute("data-interval") || "").toLowerCase();
+        if (!intv) return;
+        elements.smcIntervalSelect.value = intv;
+        syncChartTfButtons(intv);
+        run().catch(() => {});
+      });
+    });
+    syncChartTfButtons(elements.smcIntervalSelect.value || "15m");
+  }
+
+  function sanitizeSrLevels(levels, lastClose) {
+    if (!Array.isArray(levels) || !levels.length || !Number.isFinite(Number(lastClose)) || Number(lastClose) <= 0) return [];
+    const px = Number(lastClose);
+    const nearBand = px * 0.22; // Keep only nearby regime levels for clearer/professional charting
+    return levels
+      .filter((lv) => Number.isFinite(Number(lv?.price)))
+      .map((lv) => ({
+        price: Number(lv.price),
+        count: Number(lv.count) || 0,
+        side: String(lv.side || "").toLowerCase() === "support" ? "support" : "resistance"
+      }))
+      .filter((lv) => Math.abs(lv.price - px) <= nearBand)
+      .filter((lv) => (lv.side === "support" ? lv.price <= px * 1.02 : lv.price >= px * 0.98))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
   }
 
   function ensureChart() {
@@ -303,7 +346,8 @@
     }
 
     clearSrLines();
-    const srLevels = computeHistoricalSrLevels(rows);
+    const rawSrLevels = Array.isArray(payload?.srLevels) && payload.srLevels.length ? payload.srLevels : computeHistoricalSrLevels(rows);
+    const srLevels = sanitizeSrLevels(rawSrLevels, chartRows[chartRows.length - 1]?.close);
     renderSrTable(srLevels);
     srLevels.forEach((lv) => {
       const s = state.chart.addLineSeries({
@@ -463,6 +507,7 @@
     state.runInFlight = true;
     const symbol = String(elements.smcSymbolSelect?.value || "BTCUSDT").toUpperCase();
     const interval = String(elements.smcIntervalSelect?.value || "15m");
+    syncChartTfButtons(interval);
     const lookback = intervalTargetBars(interval);
     if (elements.smcStatus && !opts.fromStream) {
       elements.smcStatus.textContent = `Scanning ${symbol} ${interval}...`;
@@ -501,7 +546,9 @@
         const raw = Number(payload?.rawCandlesCount || payload?.candlesCount || 0);
         const shown = rows.length;
         const compressNote = payload?.compressed ? " · compressed for chart" : "";
-        elements.smcStatus.textContent = `Source ${payload.source || "--"} · raw ${raw} · shown ${shown}${compressNote} · range ${start} → ${end}${state.liveEnabled ? " · live ON" : " · live OFF"} · chart no-volume v10`;
+        const analysisBars = Number(payload?.analysisBarsUsed || 0);
+        const analysisNote = analysisBars > 0 ? ` · analysis ${analysisBars}` : "";
+        elements.smcStatus.textContent = `Source ${payload.source || "--"} · raw ${raw} · shown ${shown}${compressNote}${analysisNote} · range ${start} → ${end}${state.liveEnabled ? " · live ON" : " · live OFF"} · chart no-volume v12`;
       }
       connectLiveStream(symbol, interval);
     } catch (err) {
@@ -547,7 +594,10 @@
     });
   }
   if (elements.smcIntervalSelect) {
-    elements.smcIntervalSelect.addEventListener("change", () => run().catch(() => {}));
+    elements.smcIntervalSelect.addEventListener("change", () => {
+      syncChartTfButtons(elements.smcIntervalSelect.value || "15m");
+      run().catch(() => {});
+    });
   }
   if (elements.smcLiveToggleBtn) {
     elements.smcLiveToggleBtn.addEventListener("click", () => {
@@ -566,5 +616,6 @@
   window.addEventListener("resize", () => resizeChart());
   window.addEventListener("beforeunload", () => closeLiveStream());
 
+  bindChartTfButtons();
   run().catch(() => {});
 })();
