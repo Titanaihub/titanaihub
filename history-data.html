@@ -35,6 +35,11 @@
           </div>
         </div>
         <div class="history-toolbar">
+          <label for="historySourceSelect" class="history-toolbar-label">Source</label>
+          <select id="historySourceSelect" class="input input-inline history-symbol-select">
+            <option value="binance" selected>Binance</option>
+            <option value="coingecko">CoinGecko</option>
+          </select>
           <label for="historySymbolSelect" class="history-toolbar-label">Symbol</label>
           <select id="historySymbolSelect" class="input input-inline history-symbol-select">
             <option value="BTC" selected>BTC</option>
@@ -66,7 +71,7 @@
             <option value="1825">5 years</option>
           </select>
           <button id="historyRefreshBtn" class="btn btn-secondary" type="button">Refresh history</button>
-          <span id="historyDataStatus" class="demo-trading-status">Loading CoinGecko history...</span>
+          <span id="historyDataStatus" class="demo-trading-status">Loading Binance history...</span>
         </div>
         <div class="table-wrap demo-trading-trade-history-wrap">
           <table class="data-table demo-trading-trade-table">

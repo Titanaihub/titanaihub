@@ -264,6 +264,7 @@ router.get("/debug-version", (req, res) => {
 
 router.get("/market-history", async (req, res) => {
   try {
+    const source = String(req.query.source || "coingecko").toLowerCase();
     const symbolsRaw = String(req.query.symbols || "")
       .split(",")
       .map((s) => s.trim())
@@ -272,6 +273,7 @@ router.get("/market-history", async (req, res) => {
     const perCoin = sanitizeInt(req.query.perCoin, 30);
 
     const data = await getMultiCoinHistory({
+      source,
       symbols: symbolsRaw,
       days: Math.max(1, Math.min(days, 1825)),
       limitPerCoin: Math.max(1, Math.min(perCoin, 2500))

@@ -1,5 +1,6 @@
 (() => {
   const elements = {
+    historySourceSelect: document.getElementById("historySourceSelect"),
     historySymbolSelect: document.getElementById("historySymbolSelect"),
     historyDaysSelect: document.getElementById("historyDaysSelect"),
     historyRefreshBtn: document.getElementById("historyRefreshBtn"),
@@ -89,20 +90,23 @@
         errCount && state.payload?.errors?.[0]?.message
           ? ` · ${String(state.payload.errors[0].message).slice(0, 90)}`
           : "";
-      elements.historyDataStatus.textContent = `CoinGecko: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}${approxNote}${firstErr}`;
+      const sourceText = String(state.payload?.source || "binance");
+      elements.historyDataStatus.textContent = `${sourceText}: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}${approxNote}${firstErr}`;
     }
   }
 
   async function loadHistory() {
+    const source = String(elements.historySourceSelect?.value || "binance").toLowerCase();
     const symbol = String(elements.historySymbolSelect?.value || "BTC").toUpperCase();
     const days = Number(elements.historyDaysSelect?.value || 30);
     if (elements.historyDataStatus) {
-      elements.historyDataStatus.textContent = "Loading CoinGecko history...";
+      elements.historyDataStatus.textContent = `Loading ${source === "binance" ? "Binance" : "CoinGecko"} history...`;
     }
 
     try {
       const { apiGet } = window.TitanApi;
       const qs = new URLSearchParams({
+        source,
         symbols: symbol,
         days: String(days),
         perCoin: String(Math.max(30, days))
@@ -136,6 +140,11 @@
     }
     if (elements.historySymbolSelect) {
       elements.historySymbolSelect.addEventListener("change", () => {
+        loadHistory().catch(() => {});
+      });
+    }
+    if (elements.historySourceSelect) {
+      elements.historySourceSelect.addEventListener("change", () => {
         loadHistory().catch(() => {});
       });
     }
