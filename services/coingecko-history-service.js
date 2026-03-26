@@ -63,6 +63,67 @@ function dayKey(ts) {
   return new Date(ts).toISOString().slice(0, 10);
 }
 
+function summarizeRowsByDay(rows, volByDay) {
+  const byDay = new Map();
+  const sortedAsc = [...rows].sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
+
+  for (const r of sortedAsc) {
+    const d = String(r.date || "");
+    if (!d) continue;
+    const cur = byDay.get(d);
+    if (!cur) {
+      byDay.set(d, {
+        symbol: r.symbol,
+        date: d,
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.price,
+        price: r.price,
+        approximate: Boolean(r.approximate),
+        tsOpen: Number(r.ts || 0),
+        tsClose: Number(r.ts || 0)
+      });
+      continue;
+    }
+
+    if (Number(r.ts || 0) < cur.tsOpen) {
+      cur.tsOpen = Number(r.ts || 0);
+      cur.open = r.open;
+    }
+    if (Number(r.ts || 0) >= cur.tsClose) {
+      cur.tsClose = Number(r.ts || 0);
+      cur.close = r.price;
+      cur.price = r.price;
+    }
+    cur.high = Math.max(Number(cur.high), Number(r.high));
+    cur.low = Math.min(Number(cur.low), Number(r.low));
+    cur.approximate = cur.approximate || Boolean(r.approximate);
+  }
+
+  const daysAsc = [...byDay.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let prevClose = null;
+  const withChange = daysAsc.map((d) => {
+    const close = Number(d.close);
+    const changePct = prevClose && prevClose !== 0 ? ((close - prevClose) / prevClose) * 100 : null;
+    prevClose = close;
+    return {
+      symbol: d.symbol,
+      date: d.date,
+      price: close,
+      open: Number(d.open),
+      high: Number(d.high),
+      low: Number(d.low),
+      volume: volByDay.get(d.date) ?? null,
+      changePct,
+      approximate: d.approximate
+    };
+  });
+
+  withChange.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return withChange;
+}
+
 async function fetchCoinHistory(symbol, days = 30) {
   const sym = String(symbol || "").toUpperCase();
   const id = COIN_ID_MAP[sym];
@@ -71,11 +132,21 @@ async function fetchCoinHistory(symbol, days = 30) {
   }
 
   const safeDays = Math.max(1, Math.min(Number(days) || 30, 1825));
-  const daysParam = safeDays > 365 ? "max" : String(safeDays);
-  const [ohlc, market] = await Promise.all([
-    getJson(`${COINGECKO_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${daysParam}`),
-    getJson(`${COINGECKO_BASE}/coins/${id}/market_chart?vs_currency=usd&days=${daysParam}&interval=daily`)
-  ]);
+  const shortDaysParam = safeDays > 365 ? "365" : String(safeDays);
+  const marketDaysParam = safeDays > 365 ? "max" : String(safeDays);
+
+  let ohlc = [];
+  let market = null;
+  if (safeDays <= 365) {
+    [ohlc, market] = await Promise.all([
+      getJson(`${COINGECKO_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${shortDaysParam}`),
+      getJson(`${COINGECKO_BASE}/coins/${id}/market_chart?vs_currency=usd&days=${marketDaysParam}&interval=daily`)
+    ]);
+  } else {
+    market = await getJson(
+      `${COINGECKO_BASE}/coins/${id}/market_chart?vs_currency=usd&days=${marketDaysParam}&interval=daily`
+    );
+  }
 
   const volByDay = new Map();
   const totalVolumes = Array.isArray(market?.total_volumes) ? market.total_volumes : [];
@@ -85,34 +156,59 @@ async function fetchCoinHistory(symbol, days = 30) {
   }
 
   const rows = [];
-  let prevClose = null;
-  const ohlcRows = Array.isArray(ohlc) ? ohlc : [];
-  for (const row of ohlcRows) {
-    if (!Array.isArray(row) || row.length < 5) continue;
-    const ts = row[0];
-    const open = toNum(row[1]);
-    const high = toNum(row[2]);
-    const low = toNum(row[3]);
-    const close = toNum(row[4]);
-    if (open == null || high == null || low == null || close == null) continue;
+  if (safeDays <= 365) {
+    const ohlcRows = Array.isArray(ohlc) ? ohlc : [];
+    for (const row of ohlcRows) {
+      if (!Array.isArray(row) || row.length < 5) continue;
+      const ts = row[0];
+      const open = toNum(row[1]);
+      const high = toNum(row[2]);
+      const low = toNum(row[3]);
+      const close = toNum(row[4]);
+      if (open == null || high == null || low == null || close == null) continue;
 
-    const changePct = prevClose && prevClose !== 0 ? ((close - prevClose) / prevClose) * 100 : null;
-    prevClose = close;
-
-    rows.push({
-      symbol: sym,
-      date: dayKey(ts),
-      price: close,
-      open,
-      high,
-      low,
-      volume: volByDay.get(dayKey(ts)) ?? null,
-      changePct
-    });
+      rows.push({
+        symbol: sym,
+        date: dayKey(ts),
+        ts,
+        price: close,
+        open,
+        high,
+        low,
+        volume: volByDay.get(dayKey(ts)) ?? null,
+        changePct: null,
+        approximate: false
+      });
+    }
+  } else {
+    // For long ranges (>365 days), CoinGecko free APIs typically provide daily closes.
+    // Build approximate OHLC from consecutive daily closes so UI still works up to 5 years.
+    const prices = Array.isArray(market?.prices) ? market.prices : [];
+    for (const row of prices) {
+      if (!Array.isArray(row) || row.length < 2) continue;
+      const ts = row[0];
+      const close = toNum(row[1]);
+      if (close == null) continue;
+      const open = prevClose ?? close;
+      const high = Math.max(open, close);
+      const low = Math.min(open, close);
+      rows.push({
+        symbol: sym,
+        date: dayKey(ts),
+        ts,
+        price: close,
+        open,
+        high,
+        low,
+        volume: volByDay.get(dayKey(ts)) ?? null,
+        changePct: null,
+        approximate: true
+      });
+    }
   }
 
-  rows.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  return rows.slice(0, safeDays);
+  const summarized = summarizeRowsByDay(rows, volByDay);
+  return summarized.slice(0, safeDays);
 }
 
 async function getMultiCoinHistory({ symbols = [], days = 30, limitPerCoin = 30 } = {}) {
@@ -146,7 +242,8 @@ async function getMultiCoinHistory({ symbols = [], days = 30, limitPerCoin = 30 
     symbols: list,
     days: Math.max(1, Math.min(Number(days) || 30, 1825)),
     rows: out,
-    errors
+    errors,
+    approximate: Math.max(1, Math.min(Number(days) || 30, 1825)) > 365
   };
 }
 

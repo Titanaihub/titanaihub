@@ -274,7 +274,7 @@ router.get("/market-history", async (req, res) => {
     const data = await getMultiCoinHistory({
       symbols: symbolsRaw,
       days: Math.max(1, Math.min(days, 1825)),
-      limitPerCoin: Math.max(1, Math.min(perCoin, 200))
+      limitPerCoin: Math.max(1, Math.min(perCoin, 2500))
     });
     return res.json(data);
   } catch (err) {

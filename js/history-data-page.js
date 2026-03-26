@@ -84,7 +84,12 @@
     if (elements.historyDataStatus) {
       const errCount = Array.isArray(state.payload?.errors) ? state.payload.errors.length : 0;
       const symText = String(elements.historySymbolSelect?.value || "--");
-      elements.historyDataStatus.textContent = `CoinGecko: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}`;
+      const approxNote = state.payload?.approximate ? " · mode: long-range (approx OHLC)" : "";
+      const firstErr =
+        errCount && state.payload?.errors?.[0]?.message
+          ? ` · ${String(state.payload.errors[0].message).slice(0, 90)}`
+          : "";
+      elements.historyDataStatus.textContent = `CoinGecko: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}${approxNote}${firstErr}`;
     }
   }
 
