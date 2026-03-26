@@ -75,8 +75,13 @@ window.TitanDemoTrading = (() => {
     }
     if (data.running) {
       bits.push(
-        `Auto: ON · every ${Math.round(data.intervalMs / 60000)} min · cycles ${data.ticks}`
+        `Auto: ON · every ${Math.round(data.intervalMs / 60000)} min · cycles ${data.ticks ?? 0}`
       );
+      if (data.tickInProgress) {
+        bits.push(
+          "Cycle in progress (loading snapshot + AI — first cycle often 30–90s, then this clears)"
+        );
+      }
       if (data.lastTickAt) {
         bits.push(`Last cycle ${data.lastTickAt.replace("T", " ").slice(0, 19)} UTC`);
       }
@@ -198,6 +203,9 @@ window.TitanDemoTrading = (() => {
       }
     }
     await loadAccount(elements, appState);
+    [2500, 6000, 12000].forEach((ms) => {
+      setTimeout(() => loadAutoStatus(elements, appState).catch(() => {}), ms);
+    });
   }
 
   async function stopAutoTrading(elements, appState) {

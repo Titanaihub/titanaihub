@@ -75,6 +75,7 @@ function getAutoTradingStatus() {
     lastExecute: state.lastExecute,
     lastError: state.lastError,
     ticks: state.ticks,
+    tickInProgress,
     minConfidence: getMinConfidence(),
     decisionLog: state.decisionLog.slice(-15),
     tradeEnv: getDemoTradeEnvInfo()
