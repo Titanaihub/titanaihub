@@ -45,7 +45,21 @@
             <option value="XRPUSDT">XRPUSDT</option>
             <option value="DOGEUSDT">DOGEUSDT</option>
             <option value="ADAUSDT">ADAUSDT</option>
+            <option value="LINKUSDT">LINKUSDT</option>
+            <option value="AVAXUSDT">AVAXUSDT</option>
+            <option value="TONUSDT">TONUSDT</option>
+            <option value="PEPEUSDT">PEPEUSDT</option>
+            <option value="WIFUSDT">WIFUSDT</option>
+            <option value="BONKUSDT">BONKUSDT</option>
+            <option value="FLOKIUSDT">FLOKIUSDT</option>
+            <option value="SHIBUSDT">SHIBUSDT</option>
+            <option value="SUIUSDT">SUIUSDT</option>
+            <option value="ARBUSDT">ARBUSDT</option>
+            <option value="OPUSDT">OPUSDT</option>
+            <option value="NEARUSDT">NEARUSDT</option>
           </select>
+          <input id="smcCustomSymbolInput" class="input input-inline history-symbol-input" type="text" placeholder="Custom pair e.g. SUIUSDT" />
+          <button id="smcApplyCustomBtn" class="btn btn-secondary" type="button">Use pair</button>
           <label for="smcIntervalSelect" class="history-toolbar-label">Interval</label>
           <select id="smcIntervalSelect" class="input input-inline history-symbol-select">
             <option value="5m">5m</option>
@@ -57,8 +71,9 @@
           <select id="smcLookbackSelect" class="input input-inline history-symbol-select">
             <option value="240">Short (240 bars)</option>
             <option value="500">Medium (500 bars)</option>
-            <option value="1000" selected>Long (1000 bars)</option>
+            <option value="1000">Long (1000 bars)</option>
             <option value="1500">Extended (1500 bars)</option>
+            <option value="2000" selected>Max (2000 bars)</option>
           </select>
           <button id="smcRunBtn" class="btn btn-secondary" type="button">Run SMC scan</button>
           <button id="smcLiveToggleBtn" class="btn btn-secondary" type="button">Live: ON</button>
@@ -83,6 +98,20 @@
           <div class="stat-card"><span>Score</span><strong>--</strong></div>
           <div class="stat-card"><span>Confidence</span><strong>--</strong></div>
           <div class="stat-card"><span>Buy Ratio</span><strong>--</strong></div>
+          <div class="stat-card"><span>Buy Volume</span><strong>--</strong></div>
+          <div class="stat-card"><span>Sell Volume</span><strong>--</strong></div>
+        </div>
+
+        <div class="section-head" style="margin: 0.35rem 0 0.35rem;">
+          <div>
+            <h3 style="margin: 0; font-size: 0.95rem;">Owner TP/SL Metrics (from Testnet open orders)</h3>
+          </div>
+        </div>
+        <div id="smcOrderMetricsCards" class="demo-trading-summary">
+          <div class="stat-card"><span>TP Buy avg</span><strong>--</strong></div>
+          <div class="stat-card"><span>SL Buy avg</span><strong>--</strong></div>
+          <div class="stat-card"><span>TP Sell avg</span><strong>--</strong></div>
+          <div class="stat-card"><span>SL Sell avg</span><strong>--</strong></div>
         </div>
 
         <div class="table-wrap">
@@ -92,7 +121,7 @@
               <p style="margin: 0.25rem 0 0; font-size: 0.8rem;">Candles + reference levels (Ref High / Ref Low) from latest SMC scan</p>
             </div>
           </div>
-          <div id="smcChartWrap" style="width: 100%; height: 420px; border: 1px solid rgba(212,175,55,0.22); border-radius: 10px; overflow: hidden;">
+          <div id="smcChartWrap" style="width: 100%; height: 640px; border: 1px solid rgba(212,175,55,0.22); border-radius: 10px; overflow: hidden;">
             <div id="smcChart" style="width: 100%; height: 100%;"></div>
           </div>
         </div>
@@ -126,23 +155,7 @@
           </table>
         </div>
 
-        <div class="table-wrap demo-trading-trade-history-wrap">
-          <table class="data-table demo-trading-trade-table">
-            <thead>
-              <tr>
-                <th>Date (UTC)</th>
-                <th>Open</th>
-                <th>High</th>
-                <th>Low</th>
-                <th>Close</th>
-                <th>Volume (sum)</th>
-              </tr>
-            </thead>
-            <tbody id="smcCandlesBody">
-              <tr><td colspan="6">Run scan to load candles</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- Intentionally hidden to maximize chart space per user request -->
       </section>
     </main>
   </div>
@@ -150,6 +163,6 @@
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="./js/smc-page.js?v=4"></script>
+  <script src="./js/smc-page.js?v=7"></script>
 </body>
 </html>

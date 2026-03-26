@@ -1,6 +1,8 @@
 (() => {
   const elements = {
     smcSymbolSelect: document.getElementById("smcSymbolSelect"),
+    smcCustomSymbolInput: document.getElementById("smcCustomSymbolInput"),
+    smcApplyCustomBtn: document.getElementById("smcApplyCustomBtn"),
     smcIntervalSelect: document.getElementById("smcIntervalSelect"),
     smcLookbackSelect: document.getElementById("smcLookbackSelect"),
     smcRunBtn: document.getElementById("smcRunBtn"),
@@ -8,6 +10,7 @@
     smcStatus: document.getElementById("smcStatus"),
     smcSummaryCards: document.getElementById("smcSummaryCards"),
     smcConsensusCards: document.getElementById("smcConsensusCards"),
+    smcOrderMetricsCards: document.getElementById("smcOrderMetricsCards"),
     smcNotesBody: document.getElementById("smcNotesBody"),
     smcSrBody: document.getElementById("smcSrBody"),
     smcCandlesBody: document.getElementById("smcCandlesBody"),
@@ -18,6 +21,7 @@
   const state = {
     chart: null,
     candleSeries: null,
+    volumeSeries: null,
     lineRefHigh: null,
     lineRefLow: null,
     srSeries: [],
@@ -34,6 +38,27 @@
     return x.toLocaleString("en-US", { maximumFractionDigits: 8 });
   }
 
+  function getAuthHeader() {
+    try {
+      const raw = localStorage.getItem("titan_hub_auth_v1");
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      const token = parsed?.token;
+      if (!token) return {};
+      return { Authorization: `Bearer ${token}` };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function normalizePairInput(raw) {
+    const s = String(raw || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    if (!s) return "";
+    return s.endsWith("USDT") ? s : `${s}USDT`;
+  }
+
   function ensureChart() {
     if (!elements.smcChart || !elements.smcChartWrap) return false;
     if (!window.LightweightCharts) return false;
@@ -41,20 +66,20 @@
 
     state.chart = window.LightweightCharts.createChart(elements.smcChart, {
       width: elements.smcChartWrap.clientWidth || 900,
-      height: elements.smcChartWrap.clientHeight || 420,
+      height: elements.smcChartWrap.clientHeight || 640,
       layout: {
-        background: { type: "solid", color: "#0a1738" },
-        textColor: "rgba(244,248,255,0.82)"
+        background: { type: "solid", color: "#0b0e11" },
+        textColor: "rgba(228,232,238,0.92)"
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.06)" },
-        horzLines: { color: "rgba(255,255,255,0.06)" }
+        vertLines: { color: "rgba(255,255,255,0.04)" },
+        horzLines: { color: "rgba(255,255,255,0.04)" }
       },
       rightPriceScale: {
-        borderColor: "rgba(212,175,55,0.25)"
+        borderColor: "rgba(255,255,255,0.14)"
       },
       timeScale: {
-        borderColor: "rgba(212,175,55,0.25)",
+        borderColor: "rgba(255,255,255,0.14)",
         timeVisible: true
       },
       crosshair: {
@@ -63,11 +88,22 @@
     });
 
     state.candleSeries = state.chart.addCandlestickSeries({
-      upColor: "#21c46a",
-      downColor: "#e04f5f",
+      upColor: "#0ecb81",
+      downColor: "#f6465d",
       borderVisible: false,
-      wickUpColor: "#21c46a",
-      wickDownColor: "#e04f5f"
+      wickUpColor: "#0ecb81",
+      wickDownColor: "#f6465d"
+    });
+    state.volumeSeries = state.chart.addHistogramSeries({
+      color: "rgba(99, 148, 255, 0.45)",
+      priceFormat: {
+        type: "volume"
+      },
+      priceScaleId: "",
+      scaleMargins: {
+        top: 0.82,
+        bottom: 0
+      }
     });
     state.lineRefHigh = state.chart.addLineSeries({
       color: "rgba(80, 195, 255, 0.9)",
@@ -116,11 +152,27 @@
           : "flat";
     const scoreCls = Number(c.score) >= 0 ? "pos" : "neg";
     const buyRatioPct = Number.isFinite(Number(bs.buyRatio)) ? `${(Number(bs.buyRatio) * 100).toFixed(2)}%` : "--";
+    const buyVolText = Number.isFinite(Number(bs.buyVolume)) ? fmt(bs.buyVolume) : "--";
+    const sellVolText = Number.isFinite(Number(bs.sellVolume)) ? fmt(bs.sellVolume) : "--";
     elements.smcConsensusCards.innerHTML = `
       <div class="stat-card"><span>Bias</span><strong class="${biasCls}">${String(c.bias || "--")}</strong></div>
       <div class="stat-card"><span>Score</span><strong class="${scoreCls}">${fmt(c.score)}</strong></div>
       <div class="stat-card"><span>Confidence</span><strong>${fmt(c.confidence)}%</strong></div>
       <div class="stat-card"><span>Buy Ratio</span><strong>${buyRatioPct}</strong></div>
+      <div class="stat-card"><span>Buy Volume</span><strong>${buyVolText}</strong></div>
+      <div class="stat-card"><span>Sell Volume</span><strong>${sellVolText}</strong></div>
+    `;
+  }
+
+  function renderOrderMetrics(payload) {
+    if (!elements.smcOrderMetricsCards) return;
+    const a = payload?.averages || {};
+    const fmtPx = (v) => (Number.isFinite(Number(v)) ? fmt(v) : "--");
+    elements.smcOrderMetricsCards.innerHTML = `
+      <div class="stat-card"><span>TP Buy avg</span><strong>${fmtPx(a.tpBuy)}</strong></div>
+      <div class="stat-card"><span>SL Buy avg</span><strong>${fmtPx(a.slBuy)}</strong></div>
+      <div class="stat-card"><span>TP Sell avg</span><strong>${fmtPx(a.tpSell)}</strong></div>
+      <div class="stat-card"><span>SL Sell avg</span><strong>${fmtPx(a.slSell)}</strong></div>
     `;
   }
 
@@ -135,62 +187,7 @@
     body.innerHTML = notes.map((n) => `<tr><td>${String(n)}</td></tr>`).join("");
   }
 
-  function renderCandles(payload) {
-    const body = elements.smcCandlesBody;
-    if (!body) return;
-    const rows = Array.isArray(payload?.candles) ? payload.candles : [];
-    if (!rows.length) {
-      body.innerHTML = `<tr><td colspan="6">No candles</td></tr>`;
-      return;
-    }
-
-    const byDay = new Map();
-    const asc = [...rows].sort((a, b) => Number(a.openTime || 0) - Number(b.openTime || 0));
-    asc.forEach((c) => {
-      const dateKey = c.openTime ? new Date(c.openTime).toISOString().slice(0, 10) : "--";
-      const cur = byDay.get(dateKey);
-      if (!cur) {
-        byDay.set(dateKey, {
-          date: dateKey,
-          open: Number(c.open),
-          high: Number(c.high),
-          low: Number(c.low),
-          close: Number(c.close),
-          volume: Number(c.volume) || 0,
-          firstTs: Number(c.openTime || 0),
-          lastTs: Number(c.openTime || 0)
-        });
-        return;
-      }
-      const ts = Number(c.openTime || 0);
-      if (ts < cur.firstTs) {
-        cur.firstTs = ts;
-        cur.open = Number(c.open);
-      }
-      if (ts >= cur.lastTs) {
-        cur.lastTs = ts;
-        cur.close = Number(c.close);
-      }
-      cur.high = Math.max(cur.high, Number(c.high));
-      cur.low = Math.min(cur.low, Number(c.low));
-      cur.volume += Number(c.volume) || 0;
-    });
-
-    const dailyRows = [...byDay.values()].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    body.innerHTML = dailyRows
-      .slice(0, 180)
-      .map((d) => {
-        return `<tr>
-          <td>${d.date}</td>
-          <td>${fmt(d.open)}</td>
-          <td>${fmt(d.high)}</td>
-          <td>${fmt(d.low)}</td>
-          <td>${fmt(d.close)}</td>
-          <td>${fmt(d.volume)}</td>
-        </tr>`;
-      })
-      .join("");
-  }
+  function renderCandles(_payload) {}
 
   function clearSrLines() {
     if (!state.chart) return;
@@ -280,7 +277,8 @@
         open: Number(c.open),
         high: Number(c.high),
         low: Number(c.low),
-        close: Number(c.close)
+        close: Number(c.close),
+        volume: Number(c.volume)
       }))
       .filter(
         (c) =>
@@ -292,6 +290,15 @@
       );
 
     state.candleSeries.setData(chartRows);
+    if (state.volumeSeries) {
+      state.volumeSeries.setData(
+        chartRows.map((c) => ({
+          time: c.time,
+          value: Number(c.volume || 0),
+          color: c.close >= c.open ? "rgba(14,203,129,0.5)" : "rgba(246,70,93,0.5)"
+        }))
+      );
+    }
     const lastTime = chartRows.length ? chartRows[chartRows.length - 1].time : null;
 
     const refHigh = Number(payload?.smc?.reference?.refHigh);
@@ -478,12 +485,22 @@
       const qs = new URLSearchParams({
         symbol,
         interval,
-        limit: String(Math.max(60, Math.min(lookback, 1500)))
+        limit: String(Math.max(120, Math.min(lookback, 2000)))
       });
       const payload = await apiGet(`/smc/scan?${qs.toString()}`);
       const msPayload = await apiGet(`/multi-source/analysis?${qs.toString()}`);
+      let orderMetrics = null;
+      try {
+        const headers = getAuthHeader();
+        orderMetrics = await apiGet(`/multi-source/order-metrics?symbol=${encodeURIComponent(symbol)}`, {
+          headers
+        });
+      } catch (_) {
+        orderMetrics = { ok: false };
+      }
       renderSummary(payload);
       renderConsensus(msPayload);
+      renderOrderMetrics(orderMetrics);
       renderNotes(payload);
       renderCandles(payload);
       renderChart(payload, { fit: !opts.fromStream });
@@ -507,6 +524,31 @@
   }
   if (elements.smcSymbolSelect) {
     elements.smcSymbolSelect.addEventListener("change", () => run().catch(() => {}));
+  }
+  if (elements.smcApplyCustomBtn) {
+    elements.smcApplyCustomBtn.addEventListener("click", () => {
+      const pair = normalizePairInput(elements.smcCustomSymbolInput?.value || "");
+      if (!pair) return;
+      if (elements.smcSymbolSelect) {
+        const exists = [...elements.smcSymbolSelect.options].some((o) => o.value === pair);
+        if (!exists) {
+          const opt = document.createElement("option");
+          opt.value = pair;
+          opt.textContent = pair;
+          elements.smcSymbolSelect.appendChild(opt);
+        }
+        elements.smcSymbolSelect.value = pair;
+      }
+      run().catch(() => {});
+    });
+  }
+  if (elements.smcCustomSymbolInput) {
+    elements.smcCustomSymbolInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        elements.smcApplyCustomBtn?.click();
+      }
+    });
   }
   if (elements.smcIntervalSelect) {
     elements.smcIntervalSelect.addEventListener("change", () => run().catch(() => {}));

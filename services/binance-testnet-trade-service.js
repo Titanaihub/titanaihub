@@ -241,6 +241,66 @@ async function getFuturesAccountSnapshot() {
   }
 }
 
+function weightedAvgPrice(rows) {
+  const valid = rows
+    .map((r) => ({
+      price: Number(r.stopPrice || r.price || 0),
+      qty: Number(r.origQty || 0)
+    }))
+    .filter((x) => Number.isFinite(x.price) && x.price > 0 && Number.isFinite(x.qty) && x.qty > 0);
+  if (!valid.length) return null;
+  const denom = valid.reduce((acc, x) => acc + x.qty, 0);
+  if (!denom) return null;
+  const num = valid.reduce((acc, x) => acc + x.price * x.qty, 0);
+  return num / denom;
+}
+
+async function getTestnetOrderMetrics(symbol) {
+  if (!API_KEY || !API_SECRET) {
+    return { ok: false, error: "missing_keys", message: "Testnet API keys not configured" };
+  }
+  try {
+    const params = {};
+    if (symbol) params.symbol = String(symbol).toUpperCase();
+    const openOrders = await requestSigned("GET", "/fapi/v1/openOrders", params).catch(() => []);
+    const rows = Array.isArray(openOrders) ? openOrders : [];
+
+    const isTp = (o) => ["TAKE_PROFIT", "TAKE_PROFIT_MARKET"].includes(String(o.type || "").toUpperCase());
+    const isSl = (o) => ["STOP", "STOP_MARKET"].includes(String(o.type || "").toUpperCase());
+    const sideBuy = (o) => String(o.side || "").toUpperCase() === "BUY";
+    const sideSell = (o) => String(o.side || "").toUpperCase() === "SELL";
+
+    const tpBuy = rows.filter((o) => isTp(o) && sideBuy(o));
+    const slBuy = rows.filter((o) => isSl(o) && sideBuy(o));
+    const tpSell = rows.filter((o) => isTp(o) && sideSell(o));
+    const slSell = rows.filter((o) => isSl(o) && sideSell(o));
+
+    return {
+      ok: true,
+      symbol: symbol ? String(symbol).toUpperCase() : null,
+      counts: {
+        openOrders: rows.length,
+        tpBuy: tpBuy.length,
+        slBuy: slBuy.length,
+        tpSell: tpSell.length,
+        slSell: slSell.length
+      },
+      averages: {
+        tpBuy: weightedAvgPrice(tpBuy),
+        slBuy: weightedAvgPrice(slBuy),
+        tpSell: weightedAvgPrice(tpSell),
+        slSell: weightedAvgPrice(slSell)
+      }
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: "fetch_failed",
+      message: String(err?.message || err)
+    };
+  }
+}
+
 async function placeDemoEntryOrder({ symbol, action, usdtNotional }) {
   const side = action === "OPEN_LONG" ? "BUY" : action === "OPEN_SHORT" ? "SELL" : null;
   if (!side) throw new Error("Action must be OPEN_LONG or OPEN_SHORT");
@@ -270,6 +330,7 @@ async function placeDemoEntryOrder({ symbol, action, usdtNotional }) {
 
 module.exports = {
   placeDemoEntryOrder,
-  getFuturesAccountSnapshot
+  getFuturesAccountSnapshot,
+  getTestnetOrderMetrics
 };
 

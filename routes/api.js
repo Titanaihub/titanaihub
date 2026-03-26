@@ -30,7 +30,11 @@ const {
   mergeTradeDecisionWithAggressive,
   getDemoTradeEnvInfo
 } = require("../services/ai-service.js");
-const { placeDemoEntryOrder, getFuturesAccountSnapshot } = require("../services/binance-testnet-trade-service.js");
+const {
+  placeDemoEntryOrder,
+  getFuturesAccountSnapshot,
+  getTestnetOrderMetrics
+} = require("../services/binance-testnet-trade-service.js");
 const { buildLiveSnapshot } = require("../services/live-snapshot-service.js");
 const {
   startAutoTrading,
@@ -332,6 +336,28 @@ router.get("/multi-source/analysis", async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: err.message || "multi-source analysis failed"
+    });
+  }
+});
+
+router.get("/multi-source/order-metrics", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+  try {
+    const symbol = String(req.query.symbol || "").toUpperCase() || undefined;
+    const data = await getTestnetOrderMetrics(symbol);
+    return res.json(data);
+  } catch (err) {
+    console.error("multi-source order-metrics failed:", err.message);
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "order metrics failed"
     });
   }
 });
