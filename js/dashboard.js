@@ -12,6 +12,7 @@ const appState = {
     whales: [],
     whaleSummary: [],
     stablecoinFlows: null,
+    marketHistory: null,
     alerts: [],
     deepAnalysis: null
   }
@@ -35,6 +36,11 @@ const elements = {
   whaleTableBody: document.getElementById("whaleTableBody"),
   whaleSummaryGrid: document.getElementById("whaleSummaryGrid"),
   stablecoinFlowGrid: document.getElementById("stablecoinFlowGrid"),
+  historySymbolsInput: document.getElementById("historySymbolsInput"),
+  historyDaysSelect: document.getElementById("historyDaysSelect"),
+  historyRefreshBtn: document.getElementById("historyRefreshBtn"),
+  historyDataStatus: document.getElementById("historyDataStatus"),
+  historyDataTableBody: document.getElementById("historyDataTableBody"),
   alertsGrid: document.getElementById("alertsGrid"),
   rawSnapshot: document.getElementById("rawSnapshot"),
 
@@ -114,6 +120,7 @@ function bindTabs() {
     Overview: "overviewSection",
     "Coin Focus": "coinFocusSection",
     Flow: "whalesSection",
+    "History Data": "historyDataSection",
     Alerts: "alertsSection",
     Health: "healthSection",
     Trading: "demoTradingSection",
@@ -160,12 +167,123 @@ function renderRawSnapshot() {
       flowFeed: appState.snapshot.whales,
       positioningSummary: appState.snapshot.whaleSummary,
       liquiditySummary: appState.snapshot.stablecoinFlows,
+      marketHistory: appState.snapshot.marketHistory,
       alerts: appState.snapshot.alerts,
       deepAnalysis: appState.snapshot.deepAnalysis
     },
     null,
     2
   );
+}
+
+function fmtMoneyLikeCsv(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "--";
+  return x.toLocaleString("en-US", { maximumFractionDigits: 8 });
+}
+
+function fmtVolLikeCsv(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "--";
+  if (Math.abs(x) >= 1_000_000_000) return `${(x / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(x) >= 1_000_000) return `${(x / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(x) >= 1_000) return `${(x / 1_000).toFixed(2)}K`;
+  return x.toFixed(2);
+}
+
+function fmtPct(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "--";
+  return `${x >= 0 ? "+" : ""}${x.toFixed(2)}%`;
+}
+
+function renderMarketHistory() {
+  const body = elements.historyDataTableBody;
+  const statusEl = elements.historyDataStatus;
+  if (!body) return;
+
+  const payload = appState.snapshot.marketHistory;
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="8">No history rows</td></tr>`;
+  } else {
+    body.innerHTML = rows
+      .slice(0, 250)
+      .map((r) => {
+        const change = Number(r.changePct);
+        const cls = !Number.isFinite(change) ? "" : change >= 0 ? "pos" : "neg";
+        return `<tr>
+          <td>${String(r.symbol || "--")}</td>
+          <td>${String(r.date || "--")}</td>
+          <td>${fmtMoneyLikeCsv(r.price)}</td>
+          <td>${fmtMoneyLikeCsv(r.open)}</td>
+          <td>${fmtMoneyLikeCsv(r.high)}</td>
+          <td>${fmtMoneyLikeCsv(r.low)}</td>
+          <td>${fmtVolLikeCsv(r.volume)}</td>
+          <td class="${cls}">${fmtPct(r.changePct)}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  if (statusEl) {
+    const errCount = Array.isArray(payload?.errors) ? payload.errors.length : 0;
+    const symText = Array.isArray(payload?.symbols) && payload.symbols.length
+      ? payload.symbols.join(",")
+      : "--";
+    statusEl.textContent = `CoinGecko: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}`;
+  }
+}
+
+function parseSymbolInput(raw) {
+  const list = String(raw || "")
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+async function loadMarketHistory(force = false) {
+  const payload = appState.snapshot.marketHistory;
+  const nowTs = Date.now();
+  if (!force && payload?.fetchedAt && nowTs - payload.fetchedAt < 5 * 60 * 1000) {
+    return payload;
+  }
+
+  const symbols = parseSymbolInput(elements.historySymbolsInput?.value || "BTC,ETH,BNB,SOL,XRP");
+  const days = Number(elements.historyDaysSelect?.value || 30);
+
+  if (elements.historyDataStatus) {
+    elements.historyDataStatus.textContent = "Loading CoinGecko history...";
+  }
+
+  try {
+    const { apiGet } = window.TitanApi;
+    const qs = new URLSearchParams({
+      symbols: symbols.join(","),
+      days: String(days),
+      perCoin: "30"
+    });
+    const data = await apiGet(`/market-history?${qs.toString()}`);
+    appState.snapshot.marketHistory = {
+      ...data,
+      fetchedAt: Date.now()
+    };
+  } catch (err) {
+    appState.snapshot.marketHistory = {
+      ok: false,
+      symbols,
+      rows: [],
+      errors: [{ symbol: "*", message: err.message || "failed" }],
+      fetchedAt: Date.now()
+    };
+    if (elements.historyDataStatus) {
+      elements.historyDataStatus.textContent = `History load failed: ${err.message || "unknown error"}`;
+    }
+  }
+
+  renderMarketHistory();
+  return appState.snapshot.marketHistory;
 }
 
 function renderAll() {
@@ -176,6 +294,7 @@ function renderAll() {
   window.TitanRenderRealFlow.renderFlowFeed(elements, appState.snapshot);
   window.TitanRenderRealFlow.renderPositioningSummary(elements, appState.snapshot);
   window.TitanRenderRealFlow.renderLiquiditySummary(elements, appState.snapshot);
+  renderMarketHistory();
   window.TitanRenderAlerts.renderAlerts(elements, appState.snapshot);
 
   if (window.TitanRenderHealth?.renderHealth) {
@@ -246,6 +365,7 @@ async function loadAllData() {
 async function refreshDashboard() {
   try {
     const health = await loadAllData();
+    await loadMarketHistory(false);
     renderAll();
 
     const hasCoreData =
@@ -324,6 +444,22 @@ async function boot() {
   bindTabs();
   hideRawPanel();
 
+  if (elements.historyRefreshBtn) {
+    elements.historyRefreshBtn.addEventListener("click", () => {
+      loadMarketHistory(true).catch((err) => {
+        if (elements.historyDataStatus) {
+          elements.historyDataStatus.textContent = `History refresh failed: ${err.message || "unknown error"}`;
+        }
+      });
+    });
+  }
+
+  if (elements.historyDaysSelect) {
+    elements.historyDaysSelect.addEventListener("change", () => {
+      loadMarketHistory(true).catch(() => {});
+    });
+  }
+
   if (window.TitanDemoTrading?.bindEvents) {
     window.TitanDemoTrading.bindEvents(elements, appState);
   }
@@ -346,6 +482,7 @@ async function boot() {
   }
 
   await refreshDashboard();
+  await loadMarketHistory(true).catch(() => {});
   startAutoRefresh();
 }
 

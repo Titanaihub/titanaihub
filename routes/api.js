@@ -19,6 +19,7 @@ const { buildAlertPackage } = require("../services/alert-service.js");
 const { buildDeepAnalysisPackage } = require("../services/analysis-service.js");
 const { buildBinanceCoverageReport } = require("../services/data/data-quality-service.js");
 const { buildRealFlowPackage } = require("../services/real-flow-service.js");
+const { getMultiCoinHistory } = require("../services/coingecko-history-service.js");
 const {
   callDeepSeekChat,
   buildFallbackReply,
@@ -259,6 +260,34 @@ router.get("/debug-version", (req, res) => {
     deepseekEnabled: Boolean(process.env.DEEPSEEK_API_KEY),
     coinUniverse: COIN_UNIVERSE.length
   });
+});
+
+router.get("/market-history", async (req, res) => {
+  try {
+    const symbolsRaw = String(req.query.symbols || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const days = sanitizeInt(req.query.days, 30);
+    const perCoin = sanitizeInt(req.query.perCoin, 30);
+
+    const data = await getMultiCoinHistory({
+      symbols: symbolsRaw,
+      days: Math.max(1, Math.min(days, 365)),
+      limitPerCoin: Math.max(1, Math.min(perCoin, 200))
+    });
+    return res.json(data);
+  } catch (err) {
+    console.error("market-history route fallback:", err.message);
+    return res.json({
+      ok: false,
+      source: "coingecko",
+      symbols: [],
+      days: 30,
+      rows: [],
+      errors: [{ symbol: "*", message: err.message || "Failed to load market history" }]
+    });
+  }
 });
 
 router.get("/auth/session", (req, res) => {

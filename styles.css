@@ -2189,3 +2189,20 @@ body {
   border-radius: 4px;
   vertical-align: middle;
 }
+
+.history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.history-toolbar-label {
+  font-size: 0.78rem;
+  color: rgba(244, 248, 255, 0.65);
+}
+
+.history-symbol-input {
+  min-width: 18rem;
+}
