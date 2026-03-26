@@ -42,7 +42,7 @@ const router = express.Router();
 const authTokens = new Map(); // token -> { role, expiresAt }
 const OWNER_USERNAME = process.env.OWNER_USERNAME || "";
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "";
-const AUTH_TOKEN_TTL_MS = Number(process.env.AUTH_TOKEN_TTL_MS || 30 * 60 * 1000);
+const AUTH_TOKEN_TTL_MS = Number(process.env.AUTH_TOKEN_TTL_MS || 7 * 24 * 60 * 60 * 1000);
 
 function getBearerToken(req) {
   const auth = String(req.headers.authorization || "");
@@ -62,6 +62,10 @@ function verifyAuth(req) {
     authTokens.delete(token);
     return null;
   }
+
+  // Sliding session: refresh TTL on each valid request.
+  rec.expiresAt = Date.now() + AUTH_TOKEN_TTL_MS;
+  authTokens.set(token, rec);
 
   return rec;
 }
