@@ -16,6 +16,44 @@ window.TitanDemoTrading = (() => {
     return `${sign}$${Math.abs(x).toFixed(2)}`;
   }
 
+  /** Binance one-way mode sends positionSide BOTH; derive LONG/SHORT from positionAmt sign. */
+  function futuresPositionSide(p) {
+    const amt = Number(p.positionAmt || 0);
+    const ps = String(p.positionSide || "").toUpperCase();
+    if (ps === "LONG" || ps === "SHORT") return ps;
+    return amt >= 0 ? "LONG" : "SHORT";
+  }
+
+  /** Long → Buy (green), Short → Sell (red); uses global `.buy` / `.sell` from styles.css */
+  function futuresSideBuySellHtml(p) {
+    const s = futuresPositionSide(p);
+    const cls = s === "LONG" ? "buy" : "sell";
+    const label = s === "LONG" ? "Buy" : "Sell";
+    return `<span class="${cls}">${label}</span>`;
+  }
+
+  function bindDemoTradingAccountTabs(mount) {
+    const root = mount.querySelector(".demo-trading-account-tabs");
+    if (!root) return;
+    const buttons = root.querySelectorAll("button[data-demo-tab]");
+    const panels = mount.querySelectorAll("[data-demo-tab-panel]");
+
+    function activate(tabId) {
+      buttons.forEach((b) => {
+        const on = b.getAttribute("data-demo-tab") === tabId;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      panels.forEach((p) => {
+        p.hidden = p.getAttribute("data-demo-tab-panel") !== tabId;
+      });
+    }
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => activate(btn.getAttribute("data-demo-tab")));
+    });
+  }
+
   function updatePlaceOrderHint(elements, appState) {
     const el = elements.demoPlaceOrderHint;
     if (!el) return;
@@ -272,13 +310,15 @@ window.TitanDemoTrading = (() => {
     const avail = usdt.availableBalance ?? usdt.available ?? usdt.balance;
     const wallet = usdt.walletBalance ?? usdt.balance;
 
-    const posRows = (snap.positions || [])
-      .filter((p) => Math.abs(Number(p.positionAmt || 0)) > 1e-12)
+    const openPosList = (snap.positions || []).filter(
+      (p) => Math.abs(Number(p.positionAmt || 0)) > 1e-12
+    );
+    const posRows = openPosList
       .map(
         (p) => `
       <tr>
         <td>${escapeHtml(p.symbol)}</td>
-        <td>${escapeHtml(p.positionSide || (Number(p.positionAmt) >= 0 ? "LONG" : "SHORT"))}</td>
+        <td>${futuresSideBuySellHtml(p)}</td>
         <td>${escapeHtml(p.positionAmt)}</td>
         <td>${escapeHtml(p.entryPrice)}</td>
         <td>${escapeHtml(p.markPrice)}</td>
@@ -287,19 +327,9 @@ window.TitanDemoTrading = (() => {
       )
       .join("");
 
-    const ooRows = (snap.openOrders || [])
-      .map(
-        (o) => `
-      <tr>
-        <td>${escapeHtml(o.symbol)}</td>
-        <td>${escapeHtml(o.side)}</td>
-        <td>${escapeHtml(o.type)}</td>
-        <td>${escapeHtml(o.status)}</td>
-        <td>${escapeHtml(o.origQty)}</td>
-        <td>${escapeHtml(o.price || "Market")}</td>
-      </tr>`
-      )
-      .join("");
+    const unrealizedTotal = Number(snap.unrealizedTotal);
+    const unrealizedFootClass =
+      !Number.isFinite(unrealizedTotal) ? "" : unrealizedTotal >= 0 ? "pos" : "neg";
 
     const ordRows = (snap.recentOrders || [])
       .slice(0, 25)
@@ -330,6 +360,17 @@ window.TitanDemoTrading = (() => {
       )
       .join("");
 
+    const realizedSum = Number(snap.realizedRecentSum);
+    const historyPnlClass =
+      !Number.isFinite(realizedSum) ? "" : realizedSum >= 0 ? "pos" : "neg";
+    const historyPnlWord = !Number.isFinite(realizedSum)
+      ? "—"
+      : Math.abs(realizedSum) < 1e-8
+        ? "Break-even"
+        : realizedSum > 0
+          ? "Net profit"
+          : "Net loss";
+
     mount.innerHTML = `
       <div class="demo-trading-summary">
         <div class="stat-card"><span>Status</span><strong>${escapeHtml(te)}</strong></div>
@@ -338,51 +379,67 @@ window.TitanDemoTrading = (() => {
         <div class="stat-card"><span>Unrealized PnL</span><strong class="${Number(snap.unrealizedTotal) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.unrealizedTotal)}</strong></div>
         <div class="stat-card"><span>Realized PnL (recent)</span><strong class="${Number(snap.realizedRecentSum) >= 0 ? "pos" : "neg"}">${fmtUsd(snap.realizedRecentSum)}</strong></div>
       </div>
-      <h3 class="demo-trading-sub">Open positions</h3>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Mark</th><th>Unrealized PnL</th>
-            </tr>
-          </thead>
-          <tbody>${posRows || `<tr><td colspan="6">No open positions</td></tr>`}</tbody>
-        </table>
+      <div class="demo-trading-account-tabs top-tabs demo-trading-two-tabs" role="tablist" aria-label="Futures account tables">
+        <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-demo-tab="positions">Positions</button>
+        <button type="button" class="tab-btn" role="tab" aria-selected="false" data-demo-tab="orderHistory">History</button>
       </div>
-      <h3 class="demo-trading-sub">Open orders</h3>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Side</th><th>Type</th><th>Status</th><th>Qty</th><th>Price</th>
-            </tr>
-          </thead>
-          <tbody>${ooRows || `<tr><td colspan="6">No open orders</td></tr>`}</tbody>
-        </table>
+      <div class="demo-trading-tab-panel" role="tabpanel" data-demo-tab-panel="positions">
+        <p class="demo-trading-tab-hint">Open positions — trades not yet closed.</p>
+        <div class="table-wrap">
+          <table class="data-table demo-trading-pos-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Mark</th><th>Unrealized PnL</th>
+              </tr>
+            </thead>
+            <tbody>${
+              openPosList.length
+                ? posRows
+                : `<tr><td colspan="6">No open positions</td></tr>`
+            }</tbody>
+            <tfoot>
+              <tr class="demo-trading-pos-tfoot">
+                <td colspan="5">Total unrealized PnL (open)</td>
+                <td class="${unrealizedFootClass}"><strong>${fmtUsd(snap.unrealizedTotal)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
-      <h3 class="demo-trading-sub">Order history</h3>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Side</th><th>Type</th><th>Status</th><th>Filled</th><th>Avg</th><th>Updated</th>
-            </tr>
-          </thead>
-          <tbody>${ordRows || `<tr><td colspan="7">No recent orders</td></tr>`}</tbody>
-        </table>
-      </div>
-      <h3 class="demo-trading-sub">Realized PnL (income)</h3>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Symbol</th><th>Type</th><th>Amount</th><th>Time</th>
-            </tr>
-          </thead>
-          <tbody>${pnlRows || `<tr><td colspan="4">No realized rows</td></tr>`}</tbody>
-        </table>
+      <div class="demo-trading-tab-panel" role="tabpanel" data-demo-tab-panel="orderHistory" hidden>
+        <p class="demo-trading-tab-hint">Closed trades — history and realized P&amp;L.</p>
+        <h4 class="demo-trading-sub demo-trading-history-section-title">Recent fills</h4>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Side</th><th>Type</th><th>Status</th><th>Filled</th><th>Avg</th><th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>${ordRows || `<tr><td colspan="7">No recent orders</td></tr>`}</tbody>
+          </table>
+        </div>
+        <h4 class="demo-trading-sub demo-trading-history-section-title">Realized PnL (income detail)</h4>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Type</th><th>Amount</th><th>Time</th>
+              </tr>
+            </thead>
+            <tbody>${pnlRows || `<tr><td colspan="4">No realized rows</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div class="demo-trading-history-footer">
+          <div class="stat-card demo-trading-history-pnl">
+            <span>Total realized P&amp;L (closed trades, recent)</span>
+            <strong class="${historyPnlClass}">${fmtUsd(snap.realizedRecentSum)}</strong>
+            <span class="demo-trading-history-pnl-label">${escapeHtml(historyPnlWord)}</span>
+          </div>
+        </div>
       </div>
     `;
+    bindDemoTradingAccountTabs(mount);
   }
 
   async function loadAccount(elements, appState) {

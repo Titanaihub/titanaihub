@@ -2104,3 +2104,59 @@ body {
   margin: 1.25rem 0 0.5rem;
   color: rgba(244, 248, 255, 0.92);
 }
+
+.demo-trading-account-tabs {
+  margin-top: 0.25rem;
+}
+
+.demo-trading-two-tabs {
+  flex-wrap: nowrap;
+  gap: 0.65rem;
+}
+
+.demo-trading-two-tabs .tab-btn {
+  flex: 1 1 50%;
+  min-width: 0;
+  text-align: center;
+}
+
+.demo-trading-tab-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.84rem;
+  color: rgba(244, 248, 255, 0.55);
+  line-height: 1.45;
+}
+
+.demo-trading-tab-panel {
+  margin-top: 0.5rem;
+}
+
+.demo-trading-pos-tfoot td {
+  border-top: 1px solid rgba(212, 175, 55, 0.28);
+  padding-top: 0.65rem;
+}
+
+.demo-trading-history-footer {
+  margin-top: 1rem;
+}
+
+.demo-trading-history-pnl.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.demo-trading-history-pnl.stat-card strong {
+  font-size: 1.35rem;
+}
+
+.demo-trading-history-pnl-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(244, 248, 255, 0.58);
+}
+
+.demo-trading-tab-hint + .demo-trading-history-section-title {
+  margin-top: 0.35rem;
+}

@@ -120,7 +120,8 @@ function bindTabs() {
     "AI Chat": "aiChatPanel"
   };
 
-  const buttons = document.querySelectorAll(".tab-btn");
+  const nav = document.querySelector("nav.top-tabs");
+  const buttons = nav ? nav.querySelectorAll(".tab-btn") : [];
 
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
