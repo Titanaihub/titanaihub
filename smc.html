@@ -60,7 +60,8 @@
           </select>
           <input id="smcCustomSymbolInput" class="input input-inline history-symbol-input" type="text" placeholder="Custom pair e.g. SUIUSDT" />
           <button id="smcApplyCustomBtn" class="btn btn-secondary" type="button">Use pair</button>
-          <select id="smcIntervalSelect" class="input input-inline history-symbol-select smc-interval-hidden" aria-label="Interval">
+          <label for="smcIntervalSelect" class="history-toolbar-label">Interval</label>
+          <select id="smcIntervalSelect" class="input input-inline history-symbol-select" aria-label="Interval">
             <option value="1m">1m (90d)</option>
             <option value="5m">5m</option>
             <option value="15m" selected>15m</option>
@@ -79,6 +80,21 @@
           <div class="stat-card"><span>Liquidity Pool Score</span><strong>--</strong></div>
           <div class="stat-card"><span>Sweep Score</span><strong>--</strong></div>
           <div class="stat-card"><span>Displacement Score</span><strong>--</strong></div>
+        </div>
+
+        <div class="section-head" style="margin: 0.35rem 0 0.3rem;">
+          <div>
+            <h3 style="margin: 0; font-size: 0.95rem;">SMC Price Levels</h3>
+            <p style="margin: 0.25rem 0 0; font-size: 0.8rem;">Processed price zones for trading decisions</p>
+          </div>
+        </div>
+        <div id="smcPriceLevelsCards" class="demo-trading-summary">
+          <div class="stat-card"><span>Last Price</span><strong>--</strong></div>
+          <div class="stat-card"><span>Ref High</span><strong>--</strong></div>
+          <div class="stat-card"><span>Ref Low</span><strong>--</strong></div>
+          <div class="stat-card"><span>ATR</span><strong>--</strong></div>
+          <div class="stat-card"><span>Nearest Resistance</span><strong>--</strong></div>
+          <div class="stat-card"><span>Nearest Support</span><strong>--</strong></div>
         </div>
 
         <div class="section-head" style="margin: 0.4rem 0 0.3rem;">
@@ -108,25 +124,7 @@
           <div class="stat-card"><span>SL Sell avg</span><strong>--</strong></div>
         </div>
 
-        <div class="table-wrap">
-          <div class="section-head" style="margin: 0.25rem 0 0.5rem;">
-            <div>
-              <h3 style="margin: 0; font-size: 1rem;">SMC Chart</h3>
-              <p style="margin: 0.25rem 0 0; font-size: 0.8rem;">Candles + reference levels (Ref High / Ref Low) from latest SMC scan</p>
-            </div>
-          </div>
-          <div id="smcChartWrap" style="width: 100%; height: 640px; border: 1px solid rgba(212,175,55,0.22); border-radius: 10px; overflow: hidden;">
-            <div id="smcChartTfControls" class="smc-chart-tf-controls" aria-label="Chart timeframe controls">
-              <button class="smc-tf-btn active" data-interval="1m" type="button">1m</button>
-              <button class="smc-tf-btn" data-interval="5m" type="button">5m</button>
-              <button class="smc-tf-btn" data-interval="15m" type="button">15m</button>
-              <button class="smc-tf-btn" data-interval="1h" type="button">1h</button>
-              <button class="smc-tf-btn" data-interval="4h" type="button">4h</button>
-              <button class="smc-tf-btn" data-interval="1d" type="button">1d</button>
-            </div>
-            <div id="smcChart" style="width: 100%; height: 100%;"></div>
-          </div>
-        </div>
+        <p class="demo-trading-tab-hint" style="margin-top:0.5rem;">Chart removed by request. This page now shows SMC numeric output only.</p>
 
         <div class="table-wrap">
           <table class="data-table">
@@ -164,7 +162,6 @@
 
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
-  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="./js/smc-page.js?v=12"></script>
+  <script src="./js/smc-page.js?v=15"></script>
 </body>
 </html>

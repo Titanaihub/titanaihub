@@ -8,14 +8,11 @@
     smcLiveToggleBtn: document.getElementById("smcLiveToggleBtn"),
     smcStatus: document.getElementById("smcStatus"),
     smcSummaryCards: document.getElementById("smcSummaryCards"),
+    smcPriceLevelsCards: document.getElementById("smcPriceLevelsCards"),
     smcConsensusCards: document.getElementById("smcConsensusCards"),
     smcOrderMetricsCards: document.getElementById("smcOrderMetricsCards"),
     smcNotesBody: document.getElementById("smcNotesBody"),
-    smcSrBody: document.getElementById("smcSrBody"),
-    smcCandlesBody: document.getElementById("smcCandlesBody"),
-    smcChartWrap: document.getElementById("smcChartWrap"),
-    smcChart: document.getElementById("smcChart"),
-    smcChartTfControls: document.getElementById("smcChartTfControls")
+    smcSrBody: document.getElementById("smcSrBody")
   };
 
   const state = {
@@ -68,31 +65,6 @@
     return 2000;
   }
 
-  function syncChartTfButtons(activeInterval) {
-    if (!elements.smcChartTfControls) return;
-    const active = String(activeInterval || "").toLowerCase();
-    const buttons = elements.smcChartTfControls.querySelectorAll(".smc-tf-btn[data-interval]");
-    buttons.forEach((btn) => {
-      const intv = String(btn.getAttribute("data-interval") || "").toLowerCase();
-      btn.classList.toggle("active", intv === active);
-    });
-  }
-
-  function bindChartTfButtons() {
-    if (!elements.smcChartTfControls || !elements.smcIntervalSelect) return;
-    const buttons = elements.smcChartTfControls.querySelectorAll(".smc-tf-btn[data-interval]");
-    buttons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const intv = String(btn.getAttribute("data-interval") || "").toLowerCase();
-        if (!intv) return;
-        elements.smcIntervalSelect.value = intv;
-        syncChartTfButtons(intv);
-        run().catch(() => {});
-      });
-    });
-    syncChartTfButtons(elements.smcIntervalSelect.value || "15m");
-  }
-
   function sanitizeSrLevels(levels, lastClose) {
     if (!Array.isArray(levels) || !levels.length || !Number.isFinite(Number(lastClose)) || Number(lastClose) <= 0) return [];
     const px = Number(lastClose);
@@ -108,63 +80,6 @@
       .filter((lv) => (lv.side === "support" ? lv.price <= px * 1.02 : lv.price >= px * 0.98))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
-  }
-
-  function ensureChart() {
-    if (!elements.smcChart || !elements.smcChartWrap) return false;
-    if (!window.LightweightCharts) return false;
-    if (state.chart) return true;
-
-    state.chart = window.LightweightCharts.createChart(elements.smcChart, {
-      width: elements.smcChartWrap.clientWidth || 900,
-      height: elements.smcChartWrap.clientHeight || 640,
-      layout: {
-        background: { type: "solid", color: "#0b0e11" },
-        textColor: "rgba(228,232,238,0.92)"
-      },
-      grid: {
-        vertLines: { color: "rgba(255,255,255,0.04)" },
-        horzLines: { color: "rgba(255,255,255,0.04)" }
-      },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.14)"
-      },
-      timeScale: {
-        borderColor: "rgba(255,255,255,0.14)",
-        timeVisible: true
-      },
-      crosshair: {
-        mode: 0
-      }
-    });
-
-    state.candleSeries = state.chart.addCandlestickSeries({
-      upColor: "#0ecb81",
-      downColor: "#f6465d",
-      borderVisible: false,
-      wickUpColor: "#0ecb81",
-      wickDownColor: "#f6465d"
-    });
-    state.lineRefHigh = state.chart.addLineSeries({
-      color: "rgba(80, 195, 255, 0.9)",
-      lineWidth: 2,
-      lineStyle: 2,
-      title: "Ref High"
-    });
-    state.lineRefLow = state.chart.addLineSeries({
-      color: "rgba(255, 196, 80, 0.9)",
-      lineWidth: 2,
-      lineStyle: 2,
-      title: "Ref Low"
-    });
-    return true;
-  }
-
-  function resizeChart() {
-    if (!state.chart || !elements.smcChartWrap) return;
-    const w = Math.max(320, elements.smcChartWrap.clientWidth || 320);
-    const h = Math.max(260, elements.smcChartWrap.clientHeight || 260);
-    state.chart.applyOptions({ width: w, height: h });
   }
 
   function renderSummary(payload) {
@@ -228,6 +143,35 @@
   }
 
   function renderCandles(_payload) {}
+
+  function renderPriceLevels(payload) {
+    if (!elements.smcPriceLevelsCards) return;
+    const rows = Array.isArray(payload?.candles) ? payload.candles : [];
+    const lastClose = Number(rows[rows.length - 1]?.close);
+    const refHigh = Number(payload?.smc?.reference?.refHigh);
+    const refLow = Number(payload?.smc?.reference?.refLow);
+    const atr = Number(payload?.smc?.reference?.atr);
+    const levels = sanitizeSrLevels(payload?.srLevels || [], lastClose);
+    const nearestResistance = levels
+      .filter((lv) => lv.side === "resistance" && lv.price >= lastClose)
+      .sort((a, b) => a.price - b.price)[0];
+    const nearestSupport = levels
+      .filter((lv) => lv.side === "support" && lv.price <= lastClose)
+      .sort((a, b) => b.price - a.price)[0];
+    const sweepHigh = Number.isFinite(refHigh) ? refHigh * 1.001 : NaN;
+    const sweepLow = Number.isFinite(refLow) ? refLow * 0.999 : NaN;
+
+    elements.smcPriceLevelsCards.innerHTML = `
+      <div class="stat-card"><span>Last Price</span><strong>${fmt(lastClose)}</strong></div>
+      <div class="stat-card"><span>Ref High</span><strong>${fmt(refHigh)}</strong></div>
+      <div class="stat-card"><span>Ref Low</span><strong>${fmt(refLow)}</strong></div>
+      <div class="stat-card"><span>ATR</span><strong>${fmt(atr)}</strong></div>
+      <div class="stat-card"><span>Nearest Resistance</span><strong class="neg">${fmt(nearestResistance?.price)}</strong></div>
+      <div class="stat-card"><span>Nearest Support</span><strong class="pos">${fmt(nearestSupport?.price)}</strong></div>
+      <div class="stat-card"><span>Sweep High Zone (SL hunt)</span><strong class="neg">${fmt(sweepHigh)}</strong></div>
+      <div class="stat-card"><span>Sweep Low Zone (SL hunt)</span><strong class="pos">${fmt(sweepLow)}</strong></div>
+    `;
+  }
 
   function clearSrLines() {
     if (!state.chart) return;
@@ -300,141 +244,6 @@
       .join("");
   }
 
-  function renderChart(payload, options = {}) {
-    const shouldFit = options.fit === true;
-    if (!ensureChart()) {
-      if (elements.smcStatus) {
-        elements.smcStatus.textContent = "Chart library not loaded. Table data is still available.";
-      }
-      return;
-    }
-    const rows = Array.isArray(payload?.candles) ? payload.candles : [];
-    if (!rows.length) return;
-
-    const chartRows = rows
-      .map((c) => ({
-        time: Math.floor(Number(c.openTime || 0) / 1000),
-        open: Number(c.open),
-        high: Number(c.high),
-        low: Number(c.low),
-        close: Number(c.close),
-        volume: Number(c.volume)
-      }))
-      .filter(
-        (c) =>
-          Number.isFinite(c.time) &&
-          Number.isFinite(c.open) &&
-          Number.isFinite(c.high) &&
-          Number.isFinite(c.low) &&
-          Number.isFinite(c.close)
-      );
-
-    state.candleSeries.setData(chartRows);
-    const lastTime = chartRows.length ? chartRows[chartRows.length - 1].time : null;
-
-    const refHigh = Number(payload?.smc?.reference?.refHigh);
-    const refLow = Number(payload?.smc?.reference?.refLow);
-    if (Number.isFinite(refHigh)) {
-      state.lineRefHigh.setData(chartRows.map((c) => ({ time: c.time, value: refHigh })));
-    } else {
-      state.lineRefHigh.setData([]);
-    }
-    if (Number.isFinite(refLow)) {
-      state.lineRefLow.setData(chartRows.map((c) => ({ time: c.time, value: refLow })));
-    } else {
-      state.lineRefLow.setData([]);
-    }
-
-    clearSrLines();
-    const rawSrLevels = Array.isArray(payload?.srLevels) && payload.srLevels.length ? payload.srLevels : computeHistoricalSrLevels(rows);
-    const srLevels = sanitizeSrLevels(rawSrLevels, chartRows[chartRows.length - 1]?.close);
-    renderSrTable(srLevels);
-    srLevels.forEach((lv) => {
-      const s = state.chart.addLineSeries({
-        color: lv.side === "support" ? "rgba(33,196,106,0.65)" : "rgba(224,79,95,0.65)",
-        lineWidth: 1,
-        lineStyle: 2,
-        title: lv.side === "support" ? "Support" : "Resistance"
-      });
-      s.setData(chartRows.map((c) => ({ time: c.time, value: Number(lv.price) })));
-      state.srSeries.push(s);
-    });
-
-    const signals = payload?.smc?.signals || {};
-    const markers = [];
-    if (lastTime != null) {
-      if (signals.sweepLow) {
-        markers.push({
-          time: lastTime,
-          position: "belowBar",
-          color: "#21c46a",
-          shape: "arrowUp",
-          text: "Sweep Low"
-        });
-      }
-      if (signals.sweepHigh) {
-        markers.push({
-          time: lastTime,
-          position: "aboveBar",
-          color: "#e04f5f",
-          shape: "arrowDown",
-          text: "Sweep High"
-        });
-      }
-      if (signals.bosUp) {
-        markers.push({
-          time: lastTime,
-          position: "aboveBar",
-          color: "#53c3ff",
-          shape: "circle",
-          text: "BOS Up"
-        });
-      }
-      if (signals.bosDown) {
-        markers.push({
-          time: lastTime,
-          position: "belowBar",
-          color: "#ffbe55",
-          shape: "circle",
-          text: "BOS Down"
-        });
-      }
-      if (signals.chochUp) {
-        markers.push({
-          time: lastTime,
-          position: "belowBar",
-          color: "#89ffb2",
-          shape: "square",
-          text: "CHoCH Up"
-        });
-      }
-      if (signals.chochDown) {
-        markers.push({
-          time: lastTime,
-          position: "aboveBar",
-          color: "#ff8f8f",
-          shape: "square",
-          text: "CHoCH Down"
-        });
-      }
-      if (signals.displacement) {
-        markers.push({
-          time: lastTime,
-          position: "aboveBar",
-          color: "#d4af37",
-          shape: "diamond",
-          text: "Displacement"
-        });
-      }
-    }
-    state.candleSeries.setMarkers(markers);
-
-    if (shouldFit) {
-      state.chart.timeScale().fitContent();
-    }
-    resizeChart();
-  }
-
   function closeLiveStream() {
     if (state.ws) {
       try {
@@ -447,7 +256,7 @@
   }
 
   function connectLiveStream(symbol, interval) {
-    if (!state.liveEnabled || !state.candleSeries) return;
+    if (!state.liveEnabled) return;
     const sym = String(symbol || "").toLowerCase();
     const intv = String(interval || "");
     if (!sym || !intv) return;
@@ -471,14 +280,6 @@
         const msg = JSON.parse(event.data || "{}");
         const k = msg?.k;
         if (!k) return;
-        state.candleSeries.update({
-          time: Math.floor(Number(k.t || 0) / 1000),
-          open: Number(k.o),
-          high: Number(k.h),
-          low: Number(k.l),
-          close: Number(k.c)
-        });
-
         // Refresh SMC analysis when a candle closes.
         if (k.x === true && !state.runInFlight) {
           run({ fromStream: true }).catch(() => {});
@@ -507,7 +308,6 @@
     state.runInFlight = true;
     const symbol = String(elements.smcSymbolSelect?.value || "BTCUSDT").toUpperCase();
     const interval = String(elements.smcIntervalSelect?.value || "15m");
-    syncChartTfButtons(interval);
     const lookback = intervalTargetBars(interval);
     if (elements.smcStatus && !opts.fromStream) {
       elements.smcStatus.textContent = `Scanning ${symbol} ${interval}...`;
@@ -536,9 +336,12 @@
       renderOrderMetrics(orderMetrics);
       renderNotes(payload);
       renderCandles(payload);
-      renderChart(payload, { fit: !opts.fromStream });
+      const rows = Array.isArray(payload?.candles) ? payload.candles : [];
+      const lastClose = Number(rows[rows.length - 1]?.close || 0);
+      const srLevels = sanitizeSrLevels(payload?.srLevels || computeHistoricalSrLevels(rows), lastClose);
+      renderSrTable(srLevels);
+      renderPriceLevels(payload);
       if (elements.smcStatus) {
-        const rows = Array.isArray(payload?.candles) ? payload.candles : [];
         const start = rows.length ? new Date(rows[0].openTime).toISOString().slice(0, 16).replace("T", " ") : "--";
         const end = rows.length
           ? new Date(rows[rows.length - 1].openTime).toISOString().slice(0, 16).replace("T", " ")
@@ -548,7 +351,7 @@
         const compressNote = payload?.compressed ? " · compressed for chart" : "";
         const analysisBars = Number(payload?.analysisBarsUsed || 0);
         const analysisNote = analysisBars > 0 ? ` · analysis ${analysisBars}` : "";
-        elements.smcStatus.textContent = `Source ${payload.source || "--"} · raw ${raw} · shown ${shown}${compressNote}${analysisNote} · range ${start} → ${end}${state.liveEnabled ? " · live ON" : " · live OFF"} · chart no-volume v12`;
+        elements.smcStatus.textContent = `Source ${payload.source || "--"} · raw ${raw} · shown ${shown}${compressNote}${analysisNote} · range ${start} → ${end}${state.liveEnabled ? " · live ON" : " · live OFF"} · SMC data-only v14`;
       }
       connectLiveStream(symbol, interval);
     } catch (err) {
@@ -594,10 +397,7 @@
     });
   }
   if (elements.smcIntervalSelect) {
-    elements.smcIntervalSelect.addEventListener("change", () => {
-      syncChartTfButtons(elements.smcIntervalSelect.value || "15m");
-      run().catch(() => {});
-    });
+    elements.smcIntervalSelect.addEventListener("change", () => run().catch(() => {}));
   }
   if (elements.smcLiveToggleBtn) {
     elements.smcLiveToggleBtn.addEventListener("click", () => {
@@ -613,9 +413,7 @@
       }
     });
   }
-  window.addEventListener("resize", () => resizeChart());
   window.addEventListener("beforeunload", () => closeLiveStream());
 
-  bindChartTfButtons();
   run().catch(() => {});
 })();
