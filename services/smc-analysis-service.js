@@ -221,7 +221,8 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
     interval: intv,
     candlesCount: candles.length,
     smc,
-    candles: candles.slice(-120)
+    // Return the full requested range so frontend can render true lookback history.
+    candles: candles
   };
 }
 

@@ -263,7 +263,8 @@
       .join("");
   }
 
-  function renderChart(payload) {
+  function renderChart(payload, options = {}) {
+    const shouldFit = options.fit === true;
     if (!ensureChart()) {
       if (elements.smcStatus) {
         elements.smcStatus.textContent = "Chart library not loaded. Table data is still available.";
@@ -389,7 +390,9 @@
     }
     state.candleSeries.setMarkers(markers);
 
-    state.chart.timeScale().fitContent();
+    if (shouldFit) {
+      state.chart.timeScale().fitContent();
+    }
     resizeChart();
   }
 
@@ -483,7 +486,7 @@
       renderConsensus(msPayload);
       renderNotes(payload);
       renderCandles(payload);
-      renderChart(payload);
+      renderChart(payload, { fit: !opts.fromStream });
       if (elements.smcStatus) {
         elements.smcStatus.textContent = `Source ${payload.source || "--"} · candles ${payload.candlesCount || 0}${state.liveEnabled ? " · live ON" : " · live OFF"}`;
       }
