@@ -388,7 +388,8 @@ async function callDeepSeekTradeDecision(snapshot = {}) {
     "Symbols must be valid USDT-M perpetual form (e.g. BTCUSDT).",
     "Prefer WAIT when: setups disagree, evidence is weak, volatility/whale/alerts suggest elevated risk, or edge is unclear.",
     "Use OPEN_LONG or OPEN_SHORT only when your rationale explicitly states why expected edge outweighs risk for that symbol.",
-    "Use shortTermContext when available: daily average move profiles (open->high/open->low etc.) and M5/M15 SMC. If buyExhausted is true, avoid OPEN_LONG unless very strong contrary evidence. If sellExhausted is true, avoid OPEN_SHORT unless very strong contrary evidence.",
+    "Use shortTermContext when available: daily average move profiles (open->high/open->low etc.), M5/M15 SMC, and liquidity maps (BSL/SSL sweep zones). If buyExhausted is true, avoid OPEN_LONG unless very strong contrary evidence. If sellExhausted is true, avoid OPEN_SHORT unless very strong contrary evidence.",
+    "In liquidity maps, consider likelySweep: highs_first/lows_first. Avoid entering directly into an opposite nearby sweep zone unless your rationale explains why the sweep risk is acceptable.",
     "confidence is your subjective probability the chosen action is appropriate given the snapshot (0–1).",
     relaxed
       ? "Optional testnet bias: if one coin clearly leads by score AND bias/signal align without strong contradictions, you may lean toward a directional action — still explain why in rationale."

@@ -102,7 +102,9 @@ async function buildShortTermContext(snapshot) {
           history: hist,
           shortSmc: {
             m5: smc5?.smc || null,
-            m15: smc15?.smc || null
+            m15: smc15?.smc || null,
+            liquidityMap5m: smc5?.liquidityMap || null,
+            liquidityMap15m: smc15?.liquidityMap || null
           },
           gates: {
             buyExhausted,

@@ -85,6 +85,76 @@ function detectEqualLevels(candles, lookback = 30, toleranceRatio = 0.0006) {
   };
 }
 
+function buildLiquidityMap(candles, smc) {
+  const rows = Array.isArray(candles) ? candles : [];
+  if (rows.length < 20) {
+    return { zones: [], likelySweep: "none" };
+  }
+  const last = rows[rows.length - 1];
+  const lastClose = Number(last?.close || 0);
+  const eq = detectEqualLevels(rows, 55, 0.0008);
+  const refHigh = Number(smc?.reference?.refHigh);
+  const refLow = Number(smc?.reference?.refLow);
+  const zones = [];
+
+  if (eq.equalHighs.length) {
+    const px = Math.max(...eq.equalHighs.map((x) => Number(x)));
+    zones.push({
+      type: "BSL",
+      side: "resistance",
+      label: "Equal Highs (buy-side liquidity)",
+      price: px,
+      strength: Math.min(100, 40 + eq.equalHighs.length * 12),
+      distancePct: lastClose > 0 ? ((px - lastClose) / lastClose) * 100 : null
+    });
+  }
+  if (eq.equalLows.length) {
+    const px = Math.min(...eq.equalLows.map((x) => Number(x)));
+    zones.push({
+      type: "SSL",
+      side: "support",
+      label: "Equal Lows (sell-side liquidity)",
+      price: px,
+      strength: Math.min(100, 40 + eq.equalLows.length * 12),
+      distancePct: lastClose > 0 ? ((px - lastClose) / lastClose) * 100 : null
+    });
+  }
+  if (Number.isFinite(refHigh)) {
+    zones.push({
+      type: "REF_HIGH",
+      side: "resistance",
+      label: "Reference High sweep zone",
+      price: refHigh,
+      strength: 58,
+      distancePct: lastClose > 0 ? ((refHigh - lastClose) / lastClose) * 100 : null
+    });
+  }
+  if (Number.isFinite(refLow)) {
+    zones.push({
+      type: "REF_LOW",
+      side: "support",
+      label: "Reference Low sweep zone",
+      price: refLow,
+      strength: 58,
+      distancePct: lastClose > 0 ? ((refLow - lastClose) / lastClose) * 100 : null
+    });
+  }
+
+  zones.sort((a, b) => Math.abs(Number(a.distancePct || 0)) - Math.abs(Number(b.distancePct || 0)));
+
+  const above = zones.filter((z) => Number(z.distancePct) >= 0).sort((a, b) => Number(a.distancePct) - Number(b.distancePct))[0];
+  const below = zones.filter((z) => Number(z.distancePct) < 0).sort((a, b) => Math.abs(Number(a.distancePct)) - Math.abs(Number(b.distancePct)))[0];
+  let likelySweep = "none";
+  if (above && below) {
+    likelySweep = Math.abs(Number(above.distancePct)) <= Math.abs(Number(below.distancePct)) ? "highs_first" : "lows_first";
+  } else if (above) {
+    likelySweep = "highs_first";
+  } else if (below) {
+    likelySweep = "lows_first";
+  }
+  return { zones: zones.slice(0, 8), likelySweep };
+}
+
 function intervalAnalysisBars(interval) {
   const i = String(interval || "").toLowerCase();
   if (i === "1m") return 3000;
@@ -282,6 +352,7 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
   const analysisCandles = candles.slice(-analysisBars);
   const smc = analyzeSmc(analysisCandles);
   const srLevels = computeHistoricalSrLevels(analysisCandles);
+  const liquidityMap = buildLiquidityMap(analysisCandles, smc);
 
   const maxChartBars = 12000;
   let chartCandles = candles;
@@ -321,6 +392,7 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
     analysisBarsUsed: analysisCandles.length,
     smc,
     srLevels,
+    liquidityMap,
     candles: chartCandles
   };
 }
