@@ -31,7 +31,7 @@
   function fmt(n) {
     const x = Number(n);
     if (!Number.isFinite(x)) return "--";
-    return x.toLocaleString("en-US", { maximumFractionDigits: 8 });
+    return x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function getAuthHeader() {
@@ -114,8 +114,8 @@
       <div class="stat-card"><span>Score</span><strong class="${scoreCls}">${fmt(c.score)}</strong></div>
       <div class="stat-card"><span>Confidence</span><strong>${fmt(c.confidence)}%</strong></div>
       <div class="stat-card"><span>Buy Ratio</span><strong>${buyRatioPct}</strong></div>
-      <div class="stat-card"><span>Buy Volume</span><strong>${buyVolText}</strong></div>
-      <div class="stat-card"><span>Sell Volume</span><strong>${sellVolText}</strong></div>
+      <div class="stat-card"><span>Buy Volume</span><strong class="pos">${buyVolText}</strong></div>
+      <div class="stat-card"><span>Sell Volume</span><strong class="neg">${sellVolText}</strong></div>
     `;
   }
 
@@ -124,10 +124,10 @@
     const a = payload?.averages || {};
     const fmtPx = (v) => (Number.isFinite(Number(v)) ? fmt(v) : "--");
     elements.smcOrderMetricsCards.innerHTML = `
-      <div class="stat-card"><span>TP Buy avg</span><strong>${fmtPx(a.tpBuy)}</strong></div>
-      <div class="stat-card"><span>SL Buy avg</span><strong>${fmtPx(a.slBuy)}</strong></div>
-      <div class="stat-card"><span>TP Sell avg</span><strong>${fmtPx(a.tpSell)}</strong></div>
-      <div class="stat-card"><span>SL Sell avg</span><strong>${fmtPx(a.slSell)}</strong></div>
+      <div class="stat-card"><span>TP Buy avg</span><strong class="pos">${fmtPx(a.tpBuy)}</strong></div>
+      <div class="stat-card"><span>SL Buy avg</span><strong class="neg">${fmtPx(a.slBuy)}</strong></div>
+      <div class="stat-card"><span>TP Sell avg</span><strong class="pos">${fmtPx(a.tpSell)}</strong></div>
+      <div class="stat-card"><span>SL Sell avg</span><strong class="neg">${fmtPx(a.slSell)}</strong></div>
     `;
   }
 
@@ -163,8 +163,8 @@
 
     elements.smcPriceLevelsCards.innerHTML = `
       <div class="stat-card"><span>Last Price</span><strong>${fmt(lastClose)}</strong></div>
-      <div class="stat-card"><span>Ref High</span><strong>${fmt(refHigh)}</strong></div>
-      <div class="stat-card"><span>Ref Low</span><strong>${fmt(refLow)}</strong></div>
+      <div class="stat-card"><span>Ref High</span><strong class="neg">${fmt(refHigh)}</strong></div>
+      <div class="stat-card"><span>Ref Low</span><strong class="pos">${fmt(refLow)}</strong></div>
       <div class="stat-card"><span>ATR</span><strong>${fmt(atr)}</strong></div>
       <div class="stat-card"><span>Nearest Resistance</span><strong class="neg">${fmt(nearestResistance?.price)}</strong></div>
       <div class="stat-card"><span>Nearest Support</span><strong class="pos">${fmt(nearestSupport?.price)}</strong></div>
@@ -236,9 +236,9 @@
       .map(
         (lv, i) => `<tr>
           <td>SR-${i + 1}</td>
-          <td>${fmt(lv.price)}</td>
+          <td class="${lv.side === "support" ? "pos" : "neg"}">${fmt(lv.price)}</td>
           <td>${lv.count}</td>
-          <td>${lv.side === "support" ? "Support" : "Resistance"}</td>
+          <td class="${lv.side === "support" ? "pos" : "neg"}">${lv.side === "support" ? "Support" : "Resistance"}</td>
         </tr>`
       )
       .join("");
