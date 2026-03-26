@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>History Data · Titan AI Hub</title>
+  <link rel="icon" type="image/png" href="./titan-logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
+  <link rel="stylesheet" href="./styles.css?v=2617" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark brand-mark-image">
+          <img src="./titan-logo.png" alt="Titan AI Hub Logo" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Titan AI Hub</h1>
+          <p>CoinGecko Multi-Coin Historical Data</p>
+        </div>
+      </div>
+      <div class="topbar-metrics">
+        <a class="tab-btn active" href="./history-data.html?v=1">History Data</a>
+        <a class="tab-btn" href="./index.html?v=1">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>CoinGecko Market History</h2>
+            <p>Daily OHLC + volume + change from CoinGecko (multi-symbol)</p>
+          </div>
+        </div>
+        <div class="history-toolbar">
+          <label for="historySymbolSelect" class="history-toolbar-label">Symbol</label>
+          <select id="historySymbolSelect" class="input input-inline history-symbol-select">
+            <option value="BTC" selected>BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="BNB">BNB</option>
+            <option value="SOL">SOL</option>
+            <option value="XRP">XRP</option>
+            <option value="DOGE">DOGE</option>
+            <option value="ADA">ADA</option>
+            <option value="LINK">LINK</option>
+            <option value="AVAX">AVAX</option>
+            <option value="TON">TON</option>
+            <option value="PEPE">PEPE</option>
+            <option value="WIF">WIF</option>
+            <option value="BONK">BONK</option>
+            <option value="FLOKI">FLOKI</option>
+            <option value="SHIB">SHIB</option>
+          </select>
+          <label for="historyDaysSelect" class="history-toolbar-label">Days</label>
+          <select id="historyDaysSelect" class="input input-inline">
+            <option value="7">7</option>
+            <option value="14">14</option>
+            <option value="30" selected>30</option>
+            <option value="90">90</option>
+            <option value="180">180</option>
+            <option value="365">1 year</option>
+            <option value="730">2 years</option>
+            <option value="1095">3 years</option>
+            <option value="1825">5 years</option>
+          </select>
+          <button id="historyRefreshBtn" class="btn btn-secondary" type="button">Refresh history</button>
+          <span id="historyDataStatus" class="demo-trading-status">Loading CoinGecko history...</span>
+        </div>
+        <div class="table-wrap demo-trading-trade-history-wrap">
+          <table class="data-table demo-trading-trade-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Date</th>
+                <th>Price</th>
+                <th>Open</th>
+                <th>High</th>
+                <th>Low</th>
+                <th>Vol.</th>
+                <th>Change %</th>
+                <th>Open → High %</th>
+                <th>Open → Low %</th>
+                <th>Low ↔ High %</th>
+              </tr>
+            </thead>
+            <tbody id="historyDataTableBody">
+              <tr><td colspan="11">Loading history data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/config.js?v=2602"></script>
+  <script src="./js/api-client.js?v=2602"></script>
+  <script src="./js/history-data-page.js?v=1"></script>
+</body>
+</html>

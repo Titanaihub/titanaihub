@@ -70,10 +70,11 @@ async function fetchCoinHistory(symbol, days = 30) {
     throw new Error(`Unsupported symbol for CoinGecko history: ${sym}`);
   }
 
-  const safeDays = Math.max(1, Math.min(Number(days) || 30, 365));
+  const safeDays = Math.max(1, Math.min(Number(days) || 30, 1825));
+  const daysParam = safeDays > 365 ? "max" : String(safeDays);
   const [ohlc, market] = await Promise.all([
-    getJson(`${COINGECKO_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${safeDays}`),
-    getJson(`${COINGECKO_BASE}/coins/${id}/market_chart?vs_currency=usd&days=${safeDays}&interval=daily`)
+    getJson(`${COINGECKO_BASE}/coins/${id}/ohlc?vs_currency=usd&days=${daysParam}`),
+    getJson(`${COINGECKO_BASE}/coins/${id}/market_chart?vs_currency=usd&days=${daysParam}&interval=daily`)
   ]);
 
   const volByDay = new Map();
@@ -111,7 +112,7 @@ async function fetchCoinHistory(symbol, days = 30) {
   }
 
   rows.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  return rows;
+  return rows.slice(0, safeDays);
 }
 
 async function getMultiCoinHistory({ symbols = [], days = 30, limitPerCoin = 30 } = {}) {
@@ -143,7 +144,7 @@ async function getMultiCoinHistory({ symbols = [], days = 30, limitPerCoin = 30 
     ok: true,
     source: "coingecko",
     symbols: list,
-    days: Math.max(1, Math.min(Number(days) || 30, 365)),
+    days: Math.max(1, Math.min(Number(days) || 30, 1825)),
     rows: out,
     errors
   };

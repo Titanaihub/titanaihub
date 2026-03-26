@@ -2206,3 +2206,7 @@ body {
 .history-symbol-input {
   min-width: 18rem;
 }
+
+.history-symbol-select {
+  min-width: 10rem;
+}
