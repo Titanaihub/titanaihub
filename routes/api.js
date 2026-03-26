@@ -307,7 +307,7 @@ router.get("/smc/scan", async (req, res) => {
     const data = await runSmcScan({
       symbol,
       interval,
-      limit: Math.max(60, Math.min(limit, 1000))
+      limit: Math.max(60, Math.min(limit, 220000))
     });
     return res.json(data);
   } catch (err) {

@@ -191,17 +191,31 @@ function analyzeSmc(candles) {
 async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } = {}) {
   const sym = String(symbol || "BTCUSDT").toUpperCase();
   const intv = String(interval || "15m");
-  const safeLimit = Math.max(60, Math.min(Number(limit) || 220, 1000));
+  const safeLimit = Math.max(60, Math.min(Number(limit) || 220, 220000));
+  const chunkLimit = 1500;
+  const merged = [];
+  let endTime = Date.now();
 
-  const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${encodeURIComponent(sym)}&interval=${encodeURIComponent(
-    intv
-  )}&limit=${safeLimit}`;
-  const data = await getJson(url);
-  if (!Array.isArray(data) || !data.length) {
+  while (merged.length < safeLimit) {
+    const rest = safeLimit - merged.length;
+    const qLimit = Math.max(1, Math.min(chunkLimit, rest));
+    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${encodeURIComponent(
+      sym
+    )}&interval=${encodeURIComponent(intv)}&limit=${qLimit}&endTime=${endTime}`;
+    const part = await getJson(url);
+    if (!Array.isArray(part) || !part.length) break;
+    merged.push(...part);
+    const firstOpenTime = Number(part[0]?.[0] || 0);
+    if (!firstOpenTime) break;
+    endTime = firstOpenTime - 1;
+    if (part.length < qLimit) break;
+  }
+
+  if (!merged.length) {
     throw new Error("No kline data from Binance");
   }
 
-  const candles = data
+  const candles = merged
     .filter((row) => Array.isArray(row) && row.length >= 6)
     .map((row) => ({
       openTime: Number(row[0]),
@@ -211,18 +225,49 @@ async function runSmcScan({ symbol = "BTCUSDT", interval = "15m", limit = 220 } 
       close: toNum(row[4]),
       volume: toNum(row[5]),
       closeTime: Number(row[6] || 0)
-    }));
+    }))
+    .sort((a, b) => a.openTime - b.openTime)
+    .slice(-safeLimit);
 
-  const smc = analyzeSmc(candles);
+  const smc = analyzeSmc(candles.slice(-5000));
+
+  const maxChartBars = 12000;
+  let chartCandles = candles;
+  let compressed = false;
+  if (candles.length > maxChartBars) {
+    compressed = true;
+    const bucket = Math.ceil(candles.length / maxChartBars);
+    const reduced = [];
+    for (let i = 0; i < candles.length; i += bucket) {
+      const grp = candles.slice(i, i + bucket);
+      if (!grp.length) continue;
+      const first = grp[0];
+      const last = grp[grp.length - 1];
+      const high = Math.max(...grp.map((x) => Number(x.high)));
+      const low = Math.min(...grp.map((x) => Number(x.low)));
+      const volume = grp.reduce((acc, x) => acc + Number(x.volume || 0), 0);
+      reduced.push({
+        openTime: first.openTime,
+        open: first.open,
+        high,
+        low,
+        close: last.close,
+        volume,
+        closeTime: last.closeTime
+      });
+    }
+    chartCandles = reduced;
+  }
   return {
     ok: true,
     source: "binance-futures",
     symbol: sym,
     interval: intv,
-    candlesCount: candles.length,
+    candlesCount: chartCandles.length,
+    rawCandlesCount: candles.length,
+    compressed,
     smc,
-    // Return the full requested range so frontend can render true lookback history.
-    candles: candles
+    candles: chartCandles
   };
 }
 

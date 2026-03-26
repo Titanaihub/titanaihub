@@ -62,19 +62,14 @@
           <button id="smcApplyCustomBtn" class="btn btn-secondary" type="button">Use pair</button>
           <label for="smcIntervalSelect" class="history-toolbar-label">Interval</label>
           <select id="smcIntervalSelect" class="input input-inline history-symbol-select">
+            <option value="1m">1m (90d)</option>
             <option value="5m">5m</option>
             <option value="15m" selected>15m</option>
             <option value="1h">1h</option>
             <option value="4h">4h</option>
+            <option value="1d">1d</option>
           </select>
-          <label for="smcLookbackSelect" class="history-toolbar-label">Lookback</label>
-          <select id="smcLookbackSelect" class="input input-inline history-symbol-select">
-            <option value="240">Short (240 bars)</option>
-            <option value="500">Medium (500 bars)</option>
-            <option value="1000">Long (1000 bars)</option>
-            <option value="1500">Extended (1500 bars)</option>
-            <option value="2000" selected>Max (2000 bars)</option>
-          </select>
+          <span id="smcLookbackHint" class="history-toolbar-label">Profile: 1m=90d · 5m=2y · 1h=4y · 4h=5y · 1d=8y</span>
           <button id="smcRunBtn" class="btn btn-secondary" type="button">Run SMC scan</button>
           <button id="smcLiveToggleBtn" class="btn btn-secondary" type="button">Live: ON</button>
           <span id="smcStatus" class="demo-trading-status">Waiting...</span>
@@ -163,6 +158,6 @@
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="./js/smc-page.js?v=7"></script>
+  <script src="./js/smc-page.js?v=10"></script>
 </body>
 </html>

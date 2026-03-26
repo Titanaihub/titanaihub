@@ -4,7 +4,6 @@
     smcCustomSymbolInput: document.getElementById("smcCustomSymbolInput"),
     smcApplyCustomBtn: document.getElementById("smcApplyCustomBtn"),
     smcIntervalSelect: document.getElementById("smcIntervalSelect"),
-    smcLookbackSelect: document.getElementById("smcLookbackSelect"),
     smcRunBtn: document.getElementById("smcRunBtn"),
     smcLiveToggleBtn: document.getElementById("smcLiveToggleBtn"),
     smcStatus: document.getElementById("smcStatus"),
@@ -21,7 +20,6 @@
   const state = {
     chart: null,
     candleSeries: null,
-    volumeSeries: null,
     lineRefHigh: null,
     lineRefLow: null,
     srSeries: [],
@@ -59,6 +57,16 @@
     return s.endsWith("USDT") ? s : `${s}USDT`;
   }
 
+  function intervalTargetBars(interval) {
+    const i = String(interval || "").toLowerCase();
+    if (i === "1m") return 90 * 24 * 60; // 90 days
+    if (i === "5m") return 2 * 365 * 24 * 12; // 2 years
+    if (i === "1h") return 4 * 365 * 24; // 4 years
+    if (i === "4h") return 5 * 365 * 6; // 5 years
+    if (i === "1d") return 8 * 365; // 8 years
+    return 2000;
+  }
+
   function ensureChart() {
     if (!elements.smcChart || !elements.smcChartWrap) return false;
     if (!window.LightweightCharts) return false;
@@ -93,17 +101,6 @@
       borderVisible: false,
       wickUpColor: "#0ecb81",
       wickDownColor: "#f6465d"
-    });
-    state.volumeSeries = state.chart.addHistogramSeries({
-      color: "rgba(99, 148, 255, 0.45)",
-      priceFormat: {
-        type: "volume"
-      },
-      priceScaleId: "",
-      scaleMargins: {
-        top: 0.82,
-        bottom: 0
-      }
     });
     state.lineRefHigh = state.chart.addLineSeries({
       color: "rgba(80, 195, 255, 0.9)",
@@ -290,15 +287,6 @@
       );
 
     state.candleSeries.setData(chartRows);
-    if (state.volumeSeries) {
-      state.volumeSeries.setData(
-        chartRows.map((c) => ({
-          time: c.time,
-          value: Number(c.volume || 0),
-          color: c.close >= c.open ? "rgba(14,203,129,0.5)" : "rgba(246,70,93,0.5)"
-        }))
-      );
-    }
     const lastTime = chartRows.length ? chartRows[chartRows.length - 1].time : null;
 
     const refHigh = Number(payload?.smc?.reference?.refHigh);
@@ -475,7 +463,7 @@
     state.runInFlight = true;
     const symbol = String(elements.smcSymbolSelect?.value || "BTCUSDT").toUpperCase();
     const interval = String(elements.smcIntervalSelect?.value || "15m");
-    const lookback = Number(elements.smcLookbackSelect?.value || 1000);
+    const lookback = intervalTargetBars(interval);
     if (elements.smcStatus && !opts.fromStream) {
       elements.smcStatus.textContent = `Scanning ${symbol} ${interval}...`;
     }
@@ -485,7 +473,7 @@
       const qs = new URLSearchParams({
         symbol,
         interval,
-        limit: String(Math.max(120, Math.min(lookback, 2000)))
+        limit: String(Math.max(120, Math.min(lookback, 220000)))
       });
       const payload = await apiGet(`/smc/scan?${qs.toString()}`);
       const msPayload = await apiGet(`/multi-source/analysis?${qs.toString()}`);
@@ -505,7 +493,15 @@
       renderCandles(payload);
       renderChart(payload, { fit: !opts.fromStream });
       if (elements.smcStatus) {
-        elements.smcStatus.textContent = `Source ${payload.source || "--"} · candles ${payload.candlesCount || 0}${state.liveEnabled ? " · live ON" : " · live OFF"}`;
+        const rows = Array.isArray(payload?.candles) ? payload.candles : [];
+        const start = rows.length ? new Date(rows[0].openTime).toISOString().slice(0, 16).replace("T", " ") : "--";
+        const end = rows.length
+          ? new Date(rows[rows.length - 1].openTime).toISOString().slice(0, 16).replace("T", " ")
+          : "--";
+        const raw = Number(payload?.rawCandlesCount || payload?.candlesCount || 0);
+        const shown = rows.length;
+        const compressNote = payload?.compressed ? " · compressed for chart" : "";
+        elements.smcStatus.textContent = `Source ${payload.source || "--"} · raw ${raw} · shown ${shown}${compressNote} · range ${start} → ${end}${state.liveEnabled ? " · live ON" : " · live OFF"} · chart no-volume v10`;
       }
       connectLiveStream(symbol, interval);
     } catch (err) {
@@ -552,9 +548,6 @@
   }
   if (elements.smcIntervalSelect) {
     elements.smcIntervalSelect.addEventListener("change", () => run().catch(() => {}));
-  }
-  if (elements.smcLookbackSelect) {
-    elements.smcLookbackSelect.addEventListener("change", () => run().catch(() => {}));
   }
   if (elements.smcLiveToggleBtn) {
     elements.smcLiveToggleBtn.addEventListener("click", () => {
