@@ -189,33 +189,25 @@ function postJson(url, body, headers = {}) {
 function buildSystemPrompt(language) {
   if (language === "th") {
     return [
-      "คุณคือผู้ช่วยวิเคราะห์ตลาดคริปโตของ Titan AI Hub",
-      "ตอบเป็นภาษาไทยเท่านั้น",
-      "ห้ามตอบภาษาอังกฤษ ยกเว้นชื่อเหรียญ คำว่า LONG, SHORT, entry, stop loss, take profit",
-      "ถ้าผู้ใช้ถามเป็นภาษาไทย ต้องตอบไทยทั้งหมด",
-      "ตอบสั้น กระชับ อ่านง่าย",
-      "ใช้ข้อมูล snapshot ที่ให้มาเท่านั้น",
-      "ห้ามแต่งตัวเลขเพิ่ม",
-      "ถ้าผู้ใช้ถามเรื่องเทรด ให้สรุปเป็น:",
-      "1) มุมมอง",
-      "2) ความเสี่ยง",
-      "3) จุดเข้า/SL/TP ถ้ามี",
-      "ถ้าข้อมูลไม่พอให้พูดตรง ๆ"
+      "คุณคือผู้ช่วยของ Titan AI Hub — ตอบเป็นภาษาไทยเป็นหลัก (ชื่อเหรียญ / LONG / SHORT / SL / TP ใช้ได้)",
+      "กฎสำคัญ: อ่านคำถามให้ตรงก่อน แล้วตอบให้ตรงประเด็นนั้น — ห้ามตอบแบบเทมเพลตซ้ำ ๆ หรือสรุปภาพตลาดเต็มชุดทุกครั้ง",
+      "ถ้าผู้ใช้ถามเชิงสนทนา เช่น คุณเทรดยังไง ตั้งกำไรขาดทุนยังไง ทำไมมีแต่ขาดทุน ระบบทำงานยังไง — ให้อธิบายกลไก ข้อจำกัด และคำแนะนำอย่างเป็นธรรมชาติ ไม่ต้องรายงานดัชนีตลาดทั้งหมด",
+      "บริบทผลิตภัณฑ์ (พูดได้เมื่อเกี่ยวข้อง): แดชบอร์ดนี้แสดงระดับ entry/SL/TP จากการวิเคราะห์เป็นค่าแนะนำ; โหมดเทรดทดลองบน Binance Testnet มักส่งคำสั่งมาร์เก็ตตามสัญญาณ AI — ไม่ได้แปลว่าระบบจะวาง SL/TP เป็นคำสั่งอัตโนมัติในทุกเคสเหมือน EA บางตัว",
+      "ถ้าผู้ใช้ขอ 'วิเคราะห์ตลาด' 'ดู BTC' 'สรุปเหรียญ' ค่อยใช้ snapshot ช่วยสรุปมุมมอง ความเสี่ยง และระดับอ้างอิงอย่างเป็นระบบ",
+      "ใช้เฉพาะตัวเลขและข้อเท็จจริงจาก snapshot ที่ให้มา ห้ามแต่งตัวเลขใหม่",
+      "ถ้าข้อมูลไม่พอ ให้บอกตรง ๆ",
+      "โทน: สนทนา ชัดเจน ยืดหยุ่น — ไม่บังคับหัวข้อ 1) 2) 3) ทุกครั้ง"
     ].join("\n");
   }
 
   return [
-    "You are Titan AI Hub crypto market assistant.",
-    "Reply in English only.",
-    "If the user asks in English, do not answer in Thai.",
-    "Be concise and easy to read.",
-    "Use only the snapshot data provided.",
-    "Do not invent numbers.",
-    "If the user asks for trading analysis, summarize:",
-    "1) bias",
-    "2) risk",
-    "3) entry/SL/TP if available",
-    "If data is insufficient, say so clearly."
+    "You are Titan AI Hub assistant. Reply in English when the user writes in English.",
+    "Read the user's question literally first. Answer that question directly — do not default to the same market-report template every time.",
+    "If they ask how you trade, how SL/TP work, why they see losses, or how the system behaves — explain mechanics, limits, and practical guidance in plain language. Do not dump a full market overview unless they asked for market analysis.",
+    "Product context (when relevant): dashboard levels are analysis suggestions; Testnet demo trading often uses market entries from the AI signal — this is not the same as an EA that always auto-places full SL/TP chains on the exchange.",
+    "When the user asks for market analysis or a specific coin, use the snapshot and structure bias / risk / reference levels as appropriate.",
+    "Use only numbers from the provided snapshot. Do not invent figures.",
+    "Tone: conversational and clear; numbered sections are optional, not mandatory."
   ].join("\n");
 }
 
@@ -333,25 +325,29 @@ async function callDeepSeekChat({ question, overview, btc, eth, bnb, whales, coi
 
   const userPrompt =
     language === "th"
-      ? `คำถามผู้ใช้:
+      ? `คำถามผู้ใช้ (ตอบให้ตรงประเด็นนี้ก่อน):
 ${question}
 
-ข้อมูลตลาด:
+ข้อมูลตลาด (ใช้เมื่อคำถามเกี่ยวกับภาพตลาดหรือเหรียญ — ไม่ต้องยกมาทั้งหมดถ้าคำถามเป็นเรื่องกลไก/วิธีใช้):
 ${snapshotText}
 
-กรุณาตอบเป็นภาษาไทยเท่านั้น`
-      : `User question:
+ตอบเป็นภาษาไทย แบบสนทนา`
+      : `User question (answer this directly first):
 ${question}
 
-Market snapshot:
+Market snapshot (use when the question is about markets or specific assets — omit heavy detail if the question is about how the product works):
 ${snapshotText}
 
-Reply in English only.`;
+Reply in English, conversational tone.`;
+
+  const chatTempRaw = Number(process.env.CHAT_TEMPERATURE);
+  const temperature =
+    Number.isFinite(chatTempRaw) && chatTempRaw >= 0 && chatTempRaw <= 1.2 ? chatTempRaw : 0.62;
 
   const payload = {
     model: DEEPSEEK_MODEL,
     stream: false,
-    temperature: 0.2,
+    temperature,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
