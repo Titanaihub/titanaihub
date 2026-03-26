@@ -331,7 +331,14 @@ async function boot() {
     window.TitanChat.bindChatEvents(elements, appState);
   }
 
-  if (elements.chatMessages && !elements.chatMessages.children.length) {
+  let sessionRestored = false;
+  if (window.TitanChat?.restoreSessionFromStorage) {
+    sessionRestored = await window.TitanChat.restoreSessionFromStorage(elements, appState);
+  }
+
+  if (sessionRestored && window.TitanChat?.addChatMessage) {
+    window.TitanChat.addChatMessage(elements, "ai", "Session restored (stays logged in after refresh).");
+  } else if (elements.chatMessages && !elements.chatMessages.children.length) {
     if (window.TitanChat?.addChatMessage) {
       window.TitanChat.addChatMessage(elements, "ai", "AI chat ready. Login first.");
     }

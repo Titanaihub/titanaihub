@@ -1,5 +1,26 @@
 window.TitanChat = (() => {
-  const { apiPost } = window.TitanApi;
+  const { apiPost, apiGet } = window.TitanApi;
+
+  const AUTH_STORAGE_KEY = "titan_hub_auth_v1";
+
+  function persistAuth(token, role) {
+    try {
+      localStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({ token, role, at: Date.now() })
+      );
+    } catch (_) {
+      /* ignore quota / private mode */
+    }
+  }
+
+  function clearPersistedAuth() {
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
 
   function addChatMessage(elements, role, message) {
     if (!elements.chatMessages) return;
@@ -107,6 +128,7 @@ window.TitanChat = (() => {
       appState.loggedIn = true;
       appState.authToken = token;
       appState.authRole = role;
+      persistAuth(token, role);
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", "Login successful. AI chat unlocked.");
       if (window.TitanDemoTrading?.onLoginStateChange) {
@@ -117,6 +139,7 @@ window.TitanChat = (() => {
       appState.authToken = null;
       appState.authRole = null;
       appState.demoLastDecision = null;
+      clearPersistedAuth();
       updateChatUi(elements, appState);
       addChatMessage(elements, "ai", humanizeLoginError(err));
       if (window.TitanDemoTrading?.onLoginStateChange) {
@@ -211,12 +234,61 @@ window.TitanChat = (() => {
     updateChatUi(elements, appState);
   }
 
+  async function restoreSessionFromStorage(elements, appState) {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    } catch (_) {
+      return false;
+    }
+    if (!raw) return false;
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_) {
+      clearPersistedAuth();
+      return false;
+    }
+
+    const token = parsed?.token;
+    if (!token) {
+      clearPersistedAuth();
+      return false;
+    }
+
+    try {
+      const data = await apiGet("/auth/session", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data?.ok) {
+        appState.loggedIn = true;
+        appState.authToken = token;
+        appState.authRole = data.role || parsed.role || null;
+        updateChatUi(elements, appState);
+        if (window.TitanDemoTrading?.onLoginStateChange) {
+          await window.TitanDemoTrading.onLoginStateChange(elements, appState);
+        }
+        return true;
+      }
+    } catch (_) {
+      clearPersistedAuth();
+    }
+
+    appState.loggedIn = false;
+    appState.authToken = null;
+    appState.authRole = null;
+    updateChatUi(elements, appState);
+    return false;
+  }
+
   return {
     addChatMessage,
     updateChatUi,
     buildChatSnapshot,
     handleLogin,
     handleSendChat,
-    bindChatEvents
+    bindChatEvents,
+    restoreSessionFromStorage
   };
 })();

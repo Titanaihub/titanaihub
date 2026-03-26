@@ -257,6 +257,21 @@ router.get("/debug-version", (req, res) => {
   });
 });
 
+router.get("/auth/session", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth) {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized"
+    });
+  }
+  return res.json({
+    ok: true,
+    role: auth.role
+  });
+});
+
 router.post("/login", (req, res) => {
   const { username, password } = req.body || {};
 
