@@ -23,7 +23,8 @@ const state = {
   lastExecute: null,
   lastError: null,
   ticks: 0,
-  decisionLog: []
+  decisionLog: [],
+  peakPnlPctBySymbol: {}
 };
 
 let tickInProgress = false;
@@ -67,6 +68,16 @@ function topSymbolsFromSnapshot(snapshot, limit = 6) {
 function envNum(name, fallback) {
   const n = Number(process.env[name]);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function getAdaptiveExitConfig() {
+  return {
+    enabled: envBool("DEMO_ADAPTIVE_EXIT_ENABLED", true),
+    hardStopLossPct: Math.max(0.2, Math.min(envNum("DEMO_ADAPTIVE_HARD_SL_PCT", 1.2), 15)),
+    softStopLossPct: Math.max(0.1, Math.min(envNum("DEMO_ADAPTIVE_SOFT_SL_PCT", 0.6), 10)),
+    lockProfitTriggerPct: Math.max(0.1, Math.min(envNum("DEMO_ADAPTIVE_LOCK_TRIGGER_PCT", 0.8), 20)),
+    lockProfitRetracePct: Math.max(0.05, Math.min(envNum("DEMO_ADAPTIVE_LOCK_RETRACE_PCT", 0.55), 15))
+  };
 }
 
 async function buildShortTermContext(snapshot) {
@@ -161,6 +172,68 @@ function positionDirection(p) {
   return amt > 0 ? "LONG" : "SHORT";
 }
 
+function positionPnlPct(p) {
+  const entry = Number(p?.entryPrice || 0);
+  const mark = Number(p?.markPrice || 0);
+  const amt = Number(p?.positionAmt || 0);
+  if (!Number.isFinite(entry) || !Number.isFinite(mark) || !Number.isFinite(amt) || entry <= 0 || Math.abs(amt) < 1e-12) {
+    return null;
+  }
+  if (amt > 0) return ((mark - entry) / entry) * 100;
+  return ((entry - mark) / entry) * 100;
+}
+
+function marketHighRisk(snapshot, symbol) {
+  const focus = Array.isArray(snapshot?.coinFocus) ? snapshot.coinFocus : [];
+  const sym = String(symbol || "").toUpperCase();
+  const row = focus.find((c) => String(c?.futuresSymbol || "").toUpperCase() === sym);
+  const regime = String(snapshot?.overview?.marketBias || row?.marketRegime || "").toLowerCase();
+  const flags = Array.isArray(row?.riskFlags) ? row.riskFlags.map((x) => String(x).toLowerCase()) : [];
+  const note = `${regime} ${flags.join(" ")}`;
+  return /panic|capitulation|extreme fear|liquidation|trap/.test(note);
+}
+
+async function applyAdaptiveExit(snapshot) {
+  const cfg = getAdaptiveExitConfig();
+  if (!cfg.enabled) return [];
+  const open = await getOpenTestnetPositions();
+  const closed = [];
+  for (const p of open) {
+    const symbol = String(p?.symbol || "").toUpperCase();
+    if (!symbol) continue;
+    const pnlPct = positionPnlPct(p);
+    if (!Number.isFinite(pnlPct)) continue;
+    const peak = Number(state.peakPnlPctBySymbol[symbol]);
+    const nextPeak = Number.isFinite(peak) ? Math.max(peak, pnlPct) : pnlPct;
+    state.peakPnlPctBySymbol[symbol] = nextPeak;
+
+    let reason = "";
+    if (pnlPct <= -cfg.hardStopLossPct) {
+      reason = `adaptive_hard_sl_${cfg.hardStopLossPct}`;
+    } else if (pnlPct <= -cfg.softStopLossPct && marketHighRisk(snapshot, symbol)) {
+      reason = `adaptive_soft_sl_risk_${cfg.softStopLossPct}`;
+    } else if (
+      nextPeak >= cfg.lockProfitTriggerPct &&
+      pnlPct > 0 &&
+      pnlPct <= nextPeak - cfg.lockProfitRetracePct
+    ) {
+      reason = `adaptive_lock_profit_retrace_${cfg.lockProfitRetracePct}`;
+    }
+
+    if (!reason) continue;
+    const res = await closeTestnetPosition(p, reason);
+    closed.push({
+      symbol: res.symbol,
+      side: res.side,
+      qty: res.quantity,
+      pnlPct: Number(pnlPct.toFixed(4)),
+      reason
+    });
+    delete state.peakPnlPctBySymbol[symbol];
+  }
+  return closed;
+}
+
 function getAutoTradingStatus() {
   return {
     running: state.running,
@@ -197,6 +270,7 @@ async function runTick() {
     }
 
     const snapshot = await buildLiveSnapshot();
+    const adaptiveClosed = await applyAdaptiveExit(snapshot);
     const shortTermContext = await buildShortTermContext(snapshot);
     snapshot.shortTermContext = shortTermContext;
     let decision;
@@ -228,7 +302,8 @@ async function runTick() {
       state.lastExecute = {
         ts: new Date().toISOString(),
         skipped: true,
-        reason: "WAIT"
+        reason: "WAIT",
+        closedAdaptive: adaptiveClosed
       };
       return;
     }
@@ -237,7 +312,8 @@ async function runTick() {
       state.lastExecute = {
         ts: new Date().toISOString(),
         skipped: true,
-        reason: `unsupported action ${action}`
+        reason: `unsupported action ${action}`,
+        closedAdaptive: adaptiveClosed
       };
       return;
     }
@@ -247,7 +323,8 @@ async function runTick() {
         ts: new Date().toISOString(),
         skipped: true,
         reason: `confidence ${confidence.toFixed(2)} < min ${minConf}`,
-        decision: { action, symbol: decision.symbol, confidence }
+        decision: { action, symbol: decision.symbol, confidence },
+        closedAdaptive: adaptiveClosed
       };
       return;
     }
@@ -266,7 +343,8 @@ async function runTick() {
       state.lastExecute = {
         ts: new Date().toISOString(),
         skipped: true,
-        reason: `already has ${desiredDir} position on ${symbol}`
+        reason: `already has ${desiredDir} position on ${symbol}`,
+        closedAdaptive: adaptiveClosed
       };
       return;
     }
@@ -293,6 +371,7 @@ async function runTick() {
       ok: true,
       symbol,
       action,
+      closedAdaptive: adaptiveClosed,
       closedOpposite: closed,
       result
     };

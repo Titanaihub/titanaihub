@@ -560,7 +560,20 @@ function getDemoTradeEnvInfo() {
       : 1,
     shortTermSellExhaustMult: Number.isFinite(Number(process.env.DEMO_SHORT_TERM_SELL_EXHAUST_MULT))
       ? Number(process.env.DEMO_SHORT_TERM_SELL_EXHAUST_MULT)
-      : 1
+      : 1,
+    adaptiveExitEnabled: tradeEnvBool("DEMO_ADAPTIVE_EXIT_ENABLED", true),
+    adaptiveHardSlPct: Number.isFinite(Number(process.env.DEMO_ADAPTIVE_HARD_SL_PCT))
+      ? Number(process.env.DEMO_ADAPTIVE_HARD_SL_PCT)
+      : 1.2,
+    adaptiveSoftSlPct: Number.isFinite(Number(process.env.DEMO_ADAPTIVE_SOFT_SL_PCT))
+      ? Number(process.env.DEMO_ADAPTIVE_SOFT_SL_PCT)
+      : 0.6,
+    adaptiveLockTriggerPct: Number.isFinite(Number(process.env.DEMO_ADAPTIVE_LOCK_TRIGGER_PCT))
+      ? Number(process.env.DEMO_ADAPTIVE_LOCK_TRIGGER_PCT)
+      : 0.8,
+    adaptiveLockRetracePct: Number.isFinite(Number(process.env.DEMO_ADAPTIVE_LOCK_RETRACE_PCT))
+      ? Number(process.env.DEMO_ADAPTIVE_LOCK_RETRACE_PCT)
+      : 0.55
   };
 }
 
