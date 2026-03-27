@@ -20,6 +20,10 @@ function envStr(name, fallback = "") {
   return v == null ? fallback : String(v);
 }
 
+function isGlobalHistoryMode() {
+  return String(envStr("MT4_GLOBAL_HISTORY_MODE", "true")).toLowerCase() === "true";
+}
+
 function normalizeAction(action) {
   const a = String(action || "WAIT").toUpperCase();
   if (a === "OPEN_BUY" || a === "BUY") return "OPEN_BUY";
@@ -78,15 +82,17 @@ function normalizeCandleRow(row) {
 }
 
 function historyKey(accountId, symbol, timeframe) {
-  return `${String(accountId || "default")}|${String(symbol || "XAUUSD").toUpperCase()}|${String(timeframe || "M5").toUpperCase()}`;
+  const aid = isGlobalHistoryMode() ? "global" : String(accountId || "default");
+  return `${aid}|${String(symbol || "XAUUSD").toUpperCase()}|${String(timeframe || "M5").toUpperCase()}`;
 }
 
 function accountSymbolKey(accountId, symbol) {
-  return `${String(accountId || "default")}|${String(symbol || "XAUUSD").toUpperCase()}`;
+  const aid = isGlobalHistoryMode() ? "global" : String(accountId || "default");
+  return `${aid}|${String(symbol || "XAUUSD").toUpperCase()}`;
 }
 
 function listHistoryRecords(accountId, symbol) {
-  const aid = String(accountId || "default");
+  const aid = isGlobalHistoryMode() ? "global" : String(accountId || "default");
   const sym = String(symbol || "XAUUSD").toUpperCase();
   const out = [];
   for (const [k, v] of cache.historyByKey.entries()) {
@@ -501,7 +507,7 @@ function uploadGoldHistory(payload = {}) {
     return { ok: false, code: 400, message: "Only XAUUSD is enabled in MT4 MVP" };
   }
   const timeframe = String(payload.timeframe || "D1").toUpperCase();
-  const accountId = String(payload.accountId || "default");
+  const accountId = isGlobalHistoryMode() ? "global" : String(payload.accountId || "default");
   const rowsIn = Array.isArray(payload.candles) ? payload.candles : [];
   const normalized = rowsIn.map(normalizeCandleRow).filter(Boolean);
   if (!normalized.length) {
@@ -551,12 +557,14 @@ function uploadGoldHistory(payload = {}) {
     from: rec.rows[0]?.time || null,
     to: rec.rows[rec.rows.length - 1]?.time || null,
     updatedAt: rec.updatedAt,
+    globalHistoryMode: isGlobalHistoryMode(),
     bootstrap
   };
 }
 
 function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
-  const records = listHistoryRecords(accountId, symbol);
+  const effectiveAccountId = isGlobalHistoryMode() ? "global" : accountId;
+  const records = listHistoryRecords(effectiveAccountId, symbol);
   const rows = records
     .sort((a, b) => tfMs(a.timeframe) - tfMs(b.timeframe))
     .map((r) => ({
@@ -570,7 +578,8 @@ function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
     }));
   return {
     rows,
-    bootstrap: computeBootstrapStatus(accountId, symbol)
+    bootstrap: computeBootstrapStatus(effectiveAccountId, symbol),
+    globalHistoryMode: isGlobalHistoryMode()
   };
 }
 
