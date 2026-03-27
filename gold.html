@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gold Lab · Titan AI Hub</title>
+  <link rel="icon" type="image/png" href="./titan-logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
+  <link rel="stylesheet" href="./styles.css?v=2617" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark brand-mark-image">
+          <img src="./titan-logo.png" alt="Titan AI Hub Logo" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Titan AI Hub</h1>
+          <p>Gold Lab · MT4 bridge (XAUUSD MVP)</p>
+        </div>
+      </div>
+      <div class="topbar-metrics">
+        <a class="tab-btn active" href="./gold.html?v=1">Gold Lab</a>
+        <a class="tab-btn" href="./history-data.html?v=1">History Data</a>
+        <a class="tab-btn" href="./smc.html?v=1" target="_blank" rel="noopener noreferrer">SMC Lab</a>
+        <a class="tab-btn" href="./index.html?v=1">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Gold Signal Test</h2>
+            <p>Test MT4 XAUUSD signal endpoint and monitor execution log.</p>
+          </div>
+        </div>
+        <div class="history-toolbar">
+          <label for="goldApiKeyInput" class="history-toolbar-label">MT4 API Key (optional)</label>
+          <input id="goldApiKeyInput" class="input input-inline history-symbol-input" type="text" placeholder="MT4_SHARED_SECRET" />
+          <button id="goldRunSignalBtn" class="btn btn-secondary" type="button">Test signal now</button>
+          <button id="goldRunPythonSmcBtn" class="btn btn-secondary" type="button">Test Python SMC</button>
+          <button id="goldRefreshLogBtn" class="btn btn-secondary" type="button">Refresh execution log</button>
+          <button id="goldRefreshHistoryBtn" class="btn btn-secondary" type="button">Refresh history status</button>
+          <span id="goldStatus" class="demo-trading-status">Ready</span>
+        </div>
+
+        <div id="goldSignalCards" class="demo-trading-summary">
+          <div class="stat-card"><span>Action</span><strong>--</strong></div>
+          <div class="stat-card"><span>Confidence</span><strong>--</strong></div>
+          <div class="stat-card"><span>Reason</span><strong>--</strong></div>
+          <div class="stat-card"><span>SL</span><strong>--</strong></div>
+          <div class="stat-card"><span>TP</span><strong>--</strong></div>
+          <div class="stat-card"><span>Source</span><strong>--</strong></div>
+        </div>
+        <div id="goldBootstrapCards" class="demo-trading-summary" style="margin-top: 8px;">
+          <div class="stat-card"><span>Bootstrap</span><strong>--</strong></div>
+          <div class="stat-card"><span>Progress</span><strong>--</strong></div>
+          <div class="stat-card"><span>D1 Rows</span><strong>--</strong></div>
+          <div class="stat-card"><span>Target Rows</span><strong>--</strong></div>
+          <div class="stat-card"><span>Updated</span><strong>--</strong></div>
+        </div>
+        <div class="demo-trading-preview-wrap" style="margin-top: 8px;">
+          <span class="demo-trading-preview-label">Python SMC output (JSON)</span>
+          <pre id="goldPythonSmcPreview" class="raw-box demo-decision-preview">--</pre>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Account</th>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Lots</th>
+                <th>Price</th>
+                <th>PnL</th>
+                <th>Ticket</th>
+                <th>Comment</th>
+              </tr>
+            </thead>
+            <tbody id="goldExecutionBody">
+              <tr><td colspan="9">Loading execution log...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap" style="margin-top: 12px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timeframe</th>
+                <th>Total Rows</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="goldHistoryBody">
+              <tr><td colspan="5">Loading history status...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/config.js?v=2602"></script>
+  <script src="./js/api-client.js?v=2602"></script>
+  <script src="./js/gold-page.js?v=3"></script>
+</body>
+</html>
+

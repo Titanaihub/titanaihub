@@ -41,6 +41,14 @@ const {
   stopAutoTrading,
   getAutoTradingStatus
 } = require("../services/demo-auto-trading-service.js");
+const {
+  getGoldMt4Signal,
+  saveMt4Execution,
+  getMt4ExecutionLog,
+  uploadGoldHistory,
+  getGoldHistoryStatus,
+  runPythonSmc
+} = require("../services/mt4-gold-service.js");
 
 const router = express.Router();
 
@@ -730,6 +738,117 @@ router.post("/demo/auto-trading/stop", (req, res) => {
     ok: true,
     ...r.status
   });
+});
+
+router.post("/mt4/gold/signal", async (req, res) => {
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (shared) {
+    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
+    if (token !== shared) {
+      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
+    }
+  }
+  try {
+    const out = await getGoldMt4Signal(req.body || {});
+    if (!out.ok) {
+      return res.status(out.code || 400).json(out);
+    }
+    return res.json(out);
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message || "mt4 signal failed" });
+  }
+});
+
+router.post("/mt4/gold/history-upload", (req, res) => {
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (shared) {
+    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
+    if (token !== shared) {
+      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
+    }
+  }
+  try {
+    const out = uploadGoldHistory(req.body || {});
+    if (!out.ok) return res.status(out.code || 400).json(out);
+    return res.json(out);
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message || "mt4 history upload failed" });
+  }
+});
+
+router.post("/mt4/gold/execution", (req, res) => {
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (shared) {
+    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
+    if (token !== shared) {
+      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
+    }
+  }
+  try {
+    const r = saveMt4Execution(req.body || {});
+    return res.json(r);
+  } catch (err) {
+    return res.status(500).json({ ok: false, message: err.message || "mt4 execution save failed" });
+  }
+});
+
+router.get("/mt4/gold/execution-log", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+  const limit = sanitizeInt(req.query.limit, 30);
+  return res.json({
+    ok: true,
+    rows: getMt4ExecutionLog(limit)
+  });
+});
+
+router.get("/mt4/gold/history-status", (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+  const accountId = String(req.query.accountId || "default");
+  const symbol = String(req.query.symbol || "XAUUSD").toUpperCase();
+  const out = getGoldHistoryStatus(accountId, symbol);
+  return res.json({
+    ok: true,
+    rows: out.rows || [],
+    bootstrap: out.bootstrap || null
+  });
+});
+
+router.post("/mt4/gold/python-smc-test", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+  try {
+    const candles = Array.isArray(req.body?.candles) ? req.body.candles : [];
+    const out = await runPythonSmc(candles);
+    return res.json({
+      ok: true,
+      pythonSmc: out
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "python smc test failed"
+    });
+  }
 });
 
 module.exports = router;
