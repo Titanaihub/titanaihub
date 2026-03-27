@@ -606,7 +606,7 @@ async function uploadGoldHistory(payload = {}) {
   for (const row of rec.rows) rec.byTs.set(row.ts, row);
   for (const row of normalized) rec.byTs.set(row.ts, row);
   const all = Array.from(rec.byTs.values()).sort((a, b) => a.ts - b.ts);
-  const maxRows = Math.max(4000, envNum("MT4_GOLD_HISTORY_MAX_ROWS", 250000));
+  const maxRows = Math.max(4000, envNum("MT4_GOLD_HISTORY_MAX_ROWS", 1500000));
   const trimmed = all.slice(-maxRows);
   rec.rows = trimmed;
   rec.byTs = new Map(trimmed.map((r) => [r.ts, r]));
@@ -689,6 +689,25 @@ async function getGoldSyncState(symbol = "XAUUSD", timeframe = "D1", accountId =
   };
 }
 
+async function getGoldHistoryRows(accountId = "default", symbol = "XAUUSD", timeframe = "M5", limit = 2000) {
+  const effectiveAccountId = isGlobalHistoryMode() ? "global" : String(accountId || "default");
+  const s = String(symbol || "XAUUSD").toUpperCase();
+  const tf = String(timeframe || "M5").toUpperCase();
+  const n = Math.max(20, Math.min(Number(limit) || 2000, 10000));
+  const pgRows = await pgStore.getRecentCandles(s, tf, n);
+  if (Array.isArray(pgRows) && pgRows.length) {
+    return { symbol: s, timeframe: tf, rows: pgRows, source: "postgres" };
+  }
+  const key = historyKey(effectiveAccountId, s, tf);
+  const rows = cache.historyByKey.get(key)?.rows || [];
+  return {
+    symbol: s,
+    timeframe: tf,
+    rows: rows.slice(-n),
+    source: "memory"
+  };
+}
+
 function saveMt4Execution(payload = {}) {
   const rec = {
     ts: new Date().toISOString(),
@@ -719,6 +738,7 @@ module.exports = {
   uploadGoldHistory,
   getGoldHistoryStatus,
   getGoldSyncState,
+  getGoldHistoryRows,
   runPythonSmc
 };
 

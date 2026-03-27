@@ -8,6 +8,7 @@
     goldStatus: document.getElementById("goldStatus"),
     goldSignalCards: document.getElementById("goldSignalCards"),
     goldBootstrapCards: document.getElementById("goldBootstrapCards"),
+    goldTfBootstrapCards: document.getElementById("goldTfBootstrapCards"),
     goldSyncMeta: document.getElementById("goldSyncMeta"),
     goldPythonSmcPreview: document.getElementById("goldPythonSmcPreview"),
     goldExecutionBody: document.getElementById("goldExecutionBody"),
@@ -112,6 +113,41 @@
       .join("");
   }
 
+  function barsPerDay(tf) {
+    const x = String(tf || "").toUpperCase();
+    if (x === "M1") return 1440;
+    if (x === "M5") return 288;
+    if (x === "M15") return 96;
+    if (x === "M30") return 48;
+    if (x === "H1") return 24;
+    if (x === "H4") return 6;
+    if (x === "D1") return 1;
+    return 1;
+  }
+
+  function renderTfBootstrapStatus(rows, boot) {
+    if (!elements.goldTfBootstrapCards) return;
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) {
+      elements.goldTfBootstrapCards.innerHTML = `<div class="stat-card"><span>TF Progress</span><strong>--</strong></div>`;
+      return;
+    }
+    const d1Target = Math.max(365, Number(boot?.targetRows) || 3650);
+    const years = Math.max(1, d1Target / 365);
+    const ordered = ["D1", "H4", "H1", "M30", "M15", "M5", "M1"];
+    const byTf = new Map(arr.map((r) => [String(r.timeframe || "").toUpperCase(), r]));
+    const cards = ordered
+      .filter((tf) => byTf.has(tf))
+      .map((tf) => {
+        const row = byTf.get(tf) || {};
+        const totalRows = Math.max(0, Number(row.totalRows) || 0);
+        const targetRows = Math.max(365, Math.round(years * 365 * barsPerDay(tf)));
+        const pct = Math.max(0, Math.min(100, (totalRows / targetRows) * 100));
+        return `<div class="stat-card"><span>${tf}</span><strong>${fmt(pct, 1)}% (${fmt(totalRows, 0)}/${fmt(targetRows, 0)})</strong></div>`;
+      });
+    elements.goldTfBootstrapCards.innerHTML = cards.join("");
+  }
+
   function buildDemoCandles(count = 180) {
     const now = Date.now();
     return Array.from({ length: count }).map((_, i) => {
@@ -194,9 +230,11 @@
       const out = await apiGet("/mt4/gold/history-status", { headers });
       renderHistoryStatus(out?.rows || []);
       renderBootstrapStatus(out?.bootstrap || null, out || {});
+      renderTfBootstrapStatus(out?.rows || [], out?.bootstrap || null);
     } catch (_) {
       renderHistoryStatus([]);
       renderBootstrapStatus(null, {});
+      renderTfBootstrapStatus([], null);
     }
   }
 

@@ -17,7 +17,7 @@
         </div>
         <div class="brand-text">
           <h1>Titan AI Hub</h1>
-          <p>CoinGecko Multi-Coin Historical Data</p>
+          <p>Multi-source Historical Data (Crypto + MT4 Gold)</p>
         </div>
       </div>
       <div class="topbar-metrics">
@@ -33,7 +33,7 @@
         <div class="section-head">
           <div>
             <h2>History Data</h2>
-            <p>Daily OHLC + volume + change from CoinGecko (multi-symbol)</p>
+            <p>Crypto from Binance/CoinGecko and gold candles from MT4 bridge</p>
           </div>
         </div>
         <div class="history-toolbar">
@@ -41,9 +41,11 @@
           <select id="historySourceSelect" class="input input-inline history-symbol-select">
             <option value="binance" selected>Binance</option>
             <option value="coingecko">CoinGecko</option>
+            <option value="mt4gold">MT4 Gold (XAUUSD)</option>
           </select>
           <label for="historySymbolSelect" class="history-toolbar-label">Symbol</label>
           <select id="historySymbolSelect" class="input input-inline history-symbol-select">
+            <option value="XAUUSD">XAUUSD</option>
             <option value="BTC" selected>BTC</option>
             <option value="ETH">ETH</option>
             <option value="BNB">BNB</option>
@@ -59,6 +61,14 @@
             <option value="BONK">BONK</option>
             <option value="FLOKI">FLOKI</option>
             <option value="SHIB">SHIB</option>
+          </select>
+          <label for="historyGoldTfSelect" class="history-toolbar-label">Gold TF</label>
+          <select id="historyGoldTfSelect" class="input input-inline">
+            <option value="M1">M1</option>
+            <option value="M5" selected>M5</option>
+            <option value="H1">H1</option>
+            <option value="H4">H4</option>
+            <option value="D1">D1</option>
           </select>
           <label for="historyDaysSelect" class="history-toolbar-label">Days</label>
           <select id="historyDaysSelect" class="input input-inline">
@@ -103,6 +113,6 @@
 
   <script src="./js/config.js?v=2602"></script>
   <script src="./js/api-client.js?v=2602"></script>
-  <script src="./js/history-data-page.js?v=2"></script>
+  <script src="./js/history-data-page.js?v=3"></script>
 </body>
 </html>

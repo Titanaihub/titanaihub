@@ -48,6 +48,7 @@ const {
   uploadGoldHistory,
   getGoldHistoryStatus,
   getGoldSyncState,
+  getGoldHistoryRows,
   runPythonSmc
 } = require("../services/mt4-gold-service.js");
 
@@ -846,6 +847,26 @@ router.get("/mt4/gold/sync-state", async (req, res) => {
     ok: true,
     symbol,
     timeframe,
+    ...out
+  });
+});
+
+router.get("/mt4/gold/history-rows", async (req, res) => {
+  const auth = verifyAuth(req);
+  if (!auth || auth.role !== "owner") {
+    return res.status(401).json({
+      ok: false,
+      error: true,
+      message: "Unauthorized: owner login required"
+    });
+  }
+  const accountId = String(req.query.accountId || "default");
+  const symbol = String(req.query.symbol || "XAUUSD").toUpperCase();
+  const timeframe = String(req.query.timeframe || "M5").toUpperCase();
+  const limit = Math.max(20, Math.min(sanitizeInt(req.query.limit, 2000), 10000));
+  const out = await getGoldHistoryRows(accountId, symbol, timeframe, limit);
+  return res.json({
+    ok: true,
     ...out
   });
 });

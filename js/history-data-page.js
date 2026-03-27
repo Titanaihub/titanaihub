@@ -2,6 +2,7 @@
   const elements = {
     historySourceSelect: document.getElementById("historySourceSelect"),
     historySymbolSelect: document.getElementById("historySymbolSelect"),
+    historyGoldTfSelect: document.getElementById("historyGoldTfSelect"),
     historyDaysSelect: document.getElementById("historyDaysSelect"),
     historyRefreshBtn: document.getElementById("historyRefreshBtn"),
     historyDataStatus: document.getElementById("historyDataStatus"),
@@ -47,6 +48,54 @@
     if (!Number.isFinite(l) || !Number.isFinite(h) || l <= 0) return "--";
     const pct = ((h - l) / l) * 100;
     return `${pct.toFixed(2)}%`;
+  }
+
+  function getOwnerAuthHeader() {
+    try {
+      const raw = localStorage.getItem("titan_hub_auth_v1");
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      const token = parsed?.token || "";
+      if (!token) return {};
+      return { Authorization: `Bearer ${token}` };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function barsPerDay(timeframe) {
+    const tf = String(timeframe || "M5").toUpperCase();
+    if (tf === "M1") return 1440;
+    if (tf === "M5") return 288;
+    if (tf === "H1") return 24;
+    if (tf === "H4") return 6;
+    return 1;
+  }
+
+  function normalizeGoldRows(rows, symbol) {
+    const list = Array.isArray(rows) ? rows : [];
+    const out = [];
+    let prevClose = null;
+    for (const r of list) {
+      const close = Number(r.close);
+      const open = Number(r.open);
+      const high = Number(r.high);
+      const low = Number(r.low);
+      const volume = Number(r.volume || 0);
+      const changePct = Number.isFinite(prevClose) && prevClose !== 0 ? ((close - prevClose) / prevClose) * 100 : 0;
+      out.push({
+        symbol,
+        date: String(r.time || "--"),
+        price: close,
+        open,
+        high,
+        low,
+        volume,
+        changePct
+      });
+      prevClose = close;
+    }
+    return out;
   }
 
   function render() {
@@ -97,21 +146,43 @@
 
   async function loadHistory() {
     const source = String(elements.historySourceSelect?.value || "binance").toLowerCase();
-    const symbol = String(elements.historySymbolSelect?.value || "BTC").toUpperCase();
+    const selectedSymbol = String(elements.historySymbolSelect?.value || "BTC").toUpperCase();
+    const symbol = source === "mt4gold" ? "XAUUSD" : selectedSymbol;
     const days = Number(elements.historyDaysSelect?.value || 30);
     if (elements.historyDataStatus) {
-      elements.historyDataStatus.textContent = `Loading ${source === "binance" ? "Binance" : "CoinGecko"} history...`;
+      elements.historyDataStatus.textContent =
+        source === "mt4gold"
+          ? "Loading MT4 Gold history..."
+          : `Loading ${source === "binance" ? "Binance" : "CoinGecko"} history...`;
     }
 
     try {
       const { apiGet } = window.TitanApi;
-      const qs = new URLSearchParams({
-        source,
-        symbols: symbol,
-        days: String(days),
-        perCoin: String(Math.max(30, days))
-      });
-      state.payload = await apiGet(`/market-history?${qs.toString()}`);
+      if (source === "mt4gold") {
+        const timeframe = String(elements.historyGoldTfSelect?.value || "M5").toUpperCase();
+        const limit = Math.max(80, Math.min(10000, days * barsPerDay(timeframe)));
+        const qs = new URLSearchParams({
+          symbol,
+          timeframe,
+          limit: String(limit)
+        });
+        const headers = getOwnerAuthHeader();
+        const out = await apiGet(`/mt4/gold/history-rows?${qs.toString()}`, { headers });
+        state.payload = {
+          ok: true,
+          source: `mt4-gold:${timeframe}`,
+          rows: normalizeGoldRows(out.rows || [], symbol),
+          errors: []
+        };
+      } else {
+        const qs = new URLSearchParams({
+          source,
+          symbols: symbol,
+          days: String(days),
+          perCoin: String(Math.max(30, days))
+        });
+        state.payload = await apiGet(`/market-history?${qs.toString()}`);
+      }
     } catch (err) {
       state.payload = {
         ok: false,
@@ -138,6 +209,11 @@
         loadHistory().catch(() => {});
       });
     }
+    if (elements.historyGoldTfSelect) {
+      elements.historyGoldTfSelect.addEventListener("change", () => {
+        loadHistory().catch(() => {});
+      });
+    }
     if (elements.historySymbolSelect) {
       elements.historySymbolSelect.addEventListener("change", () => {
         loadHistory().catch(() => {});
@@ -145,6 +221,11 @@
     }
     if (elements.historySourceSelect) {
       elements.historySourceSelect.addEventListener("change", () => {
+        const isGold = String(elements.historySourceSelect.value || "").toLowerCase() === "mt4gold";
+        if (elements.historySymbolSelect) {
+          elements.historySymbolSelect.value = isGold ? "XAUUSD" : "BTC";
+          elements.historySymbolSelect.disabled = isGold;
+        }
         loadHistory().catch(() => {});
       });
     }

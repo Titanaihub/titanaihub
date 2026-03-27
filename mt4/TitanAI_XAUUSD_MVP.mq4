@@ -15,15 +15,22 @@ input bool BootstrapAllHistory = false;
 input int BootstrapChunkCandles = 350;
 input int LiveHistoryUpdateMinutes = 15;
 input bool BootstrapIncludeH1H4 = true;
+input bool BootstrapIncludeM15M30 = true;
+input bool BootstrapIncludeM5 = true;
+input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
 
 datetime g_lastBarTime = 0;
 bool g_bootstrapInited = false;
 bool g_bootstrapDone = false;
-int g_bootstrapStage = 0; // 0=D1,1=H4,2=H1,3=done
+int g_bootstrapStage = 0; // 0=D1,1=H4,2=H1,3=M30,4=M15,5=M5,6=M1,7=done
 int g_bootstrapShiftD1 = 0;
 int g_bootstrapShiftH4 = 0;
 int g_bootstrapShiftH1 = 0;
+int g_bootstrapShiftM30 = 0;
+int g_bootstrapShiftM15 = 0;
+int g_bootstrapShiftM5 = 0;
+int g_bootstrapShiftM1 = 0;
 datetime g_lastHistoryPushAt = 0;
 
 string JsonEscape(string s) {
@@ -75,6 +82,23 @@ string TfLabelByPeriod(int period) {
    if(period == PERIOD_H4) return "H4";
    if(period == PERIOD_D1) return "D1";
    return "M5";
+}
+
+int BarsPerDayByPeriod(int period) {
+   if(period == PERIOD_M1) return 1440;
+   if(period == PERIOD_D1) return 1;
+   if(period == PERIOD_H4) return 6;
+   if(period == PERIOD_H1) return 24;
+   if(period == PERIOD_M5) return 288;
+   return 1;
+}
+
+int TargetRowsByPeriod(int period) {
+   int bars = iBars(Symbol(), period);
+   int maxByBroker = MathMax(30, bars - 2);
+   int wanted = MathMax(30, BootstrapYears * 365 * BarsPerDayByPeriod(period));
+   if(BootstrapAllHistory) return maxByBroker;
+   return MathMin(maxByBroker, wanted);
 }
 
 bool IsNewBar() {
@@ -277,12 +301,7 @@ bool HttpGetJson(string endpoint, string &responseOut) {
 }
 
 string BuildHistoryUploadPayload(string mode, int period, int startShift, int count, bool doneFlag) {
-   int targetRows = MathMax(365, BootstrapYears * 365);
-   if(BootstrapAllHistory) {
-      if(period == PERIOD_D1) targetRows = MathMax(365, iBars(Symbol(), PERIOD_D1) - 2);
-      if(period == PERIOD_H4) targetRows = MathMax(365, iBars(Symbol(), PERIOD_H4) - 2);
-      if(period == PERIOD_H1) targetRows = MathMax(365, iBars(Symbol(), PERIOD_H1) - 2);
-   }
+   int targetRows = MathMax(365, TargetRowsByPeriod(period));
    string payload = "{";
    payload += "\"apiKey\":\"" + JsonEscape(ApiKey) + "\",";
    payload += "\"accountId\":\"" + IntegerToString(AccountNumber()) + "\",";
@@ -304,21 +323,28 @@ bool UploadHistoryChunk(string mode, int period, int startShift, int count, bool
 }
 
 void InitBootstrapState() {
-   int barsD1 = iBars(Symbol(), PERIOD_D1);
-   int barsH4 = iBars(Symbol(), PERIOD_H4);
-   int barsH1 = iBars(Symbol(), PERIOD_H1);
-   int maxRows = MathMax(30, BootstrapYears * 365);
-   if(BootstrapAllHistory) maxRows = MathMax(30, barsD1 - 2);
-   g_bootstrapShiftD1 = MathMin(barsD1 - 2, maxRows);
-   g_bootstrapShiftH4 = MathMin(barsH4 - 2, BootstrapAllHistory ? (barsH4 - 2) : (maxRows * 6));
-   g_bootstrapShiftH1 = MathMin(barsH1 - 2, BootstrapAllHistory ? (barsH1 - 2) : (maxRows * 24));
+   g_bootstrapShiftD1 = TargetRowsByPeriod(PERIOD_D1);
+   g_bootstrapShiftH4 = TargetRowsByPeriod(PERIOD_H4);
+   g_bootstrapShiftH1 = TargetRowsByPeriod(PERIOD_H1);
+   g_bootstrapShiftM30 = TargetRowsByPeriod(PERIOD_M30);
+   g_bootstrapShiftM15 = TargetRowsByPeriod(PERIOD_M15);
+   g_bootstrapShiftM5 = TargetRowsByPeriod(PERIOD_M5);
+   g_bootstrapShiftM1 = TargetRowsByPeriod(PERIOD_M1);
    if(IncrementalSyncResume) {
       int d1Resume = NextShiftAfterTs(PERIOD_D1, GetRemoteLastTsMs("D1"));
       int h4Resume = NextShiftAfterTs(PERIOD_H4, GetRemoteLastTsMs("H4"));
       int h1Resume = NextShiftAfterTs(PERIOD_H1, GetRemoteLastTsMs("H1"));
+      int m30Resume = NextShiftAfterTs(PERIOD_M30, GetRemoteLastTsMs("M30"));
+      int m15Resume = NextShiftAfterTs(PERIOD_M15, GetRemoteLastTsMs("M15"));
+      int m5Resume = NextShiftAfterTs(PERIOD_M5, GetRemoteLastTsMs("M5"));
+      int m1Resume = NextShiftAfterTs(PERIOD_M1, GetRemoteLastTsMs("M1"));
       if(d1Resume >= 0) g_bootstrapShiftD1 = MathMin(g_bootstrapShiftD1, d1Resume);
       if(h4Resume >= 0) g_bootstrapShiftH4 = MathMin(g_bootstrapShiftH4, h4Resume);
       if(h1Resume >= 0) g_bootstrapShiftH1 = MathMin(g_bootstrapShiftH1, h1Resume);
+      if(m30Resume >= 0) g_bootstrapShiftM30 = MathMin(g_bootstrapShiftM30, m30Resume);
+      if(m15Resume >= 0) g_bootstrapShiftM15 = MathMin(g_bootstrapShiftM15, m15Resume);
+      if(m5Resume >= 0) g_bootstrapShiftM5 = MathMin(g_bootstrapShiftM5, m5Resume);
+      if(m1Resume >= 0) g_bootstrapShiftM1 = MathMin(g_bootstrapShiftM1, m1Resume);
    }
    g_bootstrapStage = 0;
    g_bootstrapInited = true;
@@ -333,6 +359,15 @@ void InitBootstrapState() {
 void RunBootstrapStep() {
    if(!g_bootstrapInited) InitBootstrapState();
    if(g_bootstrapDone) return;
+   if(!BootstrapIncludeH1H4 && (g_bootstrapStage == 1 || g_bootstrapStage == 2)) g_bootstrapStage = 3;
+   if(!BootstrapIncludeM15M30 && (g_bootstrapStage == 3 || g_bootstrapStage == 4)) g_bootstrapStage = 5;
+   if(!BootstrapIncludeM5 && g_bootstrapStage == 5) g_bootstrapStage = 6;
+   if(!BootstrapIncludeM1 && g_bootstrapStage == 6) g_bootstrapStage = 7;
+   if(g_bootstrapStage >= 7) {
+      g_bootstrapDone = true;
+      Print("TitanAI bootstrap completed.");
+      return;
+   }
    int chunk = MathMax(50, MathMin(1200, BootstrapChunkCandles));
    int period = PERIOD_D1;
    int startShift = g_bootstrapShiftD1;
@@ -345,9 +380,30 @@ void RunBootstrapStep() {
       period = PERIOD_H1;
       startShift = g_bootstrapShiftH1;
       mode = "bootstrap_h1";
+   } else if(g_bootstrapStage == 3) {
+      period = PERIOD_M30;
+      startShift = g_bootstrapShiftM30;
+      mode = "bootstrap_m30";
+   } else if(g_bootstrapStage == 4) {
+      period = PERIOD_M15;
+      startShift = g_bootstrapShiftM15;
+      mode = "bootstrap_m15";
+   } else if(g_bootstrapStage == 5) {
+      period = PERIOD_M5;
+      startShift = g_bootstrapShiftM5;
+      mode = "bootstrap_m5";
+   } else if(g_bootstrapStage == 6) {
+      period = PERIOD_M1;
+      startShift = g_bootstrapShiftM1;
+      mode = "bootstrap_m1";
    }
+   bool allStagesDone =
+      (g_bootstrapStage >= 2 || !BootstrapIncludeH1H4) &&
+      (g_bootstrapStage >= 4 || !BootstrapIncludeM15M30) &&
+      (g_bootstrapStage >= 5 || !BootstrapIncludeM5) &&
+      (g_bootstrapStage >= 6 || !BootstrapIncludeM1);
    if(startShift < 1) {
-      if(g_bootstrapStage >= 2 || !BootstrapIncludeH1H4) {
+      if(allStagesDone) {
          g_bootstrapDone = true;
          Print("TitanAI bootstrap completed.");
       } else {
@@ -357,7 +413,7 @@ void RunBootstrapStep() {
    }
    int count = MathMin(chunk, startShift);
    int endShift = MathMax(1, startShift - count + 1);
-   bool finalChunk = (endShift <= 1 && (g_bootstrapStage >= 2 || !BootstrapIncludeH1H4));
+   bool finalChunk = (endShift <= 1 && allStagesDone);
    bool ok = UploadHistoryChunk(mode, period, startShift, count, finalChunk);
    if(!ok) {
       Print("TitanAI bootstrap chunk upload failed period=", TfLabelByPeriod(period), " shift=", startShift);
@@ -366,8 +422,12 @@ void RunBootstrapStep() {
    if(g_bootstrapStage == 0) g_bootstrapShiftD1 = endShift - 1;
    if(g_bootstrapStage == 1) g_bootstrapShiftH4 = endShift - 1;
    if(g_bootstrapStage == 2) g_bootstrapShiftH1 = endShift - 1;
+   if(g_bootstrapStage == 3) g_bootstrapShiftM30 = endShift - 1;
+   if(g_bootstrapStage == 4) g_bootstrapShiftM15 = endShift - 1;
+   if(g_bootstrapStage == 5) g_bootstrapShiftM5 = endShift - 1;
+   if(g_bootstrapStage == 6) g_bootstrapShiftM1 = endShift - 1;
    if(endShift <= 1) {
-      if(g_bootstrapStage >= 2 || !BootstrapIncludeH1H4) {
+      if(allStagesDone) {
          g_bootstrapDone = true;
          Print("TitanAI bootstrap completed.");
       } else {
@@ -389,6 +449,14 @@ void PushLiveHistoryIfDue() {
       int c5 = MathMin(280, s5);
       if(c5 > 0 && UploadHistoryChunk("live_append_m5", PERIOD_M5, s5, c5, false)) ok = true;
    }
+   int barsM1 = iBars(Symbol(), PERIOD_M1);
+   if(barsM1 >= 40) {
+      int s1m = MathMin(barsM1 - 2, 900);
+      int resume1m = NextShiftAfterTs(PERIOD_M1, GetRemoteLastTsMs("M1"));
+      if(resume1m >= 0) s1m = MathMin(s1m, resume1m);
+      int c1m = MathMin(800, s1m);
+      if(c1m > 0 && UploadHistoryChunk("live_append_m1", PERIOD_M1, s1m, c1m, false)) ok = true;
+   }
    int barsH1 = iBars(Symbol(), PERIOD_H1);
    if(barsH1 >= 40) {
       int s1 = MathMin(barsH1 - 2, 260);
@@ -398,6 +466,22 @@ void PushLiveHistoryIfDue() {
       if(c1 > 0 && UploadHistoryChunk("live_append_h1", PERIOD_H1, s1, c1, false)) ok = true;
    }
    int barsH4 = iBars(Symbol(), PERIOD_H4);
+   int barsM30 = iBars(Symbol(), PERIOD_M30);
+   if(barsM30 >= 40) {
+      int s30 = MathMin(barsM30 - 2, 260);
+      int resume30 = NextShiftAfterTs(PERIOD_M30, GetRemoteLastTsMs("M30"));
+      if(resume30 >= 0) s30 = MathMin(s30, resume30);
+      int c30 = MathMin(220, s30);
+      if(c30 > 0 && UploadHistoryChunk("live_append_m30", PERIOD_M30, s30, c30, false)) ok = true;
+   }
+   int barsM15 = iBars(Symbol(), PERIOD_M15);
+   if(barsM15 >= 40) {
+      int s15 = MathMin(barsM15 - 2, 260);
+      int resume15 = NextShiftAfterTs(PERIOD_M15, GetRemoteLastTsMs("M15"));
+      if(resume15 >= 0) s15 = MathMin(s15, resume15);
+      int c15 = MathMin(220, s15);
+      if(c15 > 0 && UploadHistoryChunk("live_append_m15", PERIOD_M15, s15, c15, false)) ok = true;
+   }
    if(barsH4 >= 40) {
       int s4 = MathMin(barsH4 - 2, 260);
       int resume4 = NextShiftAfterTs(PERIOD_H4, GetRemoteLastTsMs("H4"));
