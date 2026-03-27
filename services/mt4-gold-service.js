@@ -432,6 +432,8 @@ async function callDeepSeekGoldDecision(payload) {
     "You are an intraday XAUUSD (MT4) assistant.",
     "Return JSON only.",
     "Actions allowed: WAIT, OPEN_BUY, OPEN_SELL, CLOSE_ALL.",
+    "You are responsible for both entries and exits. Manage open positions actively.",
+    "When risk or momentum turns against an open position, you may use CLOSE_ALL.",
     "Avoid overtrading and avoid entries when spread is high or edge unclear.",
     "Prefer WAIT when uncertain."
   ].join("\n");
@@ -518,6 +520,9 @@ async function getGoldMt4Signal(payload = {}) {
   }
 
   const accountId = String(payload.accountId || "default");
+  const openPositions = Array.isArray(payload.openPositions) ? payload.openPositions : [];
+  const hasOpenPositions = openPositions.length > 0;
+  const aiFullControl = String(envStr("MT4_AI_FULL_CONTROL", "true")).toLowerCase() === "true";
   const requireBootstrap = String(envStr("MT4_REQUIRE_BOOTSTRAP", "true")).toLowerCase() === "true";
   const boot = await computeBootstrapStatus(accountId, symbol);
   if (requireBootstrap && !boot.completed) {
@@ -540,11 +545,13 @@ async function getGoldMt4Signal(payload = {}) {
   const pairKey = `${accountId}|${symbol}|${timeframe}`;
   const key = `${pairKey}|${latestBarTime}`;
   const now = Date.now();
-  const minIntervalMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 30000));
+  const minIntervalBaseMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 30000));
+  const minIntervalOpenMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_OPEN_MS", 10000));
+  const minIntervalMs = hasOpenPositions ? minIntervalOpenMs : minIntervalBaseMs;
   const sameBarReuse = String(envStr("MT4_REUSE_DECISION_SAME_BAR", "true")).toLowerCase() === "true";
 
   const prevPair = cache.byPair.get(pairKey);
-  if (sameBarReuse && prevPair && prevPair.latestBarTime === latestBarTime) {
+  if (sameBarReuse && !hasOpenPositions && prevPair && prevPair.latestBarTime === latestBarTime) {
     return { ok: true, source: prevPair.source, cached: true, bootstrap: boot, decision: prevPair.decision };
   }
 
@@ -571,7 +578,7 @@ async function getGoldMt4Signal(payload = {}) {
   const smcContext = buildSmcContext(mergedRows);
   const pythonSmc = await runPythonSmc(mergedRows);
   const pyPriority = String(envStr("MT4_PYTHON_SMC_PRIORITY", "true")).toLowerCase() === "true";
-  if (pyPriority && pythonSmc?.ok && pythonSmc?.decision) {
+  if (pyPriority && (!aiFullControl || !hasOpenPositions) && pythonSmc?.ok && pythonSmc?.decision) {
     const pyAction = normalizeAction(pythonSmc.decision.action);
     const pyConf = Math.max(0, Math.min(1, Number(pythonSmc.decision.confidence) || 0));
     if (pyAction !== "WAIT" && pyConf >= 0.7) {
@@ -599,7 +606,8 @@ async function getGoldMt4Signal(payload = {}) {
     }
   }
   const tokenSaver = String(envStr("MT4_TOKEN_SAVER_MODE", "true")).toLowerCase() === "true";
-  if (tokenSaver) {
+  const tokenSaverActive = tokenSaver && (!aiFullControl || !hasOpenPositions);
+  if (tokenSaverActive) {
     const skip = shouldSkipDeepSeek({ ...payload, candles: mergedRows });
     if (skip.skip) {
       const decision = {

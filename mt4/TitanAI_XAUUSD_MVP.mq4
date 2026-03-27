@@ -19,7 +19,8 @@ input bool BootstrapIncludeM15M30 = true;
 input bool BootstrapIncludeM5 = true;
 input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
-input bool EnableProfitProtect = true;
+input bool AiFullControlMode = true;
+input bool EnableProfitProtect = false;
 input int ProfitLockStartPoints = 120;
 input int ProfitLockGivebackPoints = 60;
 input int BreakEvenAtPoints = 90;
@@ -751,7 +752,7 @@ void OnTick() {
 }
 
 void OnTimer() {
-   ManageProfitProtection();
+   if(!AiFullControlMode) ManageProfitProtection();
    if(BootstrapHistoryFirst && !g_bootstrapDone) {
       RunBootstrapStep();
       return;
