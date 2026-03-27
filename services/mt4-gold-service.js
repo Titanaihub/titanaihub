@@ -7,6 +7,7 @@ const pgStore = require("./mt4-gold-pg-store.js");
 
 const cache = {
   byKey: new Map(),
+  byPair: new Map(),
   executionLog: [],
   historyByKey: new Map(),
   bootstrapByAccountSymbol: new Map(),
@@ -394,13 +395,39 @@ function quickFallbackDecision(payload) {
   };
 }
 
+function shouldSkipDeepSeek(payload) {
+  const rows = Array.isArray(payload?.candles) ? payload.candles : [];
+  const openPositions = Array.isArray(payload?.openPositions) ? payload.openPositions : [];
+  if (openPositions.length > 0) return { skip: false, reason: "" };
+  if (rows.length < 30) return { skip: true, reason: "token_saver_not_enough_rows" };
+  const tail = rows.slice(-18);
+  const closes = tail.map((r) => Number(r.close || 0)).filter((v) => Number.isFinite(v) && v > 0);
+  if (closes.length < 8) return { skip: true, reason: "token_saver_invalid_rows" };
+  const last = closes[closes.length - 1];
+  const first = closes[0];
+  const impulseAbs = Math.abs((last - first) / Math.max(first, 1e-9));
+  let sumAbsRet = 0;
+  for (let i = 1; i < closes.length; i++) {
+    sumAbsRet += Math.abs((closes[i] - closes[i - 1]) / Math.max(closes[i - 1], 1e-9));
+  }
+  const avgAbsRet = sumAbsRet / Math.max(1, closes.length - 1);
+  const spreadPoints = Number(payload?.spreadPoints || 0);
+  const spreadGuard = Math.max(20, envNum("MT4_TOKEN_SAVER_MAX_SPREAD_POINTS", 35));
+  if (spreadPoints > spreadGuard) return { skip: true, reason: "token_saver_spread_high" };
+  const quietImpulse = impulseAbs < envNum("MT4_TOKEN_SAVER_IMPULSE_MIN", 0.00035);
+  const quietVol = avgAbsRet < envNum("MT4_TOKEN_SAVER_AVGRET_MIN", 0.00022);
+  if (quietImpulse && quietVol) return { skip: true, reason: "token_saver_quiet_market" };
+  return { skip: false, reason: "" };
+}
+
 async function callDeepSeekGoldDecision(payload) {
   const apiKey = envStr("DEEPSEEK_API_KEY");
   if (!apiKey) {
     return { decision: quickFallbackDecision(payload), source: "fallback_no_key" };
   }
   const rows = Array.isArray(payload?.candles) ? payload.candles : [];
-  const tail = rows.slice(-120);
+  const maxCandles = Math.max(30, Math.min(220, envNum("MT4_DEEPSEEK_CANDLES_MAX", 60)));
+  const tail = rows.slice(-maxCandles);
   const system = [
     "You are an intraday XAUUSD (MT4) assistant.",
     "Return JSON only.",
@@ -510,9 +537,16 @@ async function getGoldMt4Signal(payload = {}) {
     };
   }
   const latestBarTime = String(candles[candles.length - 1]?.time || payload.brokerTime || "");
-  const key = `${accountId}|${symbol}|${timeframe}|${latestBarTime}`;
+  const pairKey = `${accountId}|${symbol}|${timeframe}`;
+  const key = `${pairKey}|${latestBarTime}`;
   const now = Date.now();
   const minIntervalMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 30000));
+  const sameBarReuse = String(envStr("MT4_REUSE_DECISION_SAME_BAR", "true")).toLowerCase() === "true";
+
+  const prevPair = cache.byPair.get(pairKey);
+  if (sameBarReuse && prevPair && prevPair.latestBarTime === latestBarTime) {
+    return { ok: true, source: prevPair.source, cached: true, bootstrap: boot, decision: prevPair.decision };
+  }
 
   const prev = cache.byKey.get(key);
   if (prev && now - prev.ts < minIntervalMs) {
@@ -550,6 +584,7 @@ async function getGoldMt4Signal(payload = {}) {
         riskPercent: Number(pythonSmc.decision.riskPercent) > 0 ? Number(pythonSmc.decision.riskPercent) : 0.3
       };
       cache.byKey.set(key, { ts: now, source: "python_smc_priority", decision });
+      cache.byPair.set(pairKey, { ts: now, source: "python_smc_priority", decision, latestBarTime });
       return {
         ok: true,
         source: "python_smc_priority",
@@ -563,6 +598,29 @@ async function getGoldMt4Signal(payload = {}) {
       };
     }
   }
+  const tokenSaver = String(envStr("MT4_TOKEN_SAVER_MODE", "true")).toLowerCase() === "true";
+  if (tokenSaver) {
+    const skip = shouldSkipDeepSeek({ ...payload, candles: mergedRows });
+    if (skip.skip) {
+      const decision = {
+        action: "WAIT",
+        confidence: 0.25,
+        reason: skip.reason,
+        sl: null,
+        tp: null,
+        riskPercent: 0.2
+      };
+      cache.byKey.set(key, { ts: now, source: "token_saver_guard", decision });
+      cache.byPair.set(pairKey, { ts: now, source: "token_saver_guard", decision, latestBarTime });
+      return {
+        ok: true,
+        source: "token_saver_guard",
+        cached: false,
+        bootstrap: boot,
+        decision
+      };
+    }
+  }
   const ai = await callDeepSeekGoldDecision({
     ...payload,
     candles: mergedRows,
@@ -572,6 +630,7 @@ async function getGoldMt4Signal(payload = {}) {
   });
   const decision = ai.decision || quickFallbackDecision(payload);
   cache.byKey.set(key, { ts: now, source: ai.source || "fallback", decision });
+  cache.byPair.set(pairKey, { ts: now, source: ai.source || "fallback", decision, latestBarTime });
 
   return {
     ok: true,

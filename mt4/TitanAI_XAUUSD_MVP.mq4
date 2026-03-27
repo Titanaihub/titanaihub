@@ -19,6 +19,14 @@ input bool BootstrapIncludeM15M30 = true;
 input bool BootstrapIncludeM5 = true;
 input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
+input bool EnableProfitProtect = true;
+input int ProfitLockStartPoints = 120;
+input int ProfitLockGivebackPoints = 60;
+input int BreakEvenAtPoints = 90;
+input int BreakEvenOffsetPoints = 10;
+input int TrailStartPoints = 160;
+input int TrailDistancePoints = 90;
+input int TrailStepPoints = 20;
 
 datetime g_lastBarTime = 0;
 bool g_bootstrapInited = false;
@@ -32,6 +40,108 @@ int g_bootstrapShiftM15 = 0;
 int g_bootstrapShiftM5 = 0;
 int g_bootstrapShiftM1 = 0;
 datetime g_lastHistoryPushAt = 0;
+int g_profitTrackTickets[300];
+double g_profitTrackMaxPts[300];
+
+int FindProfitTrackIndex(int ticket) {
+   for(int i = 0; i < 300; i++) {
+      if(g_profitTrackTickets[i] == ticket) return i;
+   }
+   return -1;
+}
+
+int EnsureProfitTrackIndex(int ticket) {
+   int idx = FindProfitTrackIndex(ticket);
+   if(idx >= 0) return idx;
+   for(int i = 0; i < 300; i++) {
+      if(g_profitTrackTickets[i] == 0) {
+         g_profitTrackTickets[i] = ticket;
+         g_profitTrackMaxPts[i] = 0.0;
+         return i;
+      }
+   }
+   return -1;
+}
+
+void CleanupProfitTrack() {
+   for(int i = 0; i < 300; i++) {
+      int tk = g_profitTrackTickets[i];
+      if(tk <= 0) continue;
+      if(!OrderSelect(tk, SELECT_BY_TICKET, MODE_TRADES) || OrderCloseTime() > 0) {
+         g_profitTrackTickets[i] = 0;
+         g_profitTrackMaxPts[i] = 0.0;
+      }
+   }
+}
+
+bool ModifyOrderSL(int ticket, double newSL) {
+   if(!OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES)) return false;
+   newSL = NormalizeDouble(newSL, Digits);
+   double oldSL = OrderStopLoss();
+   if(MathAbs(newSL - oldSL) < (TrailStepPoints * Point)) return true;
+   bool ok = OrderModify(ticket, OrderOpenPrice(), newSL, OrderTakeProfit(), 0, clrDeepSkyBlue);
+   if(!ok) {
+      Print("TitanAI OrderModify failed ticket=", ticket, " err=", GetLastError());
+      return false;
+   }
+   return true;
+}
+
+void ManageProfitProtection() {
+   if(!EnableProfitProtect) return;
+   CleanupProfitTrack();
+   for(int i = OrdersTotal() - 1; i >= 0; i--) {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != Symbol()) continue;
+      if(OrderMagicNumber() != MagicNumber) continue;
+      int type = OrderType();
+      if(type != OP_BUY && type != OP_SELL) continue;
+      int ticket = OrderTicket();
+      int idx = EnsureProfitTrackIndex(ticket);
+      if(idx < 0) continue;
+      double openPrice = OrderOpenPrice();
+      double nowPts = (type == OP_BUY) ? ((Bid - openPrice) / Point) : ((openPrice - Ask) / Point);
+      if(nowPts > g_profitTrackMaxPts[idx]) g_profitTrackMaxPts[idx] = nowPts;
+      double maxPts = g_profitTrackMaxPts[idx];
+
+      if(maxPts >= ProfitLockStartPoints && nowPts <= (maxPts - ProfitLockGivebackPoints)) {
+         double lots = OrderLots();
+         bool closed = (type == OP_BUY)
+            ? OrderClose(ticket, lots, Bid, SlippagePoints, clrTomato)
+            : OrderClose(ticket, lots, Ask, SlippagePoints, clrTomato);
+         if(closed) {
+            SendExecution("CLOSE", lots, (type == OP_BUY ? Bid : Ask), 0.0, ticket, "profit_retrace_lock");
+            g_profitTrackTickets[idx] = 0;
+            g_profitTrackMaxPts[idx] = 0.0;
+         } else {
+            Print("TitanAI profit lock close failed ticket=", ticket, " err=", GetLastError());
+         }
+         continue;
+      }
+
+      if(nowPts >= BreakEvenAtPoints) {
+         double beSL = (type == OP_BUY)
+            ? (openPrice + BreakEvenOffsetPoints * Point)
+            : (openPrice - BreakEvenOffsetPoints * Point);
+         double curSL = OrderStopLoss();
+         bool betterBE = (type == OP_BUY)
+            ? (curSL <= 0 || beSL > curSL)
+            : (curSL <= 0 || beSL < curSL);
+         if(betterBE) ModifyOrderSL(ticket, beSL);
+      }
+
+      if(nowPts >= TrailStartPoints) {
+         double trailSL = (type == OP_BUY)
+            ? (Bid - TrailDistancePoints * Point)
+            : (Ask + TrailDistancePoints * Point);
+         double cur = OrderStopLoss();
+         bool betterTrail = (type == OP_BUY)
+            ? (cur <= 0 || trailSL > cur + TrailStepPoints * Point)
+            : (cur <= 0 || trailSL < cur - TrailStepPoints * Point);
+         if(betterTrail) ModifyOrderSL(ticket, trailSL);
+      }
+   }
+}
 
 string JsonEscape(string s) {
    string out = s;
@@ -636,6 +746,7 @@ void OnTick() {
 }
 
 void OnTimer() {
+   ManageProfitProtection();
    if(BootstrapHistoryFirst && !g_bootstrapDone) {
       RunBootstrapStep();
       return;
