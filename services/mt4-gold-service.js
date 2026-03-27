@@ -42,7 +42,17 @@ function tfMs(tf) {
 
 function toTsMs(v) {
   if (typeof v === "number" && Number.isFinite(v)) return v;
-  const t = Date.parse(String(v || ""));
+  const raw = String(v || "").trim();
+  if (!raw) return null;
+  let t = Date.parse(raw);
+  if (Number.isFinite(t)) return t;
+  // MT4 often sends "YYYY.MM.DD HH:mm" (or with seconds).
+  const normalized = raw.replace(/\./g, "-").replace(" ", "T");
+  t = Date.parse(normalized);
+  if (Number.isFinite(t)) return t;
+  // Fallback: remove timezone ambiguity.
+  const noTz = normalized.replace("T", " ");
+  t = Date.parse(noTz);
   return Number.isFinite(t) ? t : null;
 }
 

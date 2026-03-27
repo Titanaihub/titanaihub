@@ -1,6 +1,6 @@
 #property strict
 
-input string ApiBaseUrl = "https://your-domain.com";
+input string ApiBaseUrl = "https://titan-ai-api.onrender.com";
 input string ApiKey = "change-me";
 input int PollSeconds = 30;
 input int SlippagePoints = 30;
@@ -37,6 +37,33 @@ string NumToStr(double v, int digits = 8) {
    return DoubleToString(v, digits);
 }
 
+string Upper(string s) {
+   string t = s;
+   StringToUpper(t);
+   return t;
+}
+
+string GetApiBaseUrl() {
+   string u = ApiBaseUrl;
+   // Clean common copy/paste issues from MT4 inputs.
+   StringReplace(u, " ", "");
+   StringReplace(u, "\t", "");
+   StringReplace(u, "https//", "https://");
+   StringReplace(u, "http//", "http://");
+   StringReplace(u, "：", ":");
+   StringReplace(u, "／", "/");
+   if(StringFind(u, "your-domain.com", 0) >= 0 || StringLen(u) < 8) {
+      u = "https://titan-ai-api.onrender.com";
+   }
+   if(StringFind(u, "http://", 0) != 0 && StringFind(u, "https://", 0) != 0) {
+      u = "https://" + u;
+   }
+   while(StringLen(u) > 0 && StringSubstr(u, StringLen(u) - 1, 1) == "/") {
+      u = StringSubstr(u, 0, StringLen(u) - 1);
+   }
+   return u;
+}
+
 string TfLabelByPeriod(int period) {
    if(period == PERIOD_M1) return "M1";
    if(period == PERIOD_M5) return "M5";
@@ -67,7 +94,7 @@ double CurrentSpreadPoints() {
 }
 
 bool IsTradeSymbolAllowed() {
-   string s = StringUpper(Symbol());
+   string s = Upper(Symbol());
    return (s == "XAUUSD" || StringFind(s, "GOLD", 0) >= 0);
 }
 
@@ -205,7 +232,7 @@ string BuildSignalPayload() {
 }
 
 bool HttpPostJson(string endpoint, string body, string &responseOut) {
-   string url = ApiBaseUrl + endpoint;
+   string url = GetApiBaseUrl() + endpoint;
    char postData[];
    StringToCharArray(body, postData, 0, WHOLE_ARRAY, CP_UTF8);
    char result[];
@@ -420,7 +447,7 @@ void HandleSignal() {
    string action, reason;
    double sl, tp;
    ParseDecision(rsp, action, sl, tp, reason);
-   action = StringUpper(action);
+   action = Upper(action);
 
    if(action == "WAIT") return;
    if(action == "CLOSE_ALL") {
@@ -442,9 +469,10 @@ void HandleSignal() {
 }
 
 int OnInit() {
-   if(PollSeconds < 5) PollSeconds = 5;
-   EventSetTimer(PollSeconds);
-   Print("TitanAI_XAUUSD_MVP initialized. Add API URL to MT4 WebRequest whitelist.");
+   int timerSeconds = PollSeconds;
+   if(timerSeconds < 5) timerSeconds = 5;
+   EventSetTimer(timerSeconds);
+   Print("TitanAI_XAUUSD_MVP initialized. baseUrl=", GetApiBaseUrl(), ". Add API URL to MT4 WebRequest whitelist.");
    return(INIT_SUCCEEDED);
 }
 
