@@ -1,7 +1,7 @@
 #property strict
 
 input string ApiBaseUrl = "https://titan-ai-api.onrender.com";
-input string ApiKey = "change-me";
+input string ApiKey = "T!tan_MT4_2026#XAUUSD@9qL7mP2vR";
 input int PollSeconds = 30;
 input int SlippagePoints = 30;
 input int MaxSpreadPoints = 45;
@@ -458,9 +458,14 @@ void InitBootstrapState() {
    }
    g_bootstrapStage = 0;
    g_bootstrapInited = true;
-   g_bootstrapDone = (g_bootstrapShiftD1 < 1);
+   bool hasAnyWork = (g_bootstrapShiftD1 > 0)
+      || (BootstrapIncludeH1H4 && (g_bootstrapShiftH4 > 0 || g_bootstrapShiftH1 > 0))
+      || (BootstrapIncludeM15M30 && (g_bootstrapShiftM30 > 0 || g_bootstrapShiftM15 > 0))
+      || (BootstrapIncludeM5 && g_bootstrapShiftM5 > 0)
+      || (BootstrapIncludeM1 && g_bootstrapShiftM1 > 0);
+   g_bootstrapDone = !hasAnyWork;
    if(g_bootstrapDone) {
-      Print("TitanAI bootstrap skipped (not enough D1 bars).");
+      Print("TitanAI bootstrap skipped (no available bars in enabled timeframes).");
    } else {
       Print("TitanAI bootstrap start D1 rows=", g_bootstrapShiftD1);
    }
