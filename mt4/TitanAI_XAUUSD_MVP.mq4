@@ -234,9 +234,10 @@ string BuildSignalPayload() {
 bool HttpPostJson(string endpoint, string body, string &responseOut) {
    string url = GetApiBaseUrl() + endpoint;
    char postData[];
-   StringToCharArray(body, postData, 0, WHOLE_ARRAY, CP_UTF8);
+   int bodyLen = StringLen(body);
+   StringToCharArray(body, postData, 0, bodyLen, CP_UTF8);
    char result[];
-   string headers = "Content-Type: application/json\r\nX-MT4-Key: " + ApiKey + "\r\n";
+   string headers = "Content-Type: application/json\r\nAccept: application/json\r\nX-MT4-Key: " + ApiKey + "\r\n";
    string resultHeaders = "";
    int timeout = 6000;
    int code = WebRequest("POST", url, headers, timeout, postData, result, resultHeaders);
