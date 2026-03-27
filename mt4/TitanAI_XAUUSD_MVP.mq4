@@ -11,6 +11,7 @@ input bool TradeOnlyM5Close = true;
 input int CandlesToSend = 120;
 input bool BootstrapHistoryFirst = true;
 input int BootstrapYears = 10;
+input bool BootstrapAllHistory = false;
 input int BootstrapChunkCandles = 350;
 input int LiveHistoryUpdateMinutes = 15;
 input bool BootstrapIncludeH1H4 = true;
@@ -254,6 +255,12 @@ bool HttpPostJson(string endpoint, string body, string &responseOut) {
 }
 
 string BuildHistoryUploadPayload(string mode, int period, int startShift, int count, bool doneFlag) {
+   int targetRows = MathMax(365, BootstrapYears * 365);
+   if(BootstrapAllHistory) {
+      if(period == PERIOD_D1) targetRows = MathMax(365, iBars(Symbol(), PERIOD_D1) - 2);
+      if(period == PERIOD_H4) targetRows = MathMax(365, iBars(Symbol(), PERIOD_H4) - 2);
+      if(period == PERIOD_H1) targetRows = MathMax(365, iBars(Symbol(), PERIOD_H1) - 2);
+   }
    string payload = "{";
    payload += "\"apiKey\":\"" + JsonEscape(ApiKey) + "\",";
    payload += "\"accountId\":\"" + IntegerToString(AccountNumber()) + "\",";
@@ -261,7 +268,7 @@ string BuildHistoryUploadPayload(string mode, int period, int startShift, int co
    payload += "\"timeframe\":\"" + TfLabelByPeriod(period) + "\",";
    payload += "\"mode\":\"" + JsonEscape(mode) + "\",";
    payload += "\"done\":" + (doneFlag ? "true" : "false") + ",";
-   payload += "\"targetRows\":" + IntegerToString(MathMax(365, BootstrapYears * 365)) + ",";
+   payload += "\"targetRows\":" + IntegerToString(targetRows) + ",";
    payload += "\"brokerTime\":\"" + TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS) + "\",";
    payload += "\"candles\":" + BuildCandlesJsonByPeriodRange(period, startShift, count);
    payload += "}";
@@ -279,9 +286,10 @@ void InitBootstrapState() {
    int barsH4 = iBars(Symbol(), PERIOD_H4);
    int barsH1 = iBars(Symbol(), PERIOD_H1);
    int maxRows = MathMax(30, BootstrapYears * 365);
+   if(BootstrapAllHistory) maxRows = MathMax(30, barsD1 - 2);
    g_bootstrapShiftD1 = MathMin(barsD1 - 2, maxRows);
-   g_bootstrapShiftH4 = MathMin(barsH4 - 2, maxRows * 6);
-   g_bootstrapShiftH1 = MathMin(barsH1 - 2, maxRows * 24);
+   g_bootstrapShiftH4 = MathMin(barsH4 - 2, BootstrapAllHistory ? (barsH4 - 2) : (maxRows * 6));
+   g_bootstrapShiftH1 = MathMin(barsH1 - 2, BootstrapAllHistory ? (barsH1 - 2) : (maxRows * 24));
    g_bootstrapStage = 0;
    g_bootstrapInited = true;
    g_bootstrapDone = (g_bootstrapShiftD1 < 1);

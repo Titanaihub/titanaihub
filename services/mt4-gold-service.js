@@ -2,13 +2,19 @@ const { postJson } = require("./ai-service.js");
 const { DEEPSEEK_MODEL } = require("../config/constants.js");
 const { spawn } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
 const cache = {
   byKey: new Map(),
   executionLog: [],
   historyByKey: new Map(),
-  bootstrapByAccountSymbol: new Map()
+  bootstrapByAccountSymbol: new Map(),
+  persistedAt: null
 };
+
+const DATA_DIR = path.resolve(__dirname, "..", ".data");
+const STORE_FILE = path.join(DATA_DIR, "mt4-gold-store.json");
+let persistTimer = null;
 
 function envNum(name, fallback) {
   const n = Number(process.env[name]);
@@ -22,6 +28,68 @@ function envStr(name, fallback = "") {
 
 function isGlobalHistoryMode() {
   return String(envStr("MT4_GLOBAL_HISTORY_MODE", "true")).toLowerCase() === "true";
+}
+
+function toPlainHistoryRecord(rec) {
+  return {
+    accountId: rec.accountId,
+    symbol: rec.symbol,
+    timeframe: rec.timeframe,
+    rows: Array.isArray(rec.rows) ? rec.rows : [],
+    updatedAt: rec.updatedAt || null
+  };
+}
+
+function saveStoreSoon() {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      const payload = {
+        version: 1,
+        persistedAt: new Date().toISOString(),
+        executionLog: cache.executionLog,
+        historyByKey: Array.from(cache.historyByKey.entries()).map(([k, v]) => [k, toPlainHistoryRecord(v)]),
+        bootstrapByAccountSymbol: Array.from(cache.bootstrapByAccountSymbol.entries())
+      };
+      fs.writeFileSync(STORE_FILE, JSON.stringify(payload));
+      cache.persistedAt = payload.persistedAt;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("mt4 store persist failed:", err.message);
+    }
+  }, 300);
+}
+
+function loadStoreFromDisk() {
+  try {
+    if (!fs.existsSync(STORE_FILE)) return;
+    const raw = fs.readFileSync(STORE_FILE, "utf8");
+    const parsed = JSON.parse(raw || "{}");
+    cache.executionLog = Array.isArray(parsed.executionLog) ? parsed.executionLog.slice(-500) : [];
+    const hist = new Map();
+    for (const pair of Array.isArray(parsed.historyByKey) ? parsed.historyByKey : []) {
+      const key = pair?.[0];
+      const rec = pair?.[1];
+      if (!key || !rec || !Array.isArray(rec.rows)) continue;
+      const rows = rec.rows.map(normalizeCandleRow).filter(Boolean);
+      hist.set(String(key), {
+        accountId: String(rec.accountId || "default"),
+        symbol: String(rec.symbol || "XAUUSD").toUpperCase(),
+        timeframe: String(rec.timeframe || "M5").toUpperCase(),
+        rows,
+        byTs: new Map(rows.map((r) => [r.ts, r])),
+        updatedAt: rec.updatedAt || null
+      });
+    }
+    cache.historyByKey = hist;
+    cache.bootstrapByAccountSymbol = new Map(Array.isArray(parsed.bootstrapByAccountSymbol) ? parsed.bootstrapByAccountSymbol : []);
+    cache.persistedAt = parsed.persistedAt || null;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("mt4 store load failed:", err.message);
+  }
 }
 
 function normalizeAction(action) {
@@ -544,6 +612,7 @@ function uploadGoldHistory(payload = {}) {
     mode,
     updatedAt: new Date().toISOString()
   });
+  saveStoreSoon();
   const bootstrap = computeBootstrapStatus(accountId, symbol);
 
   return {
@@ -579,7 +648,12 @@ function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
   return {
     rows,
     bootstrap: computeBootstrapStatus(effectiveAccountId, symbol),
-    globalHistoryMode: isGlobalHistoryMode()
+    globalHistoryMode: isGlobalHistoryMode(),
+    sync: {
+      persistence: "disk_file",
+      persistedAt: cache.persistedAt || null,
+      storeFile: STORE_FILE
+    }
   };
 }
 
@@ -597,6 +671,7 @@ function saveMt4Execution(payload = {}) {
   };
   cache.executionLog.push(rec);
   if (cache.executionLog.length > 200) cache.executionLog.shift();
+  saveStoreSoon();
   return { ok: true, saved: rec };
 }
 
@@ -613,4 +688,6 @@ module.exports = {
   getGoldHistoryStatus,
   runPythonSmc
 };
+
+loadStoreFromDisk();
 

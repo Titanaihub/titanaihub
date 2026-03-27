@@ -8,6 +8,7 @@
     goldStatus: document.getElementById("goldStatus"),
     goldSignalCards: document.getElementById("goldSignalCards"),
     goldBootstrapCards: document.getElementById("goldBootstrapCards"),
+    goldSyncMeta: document.getElementById("goldSyncMeta"),
     goldPythonSmcPreview: document.getElementById("goldPythonSmcPreview"),
     goldExecutionBody: document.getElementById("goldExecutionBody"),
     goldHistoryBody: document.getElementById("goldHistoryBody")
@@ -47,7 +48,7 @@
     `;
   }
 
-  function renderBootstrapStatus(boot) {
+  function renderBootstrapStatus(boot, meta = {}) {
     if (!elements.goldBootstrapCards) return;
     const completed = Boolean(boot?.completed);
     const statusCls = completed ? "pos" : "neg";
@@ -58,6 +59,11 @@
       <div class="stat-card"><span>Target Rows</span><strong>${fmt(boot?.targetRows, 0)}</strong></div>
       <div class="stat-card"><span>Updated</span><strong>${String(boot?.updatedAt || "--")}</strong></div>
     `;
+    if (elements.goldSyncMeta) {
+      const mode = meta?.globalHistoryMode ? "global" : "by-account";
+      const persistedAt = String(meta?.sync?.persistedAt || "--");
+      elements.goldSyncMeta.textContent = `Sync mode: ${mode} | Persistence: disk_file | Last persisted: ${persistedAt}`;
+    }
   }
 
   function renderExecution(rows) {
@@ -140,7 +146,7 @@
       };
       const out = await apiPost("/mt4/gold/signal", payload, apiKey ? { "x-mt4-key": apiKey } : {});
       renderSignal(out);
-      renderBootstrapStatus(out?.bootstrap || null);
+      renderBootstrapStatus(out?.bootstrap || null, out || {});
       if (elements.goldStatus) {
         elements.goldStatus.textContent = `Signal ready: ${String(out?.decision?.action || "--")}`;
       }
@@ -187,10 +193,10 @@
       const headers = getOwnerAuthHeader();
       const out = await apiGet("/mt4/gold/history-status", { headers });
       renderHistoryStatus(out?.rows || []);
-      renderBootstrapStatus(out?.bootstrap || null);
+      renderBootstrapStatus(out?.bootstrap || null, out || {});
     } catch (_) {
       renderHistoryStatus([]);
-      renderBootstrapStatus(null);
+      renderBootstrapStatus(null, {});
     }
   }
 
