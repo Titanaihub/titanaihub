@@ -15,6 +15,7 @@ input bool BootstrapAllHistory = false;
 input int BootstrapChunkCandles = 350;
 input int LiveHistoryUpdateMinutes = 15;
 input bool BootstrapIncludeH1H4 = true;
+input bool IncrementalSyncResume = true;
 
 datetime g_lastBarTime = 0;
 bool g_bootstrapInited = false;
@@ -254,6 +255,27 @@ bool HttpPostJson(string endpoint, string body, string &responseOut) {
    return true;
 }
 
+bool HttpGetJson(string endpoint, string &responseOut) {
+   string url = GetApiBaseUrl() + endpoint;
+   char postData[];
+   ArrayResize(postData, 0);
+   char result[];
+   string headers = "Accept: application/json\r\nX-MT4-Key: " + ApiKey + "\r\n";
+   string resultHeaders = "";
+   int timeout = 6000;
+   int code = WebRequest("GET", url, headers, timeout, postData, result, resultHeaders);
+   if(code == -1) {
+      Print("TitanAI WebRequest(GET) error: ", GetLastError(), " url=", url);
+      return false;
+   }
+   responseOut = CharArrayToString(result, 0, -1, CP_UTF8);
+   if(code < 200 || code >= 300) {
+      Print("TitanAI HTTP(GET) status=", code, " body=", responseOut);
+      return false;
+   }
+   return true;
+}
+
 string BuildHistoryUploadPayload(string mode, int period, int startShift, int count, bool doneFlag) {
    int targetRows = MathMax(365, BootstrapYears * 365);
    if(BootstrapAllHistory) {
@@ -290,6 +312,14 @@ void InitBootstrapState() {
    g_bootstrapShiftD1 = MathMin(barsD1 - 2, maxRows);
    g_bootstrapShiftH4 = MathMin(barsH4 - 2, BootstrapAllHistory ? (barsH4 - 2) : (maxRows * 6));
    g_bootstrapShiftH1 = MathMin(barsH1 - 2, BootstrapAllHistory ? (barsH1 - 2) : (maxRows * 24));
+   if(IncrementalSyncResume) {
+      int d1Resume = NextShiftAfterTs(PERIOD_D1, GetRemoteLastTsMs("D1"));
+      int h4Resume = NextShiftAfterTs(PERIOD_H4, GetRemoteLastTsMs("H4"));
+      int h1Resume = NextShiftAfterTs(PERIOD_H1, GetRemoteLastTsMs("H1"));
+      if(d1Resume >= 0) g_bootstrapShiftD1 = MathMin(g_bootstrapShiftD1, d1Resume);
+      if(h4Resume >= 0) g_bootstrapShiftH4 = MathMin(g_bootstrapShiftH4, h4Resume);
+      if(h1Resume >= 0) g_bootstrapShiftH1 = MathMin(g_bootstrapShiftH1, h1Resume);
+   }
    g_bootstrapStage = 0;
    g_bootstrapInited = true;
    g_bootstrapDone = (g_bootstrapShiftD1 < 1);
@@ -354,20 +384,26 @@ void PushLiveHistoryIfDue() {
    int barsM5 = iBars(Symbol(), PERIOD_M5);
    if(barsM5 >= 40) {
       int s5 = MathMin(barsM5 - 2, 320);
+      int resume5 = NextShiftAfterTs(PERIOD_M5, GetRemoteLastTsMs("M5"));
+      if(resume5 >= 0) s5 = MathMin(s5, resume5);
       int c5 = MathMin(280, s5);
-      if(UploadHistoryChunk("live_append_m5", PERIOD_M5, s5, c5, false)) ok = true;
+      if(c5 > 0 && UploadHistoryChunk("live_append_m5", PERIOD_M5, s5, c5, false)) ok = true;
    }
    int barsH1 = iBars(Symbol(), PERIOD_H1);
    if(barsH1 >= 40) {
       int s1 = MathMin(barsH1 - 2, 260);
+      int resume1 = NextShiftAfterTs(PERIOD_H1, GetRemoteLastTsMs("H1"));
+      if(resume1 >= 0) s1 = MathMin(s1, resume1);
       int c1 = MathMin(220, s1);
-      if(UploadHistoryChunk("live_append_h1", PERIOD_H1, s1, c1, false)) ok = true;
+      if(c1 > 0 && UploadHistoryChunk("live_append_h1", PERIOD_H1, s1, c1, false)) ok = true;
    }
    int barsH4 = iBars(Symbol(), PERIOD_H4);
    if(barsH4 >= 40) {
       int s4 = MathMin(barsH4 - 2, 260);
+      int resume4 = NextShiftAfterTs(PERIOD_H4, GetRemoteLastTsMs("H4"));
+      if(resume4 >= 0) s4 = MathMin(s4, resume4);
       int c4 = MathMin(220, s4);
-      if(UploadHistoryChunk("live_append_h4", PERIOD_H4, s4, c4, false)) ok = true;
+      if(c4 > 0 && UploadHistoryChunk("live_append_h4", PERIOD_H4, s4, c4, false)) ok = true;
    }
    if(ok) g_lastHistoryPushAt = TimeCurrent();
 }
@@ -397,6 +433,28 @@ double JsonGetNumber(string json, string key, double defv = 0.0) {
    }
    if(e <= s) return defv;
    return StrToDouble(StringSubstr(json, s, e - s));
+}
+
+double GetRemoteLastTsMs(string timeframe) {
+   if(!IncrementalSyncResume) return 0.0;
+   string endpoint = "/api/mt4/gold/sync-state?symbol=XAUUSD&timeframe=" + timeframe + "&accountId=" + IntegerToString(AccountNumber());
+   string rsp = "";
+   if(!HttpGetJson(endpoint, rsp)) return 0.0;
+   return JsonGetNumber(rsp, "lastTsMs", 0.0);
+}
+
+int NextShiftAfterTs(int period, double lastTsMs) {
+   if(lastTsMs <= 0) return -1;
+   datetime ts = (datetime)MathFloor(lastTsMs / 1000.0);
+   int bars = iBars(Symbol(), period);
+   if(bars < 5) return -1;
+   for(int i = 1; i <= bars - 2; i++) {
+      datetime t = iTime(Symbol(), period, i);
+      if(t <= ts) {
+         return i - 1;
+      }
+   }
+   return bars - 2;
 }
 
 bool ParseDecision(string json, string &action, double &sl, double &tp, string &reason) {

@@ -47,6 +47,7 @@ const {
   getMt4ExecutionLog,
   uploadGoldHistory,
   getGoldHistoryStatus,
+  getGoldSyncState,
   runPythonSmc
 } = require("../services/mt4-gold-service.js");
 
@@ -759,7 +760,7 @@ router.post("/mt4/gold/signal", async (req, res) => {
   }
 });
 
-router.post("/mt4/gold/history-upload", (req, res) => {
+router.post("/mt4/gold/history-upload", async (req, res) => {
   const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
   if (shared) {
     const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
@@ -768,7 +769,7 @@ router.post("/mt4/gold/history-upload", (req, res) => {
     }
   }
   try {
-    const out = uploadGoldHistory(req.body || {});
+    const out = await uploadGoldHistory(req.body || {});
     if (!out.ok) return res.status(out.code || 400).json(out);
     return res.json(out);
   } catch (err) {
@@ -808,7 +809,7 @@ router.get("/mt4/gold/execution-log", (req, res) => {
   });
 });
 
-router.get("/mt4/gold/history-status", (req, res) => {
+router.get("/mt4/gold/history-status", async (req, res) => {
   const auth = verifyAuth(req);
   if (!auth || auth.role !== "owner") {
     return res.status(401).json({
@@ -819,11 +820,33 @@ router.get("/mt4/gold/history-status", (req, res) => {
   }
   const accountId = String(req.query.accountId || "default");
   const symbol = String(req.query.symbol || "XAUUSD").toUpperCase();
-  const out = getGoldHistoryStatus(accountId, symbol);
+  const out = await getGoldHistoryStatus(accountId, symbol);
   return res.json({
     ok: true,
     rows: out.rows || [],
-    bootstrap: out.bootstrap || null
+    bootstrap: out.bootstrap || null,
+    globalHistoryMode: Boolean(out.globalHistoryMode),
+    sync: out.sync || null
+  });
+});
+
+router.get("/mt4/gold/sync-state", async (req, res) => {
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (shared) {
+    const token = String(req.headers["x-mt4-key"] || req.query?.apiKey || "");
+    if (token !== shared) {
+      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
+    }
+  }
+  const symbol = String(req.query.symbol || "XAUUSD").toUpperCase();
+  const timeframe = String(req.query.timeframe || "D1").toUpperCase();
+  const accountId = String(req.query.accountId || "default");
+  const out = await getGoldSyncState(symbol, timeframe, accountId);
+  return res.json({
+    ok: true,
+    symbol,
+    timeframe,
+    ...out
   });
 });
 

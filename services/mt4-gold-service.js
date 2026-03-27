@@ -3,6 +3,7 @@ const { DEEPSEEK_MODEL } = require("../config/constants.js");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const pgStore = require("./mt4-gold-pg-store.js");
 
 const cache = {
   byKey: new Map(),
@@ -235,20 +236,24 @@ function buildSmcContext(rows) {
   };
 }
 
-function computeBootstrapStatus(accountId, symbol) {
+async function computeBootstrapStatus(accountId, symbol) {
   const key = accountSymbolKey(accountId, symbol);
   const rec = cache.bootstrapByAccountSymbol.get(key);
   const targetRows = Math.max(1, Number(rec?.targetRows) || 3650);
   const d1Key = historyKey(accountId, symbol, "D1");
   const d1Rows = cache.historyByKey.get(d1Key)?.rows?.length || 0;
+  const pgState = await pgStore.getBootstrapState(String(symbol || "XAUUSD").toUpperCase());
+  const pgD1 = await pgStore.getSyncState(String(symbol || "XAUUSD").toUpperCase(), "D1");
+  const target = Math.max(targetRows, Number(pgState?.targetRows) || 0);
+  const d1Count = Math.max(d1Rows, Number(pgD1?.totalRows) || 0);
   const progressPct = Math.max(0, Math.min(100, (d1Rows / targetRows) * 100));
-  const completed = Boolean(rec?.completed) || d1Rows >= targetRows;
+  const completed = Boolean(rec?.completed) || Boolean(pgState?.completed) || d1Count >= target;
   return {
-    targetRows,
-    currentRows: d1Rows,
-    progressPct,
+    targetRows: target,
+    currentRows: d1Count,
+    progressPct: Math.max(0, Math.min(100, (d1Count / Math.max(1, target)) * 100)),
     completed,
-    updatedAt: rec?.updatedAt || null
+    updatedAt: rec?.updatedAt || pgState?.updatedAt || null
   };
 }
 
@@ -487,7 +492,7 @@ async function getGoldMt4Signal(payload = {}) {
 
   const accountId = String(payload.accountId || "default");
   const requireBootstrap = String(envStr("MT4_REQUIRE_BOOTSTRAP", "true")).toLowerCase() === "true";
-  const boot = computeBootstrapStatus(accountId, symbol);
+  const boot = await computeBootstrapStatus(accountId, symbol);
   if (requireBootstrap && !boot.completed) {
     return {
       ok: true,
@@ -517,10 +522,18 @@ async function getGoldMt4Signal(payload = {}) {
   const records = listHistoryRecords(accountId, symbol);
   const d1Rec = records.find((r) => r.timeframe === "D1");
   const tfRec = records.find((r) => r.timeframe === timeframe);
+  const pgRows = await pgStore.getRecentCandles(symbol, timeframe, 2200);
+  const pgD1Rows = await pgStore.getRecentCandles(symbol, "D1", 4200);
   const mergedRows = tfRec?.rows?.length
     ? [...tfRec.rows.slice(-2000), ...candles.map(normalizeCandleRow).filter(Boolean)].sort((a, b) => a.ts - b.ts)
-    : candles.map(normalizeCandleRow).filter(Boolean);
-  const historyProfile = d1Rec?.rows?.length ? calcHistoryBehaviorStats(d1Rec.rows.slice(-4000)) : null;
+    : pgRows.length
+      ? [...pgRows, ...candles.map(normalizeCandleRow).filter(Boolean)].sort((a, b) => a.ts - b.ts)
+      : candles.map(normalizeCandleRow).filter(Boolean);
+  const historyProfile = pgD1Rows.length
+    ? calcHistoryBehaviorStats(pgD1Rows.slice(-4000))
+    : d1Rec?.rows?.length
+      ? calcHistoryBehaviorStats(d1Rec.rows.slice(-4000))
+      : null;
   const smcContext = buildSmcContext(mergedRows);
   const pythonSmc = await runPythonSmc(mergedRows);
   const pyPriority = String(envStr("MT4_PYTHON_SMC_PRIORITY", "true")).toLowerCase() === "true";
@@ -569,7 +582,7 @@ async function getGoldMt4Signal(payload = {}) {
   };
 }
 
-function uploadGoldHistory(payload = {}) {
+async function uploadGoldHistory(payload = {}) {
   const symbol = String(payload.symbol || "").toUpperCase();
   if (symbol !== "XAUUSD") {
     return { ok: false, code: 400, message: "Only XAUUSD is enabled in MT4 MVP" };
@@ -604,7 +617,7 @@ function uploadGoldHistory(payload = {}) {
   const targetRows = Math.max(365, Number(payload.targetRows) || Number(prevBoot.targetRows) || 3650);
   const mode = String(payload.mode || "append");
   const doneFlag = Boolean(payload.done);
-  const computed = computeBootstrapStatus(accountId, symbol);
+  const computed = await computeBootstrapStatus(accountId, symbol);
   const completed = Boolean(prevBoot.completed) || (timeframe === "D1" && (doneFlag || computed.currentRows >= targetRows));
   cache.bootstrapByAccountSymbol.set(asKey, {
     targetRows,
@@ -613,7 +626,9 @@ function uploadGoldHistory(payload = {}) {
     updatedAt: new Date().toISOString()
   });
   saveStoreSoon();
-  const bootstrap = computeBootstrapStatus(accountId, symbol);
+  await pgStore.upsertCandles(symbol, timeframe, rec.rows.slice(-Math.min(5000, normalized.length + 200)));
+  await pgStore.saveBootstrapState(symbol, targetRows, completed, mode);
+  const bootstrap = await computeBootstrapStatus(accountId, symbol);
 
   return {
     ok: true,
@@ -631,7 +646,7 @@ function uploadGoldHistory(payload = {}) {
   };
 }
 
-function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
+async function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
   const effectiveAccountId = isGlobalHistoryMode() ? "global" : accountId;
   const records = listHistoryRecords(effectiveAccountId, symbol);
   const rows = records
@@ -645,15 +660,32 @@ function getGoldHistoryStatus(accountId = "default", symbol = "XAUUSD") {
       to: r.rows[r.rows.length - 1]?.time || null,
       updatedAt: r.updatedAt || null
     }));
+  const pgRows = await pgStore.getHistoryStatus(String(symbol || "XAUUSD").toUpperCase());
+  const combinedRows = (Array.isArray(pgRows) && pgRows.length) ? pgRows : rows;
   return {
-    rows,
-    bootstrap: computeBootstrapStatus(effectiveAccountId, symbol),
+    rows: combinedRows,
+    bootstrap: await computeBootstrapStatus(effectiveAccountId, symbol),
     globalHistoryMode: isGlobalHistoryMode(),
     sync: {
-      persistence: "disk_file",
+      persistence: pgStore.enabled() ? "postgres+disk_file" : "disk_file",
       persistedAt: cache.persistedAt || null,
       storeFile: STORE_FILE
     }
+  };
+}
+
+async function getGoldSyncState(symbol = "XAUUSD", timeframe = "D1", accountId = "default") {
+  const s = String(symbol || "XAUUSD").toUpperCase();
+  const tf = String(timeframe || "D1").toUpperCase();
+  const pg = await pgStore.getSyncState(s, tf);
+  if (pg.lastTsMs) return { ...pg, source: "postgres" };
+  const key = historyKey(accountId, s, tf);
+  const rows = cache.historyByKey.get(key)?.rows || [];
+  const lastTsMs = rows.length ? Number(rows[rows.length - 1].ts || 0) : null;
+  return {
+    lastTsMs,
+    totalRows: rows.length,
+    source: "memory"
   };
 }
 
@@ -686,6 +718,7 @@ module.exports = {
   getMt4ExecutionLog,
   uploadGoldHistory,
   getGoldHistoryStatus,
+  getGoldSyncState,
   runPythonSmc
 };
 
