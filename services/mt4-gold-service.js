@@ -11,6 +11,8 @@ const cache = {
   executionLog: [],
   historyByKey: new Map(),
   bootstrapByAccountSymbol: new Map(),
+  /** @type {Map<string, number>} last time we emitted OPEN_* (ms) — anti-scalp throttle */
+  entryThrottleByAccount: new Map(),
   persistedAt: null
 };
 
@@ -212,6 +214,380 @@ function calcHistoryBehaviorStats(d1Rows) {
       openToClosePct: ((c - o) / o) * 100
     } : null
   };
+}
+
+function mean(arr) {
+  const a = arr.filter((x) => Number.isFinite(x));
+  if (!a.length) return null;
+  return a.reduce((s, x) => s + x, 0) / a.length;
+}
+
+function minMax(arr) {
+  const a = arr.filter((x) => Number.isFinite(x));
+  if (!a.length) return { min: null, max: null };
+  return { min: Math.min(...a), max: Math.max(...a) };
+}
+
+function smaCloses(closes, n) {
+  if (!Array.isArray(closes) || closes.length < n) return null;
+  const slice = closes.slice(-n);
+  const s = slice.reduce((acc, x) => acc + x, 0);
+  return s / n;
+}
+
+/** Per-day OHLC-derived % metrics + day-over-day close change %. */
+function buildD1DayMetrics(rows) {
+  const out = [];
+  const list = Array.isArray(rows) ? rows : [];
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
+    const o = Number(r.open);
+    const h = Number(r.high);
+    const l = Number(r.low);
+    const c = Number(r.close);
+    if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c) || o <= 0 || l <= 0) continue;
+    const prevC = i > 0 ? Number(list[i - 1].close) : null;
+    const changeFromPrevClosePct =
+      Number.isFinite(prevC) && prevC > 0 ? ((c - prevC) / prevC) * 100 : null;
+    out.push({
+      openToHighPct: ((h - o) / o) * 100,
+      openToLowPct: ((o - l) / o) * 100,
+      lowToHighPct: ((h - l) / l) * 100,
+      openToClosePct: ((c - o) / o) * 100,
+      changeFromPrevClosePct
+    });
+  }
+  return out;
+}
+
+function summarizeMetricWindow(metrics, label) {
+  if (!metrics.length) return null;
+  const oth = metrics.map((m) => m.openToHighPct);
+  const otl = metrics.map((m) => m.openToLowPct);
+  const lth = metrics.map((m) => m.lowToHighPct);
+  const otc = metrics.map((m) => m.openToClosePct);
+  const chg = metrics.map((m) => m.changeFromPrevClosePct).filter((x) => x != null);
+  return {
+    label,
+    days: metrics.length,
+    openToHighPct: { avg: mean(oth), ...minMax(oth) },
+    openToLowPct: { avg: mean(otl), ...minMax(otl) },
+    lowToHighPct: { avg: mean(lth), ...minMax(lth) },
+    openToClosePct: { avg: mean(otc), ...minMax(otc) },
+    changeFromPrevClosePct: chg.length ? { avg: mean(chg), ...minMax(chg) } : null
+  };
+}
+
+/** Rich D1 stats: rolling 15/30/60 + all sample; complements legacy calcHistoryBehaviorStats. */
+function buildRichHistoryProfile(d1Rows) {
+  const rows = Array.isArray(d1Rows) ? d1Rows.slice().sort((a, b) => a.ts - b.ts) : [];
+  if (rows.length < 10) return null;
+  const metrics = buildD1DayMetrics(rows);
+  if (!metrics.length) return null;
+  const last15 = metrics.slice(-15);
+  const last30 = metrics.slice(-30);
+  const last60 = metrics.slice(-60);
+  const windows = {
+    last15: summarizeMetricWindow(last15, "last15"),
+    last30: summarizeMetricWindow(last30, "last30"),
+    last60: rows.length >= 60 ? summarizeMetricWindow(last60, "last60") : null,
+    all: summarizeMetricWindow(metrics, "all")
+  };
+  const chgAll = metrics.map((m) => m.changeFromPrevClosePct).filter((x) => x != null);
+  return {
+    windows,
+    extremes: {
+      changeFromPrevClosePctAllTime: chgAll.length ? { ...minMax(chgAll), sampleDays: chgAll.length } : null
+    },
+    legacy: calcHistoryBehaviorStats(rows)
+  };
+}
+
+/** D1 + H1 + M5 bias — H1 cuts M5 noise / over-scalping against the swing. */
+function computeTrendContext(d1Rows, mergedRows, h1Rows) {
+  const d1 = Array.isArray(d1Rows) ? d1Rows.slice().sort((a, b) => a.ts - b.ts) : [];
+  const closesD1 = d1.map((r) => Number(r.close)).filter((x) => Number.isFinite(x) && x > 0);
+  let d1Bias = "neutral";
+  let d1Strength = 0;
+  if (closesD1.length >= 20) {
+    const sma20 = smaCloses(closesD1, 20);
+    const last = closesD1[closesD1.length - 1];
+    if (sma20 > 0) {
+      const pct = (last - sma20) / sma20;
+      if (pct > 0.002) {
+        d1Bias = "bullish";
+        d1Strength = Math.min(1, pct / 0.015);
+      } else if (pct < -0.002) {
+        d1Bias = "bearish";
+        d1Strength = Math.min(1, -pct / 0.015);
+      }
+    }
+  }
+  const h1 = Array.isArray(h1Rows) ? h1Rows.slice().sort((a, b) => a.ts - b.ts) : [];
+  const closesH1 = h1.map((r) => Number(r.close)).filter((x) => Number.isFinite(x) && x > 0);
+  let h1Bias = "neutral";
+  let h1Strength = 0;
+  if (closesH1.length >= 20) {
+    const sma20 = smaCloses(closesH1, 20);
+    const last = closesH1[closesH1.length - 1];
+    if (sma20 > 0) {
+      const pct = (last - sma20) / sma20;
+      if (pct > 0.0015) {
+        h1Bias = "bullish";
+        h1Strength = Math.min(1, pct / 0.012);
+      } else if (pct < -0.0015) {
+        h1Bias = "bearish";
+        h1Strength = Math.min(1, -pct / 0.012);
+      }
+    }
+  }
+  const m5 = Array.isArray(mergedRows) ? mergedRows.slice(-200) : [];
+  const closesM5 = m5.map((r) => Number(r.close)).filter((x) => Number.isFinite(x) && x > 0);
+  let m5Bias = "neutral";
+  let m5Strength = 0;
+  if (closesM5.length >= 20) {
+    const sma20 = smaCloses(closesM5, 20);
+    const last = closesM5[closesM5.length - 1];
+    if (sma20 > 0) {
+      const pct = (last - sma20) / sma20;
+      if (pct > 0.001) {
+        m5Bias = "bullish";
+        m5Strength = Math.min(1, pct / 0.008);
+      } else if (pct < -0.001) {
+        m5Bias = "bearish";
+        m5Strength = Math.min(1, -pct / 0.008);
+      }
+    }
+  }
+  let alignment = "mixed";
+  if (d1Bias === "neutral" || m5Bias === "neutral") alignment = "neutral_or_mixed";
+  else if (d1Bias === m5Bias) alignment = "aligned";
+  else alignment = "conflicting";
+  let htfVsM5 = "ok";
+  if (h1Bias !== "neutral" && m5Bias !== "neutral" && h1Bias !== m5Bias) htfVsM5 = "m5_fights_h1";
+  return {
+    d1: { bias: d1Bias, strength: Number(d1Strength.toFixed(3)), smaVsLast: closesD1.length >= 20 },
+    h1: { bias: h1Bias, strength: Number(h1Strength.toFixed(3)), smaVsLast: closesH1.length >= 20 },
+    m5: { bias: m5Bias, strength: Number(m5Strength.toFixed(3)), smaVsLast: closesM5.length >= 20 },
+    alignment,
+    htfVsM5,
+    rule:
+      "Use D1+H1 for swing direction; M5 is execution noise. Do not OPEN_SELL when D1 and H1 are both clearly bullish; do not OPEN_BUY when both clearly bearish. If htfVsM5 is m5_fights_h1, prefer WAIT for new entries. Prefer WAIT when D1 and M5 conflict unless managing exits."
+  };
+}
+
+/** Avg M5 bar range (price) — used for minimum stop distance vs tight scalping SL. */
+function computeMinStopDistancePrice(rows) {
+  const tail = Array.isArray(rows) ? rows.slice(-48) : [];
+  if (tail.length < 10) return 0;
+  let sum = 0;
+  let n = 0;
+  for (const r of tail) {
+    const h = Number(r.high);
+    const l = Number(r.low);
+    if (Number.isFinite(h) && Number.isFinite(l) && h > l) {
+      sum += h - l;
+      n++;
+    }
+  }
+  if (n < 5) return 0;
+  const avg = sum / n;
+  const mult = Math.max(0.9, envNum("MT4_MIN_SL_RANGE_MULT", 1.45));
+  const floor = Math.max(0.5, envNum("MT4_MIN_SL_PRICE_FLOOR", 2.8));
+  return Math.max(floor, avg * mult);
+}
+
+function normalizeStopsForDecision(decision, payload, mergedRows) {
+  if (!decision) return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const bid = Number(payload?.bid);
+  const ask = Number(payload?.ask);
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || ask < bid) return decision;
+  const minDist = computeMinStopDistancePrice(mergedRows);
+  if (minDist <= 0) return decision;
+  const rr = Math.max(1.15, envNum("MT4_DEFAULT_TP_RR", 1.55));
+  let sl = decision.sl != null ? Number(decision.sl) : NaN;
+  let tp = decision.tp != null ? Number(decision.tp) : NaN;
+
+  if (a === "OPEN_BUY") {
+    const entry = ask;
+    const maxSl = entry - minDist;
+    if (!Number.isFinite(sl) || sl <= 0 || sl > maxSl) sl = maxSl;
+    if (!Number.isFinite(tp) || tp <= 0) tp = entry + minDist * rr;
+  } else {
+    const entry = bid;
+    const minSl = entry + minDist;
+    if (!Number.isFinite(sl) || sl <= 0 || sl < minSl) sl = minSl;
+    if (!Number.isFinite(tp) || tp <= 0) tp = entry - minDist * rr;
+  }
+  return {
+    ...decision,
+    sl,
+    tp,
+    reason: String(decision.reason || "").slice(0, 200)
+  };
+}
+
+function applyMinConfidenceGuard(decision) {
+  if (!decision) return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const minC = Math.max(0, Math.min(1, envNum("MT4_MIN_ENTRY_CONFIDENCE", 0.52)));
+  const c = Number(decision.confidence) || 0;
+  if (c < minC) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: c,
+      reason: `low_confidence_guard:${c.toFixed(2)}<${minC} ${String(decision.reason || "").slice(0, 100)}`
+    };
+  }
+  return decision;
+}
+
+function applyAlignmentConflictGuard(decision, trendContext, hasOpenPositions) {
+  if (!decision || hasOpenPositions) return decision;
+  const soft = String(envStr("MT4_CONFLICT_ALIGNMENT_SOFT_BLOCK", "true")).toLowerCase() === "true";
+  if (!soft || !trendContext) return decision;
+  if (trendContext.alignment !== "conflicting") return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const thr = Math.max(0.12, Math.min(0.85, envNum("MT4_CONFLICT_ALIGNMENT_STRENGTH", 0.28)));
+  const d1s = Number(trendContext.d1?.strength) || 0;
+  const m5s = Number(trendContext.m5?.strength) || 0;
+  if (d1s >= thr && m5s >= thr) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.38),
+      reason: `alignment_conflict_guard ${String(decision.reason || "").slice(0, 120)}`
+    };
+  }
+  return decision;
+}
+
+function applyEntryCooldown(decision, accountId, symbol, hasOpenPositions) {
+  if (!decision || hasOpenPositions) return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const minMs = Math.max(0, envNum("MT4_MIN_MS_BETWEEN_NEW_ENTRIES", 720000));
+  if (minMs <= 0) return decision;
+  const key = `${String(accountId || "default")}|${String(symbol || "XAUUSD").toUpperCase()}`;
+  const last = cache.entryThrottleByAccount.get(key) || 0;
+  const now = Date.now();
+  if (now - last < minMs) {
+    const left = Math.ceil((minMs - (now - last)) / 1000);
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+      reason: `entry_cooldown:${left}s ${String(decision.reason || "").slice(0, 100)}`
+    };
+  }
+  return decision;
+}
+
+/** Block shorts when D1+H1 both bullish (and mirror) — reduces sell arrows in a rally. */
+function applyHtfDualBlockGuard(decision, trendContext, hasOpenPositions) {
+  if (!decision || hasOpenPositions) return decision;
+  const soft = String(envStr("MT4_HTF_DUAL_BLOCK", "true")).toLowerCase() === "true";
+  if (!soft || !trendContext) return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const thr = Math.max(0.1, Math.min(0.85, envNum("MT4_HTF_DUAL_BLOCK_STRENGTH", 0.22)));
+  const d1b = trendContext.d1?.bias;
+  const h1b = trendContext.h1?.bias;
+  const d1s = Number(trendContext.d1?.strength) || 0;
+  const h1s = Number(trendContext.h1?.strength) || 0;
+  const bothBull = d1b === "bullish" && h1b === "bullish" && d1s >= thr && h1s >= thr * 0.85;
+  const bothBear = d1b === "bearish" && h1b === "bearish" && d1s >= thr && h1s >= thr * 0.85;
+  if (a === "OPEN_SELL" && bothBull) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+      reason: `htf_dual_block:no_short_when_d1_h1_bull ${String(decision.reason || "").slice(0, 100)}`
+    };
+  }
+  if (a === "OPEN_BUY" && bothBear) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+      reason: `htf_dual_block:no_long_when_d1_h1_bear ${String(decision.reason || "").slice(0, 100)}`
+    };
+  }
+  return decision;
+}
+
+/** When M5 disagrees with H1 strongly, stand aside (anti-chop). */
+function applyM5VsH1Guard(decision, trendContext, hasOpenPositions) {
+  if (!decision || hasOpenPositions) return decision;
+  const soft = String(envStr("MT4_M5_VS_H1_SOFT_BLOCK", "true")).toLowerCase() === "true";
+  if (!soft || !trendContext || trendContext.htfVsM5 !== "m5_fights_h1") return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
+  const h1s = Number(trendContext.h1?.strength) || 0;
+  const m5s = Number(trendContext.m5?.strength) || 0;
+  const need = Math.max(0.12, Math.min(0.9, envNum("MT4_M5_VS_H1_MIN_STRENGTH", 0.26)));
+  if (h1s < need || m5s < need) return decision;
+  return {
+    ...decision,
+    action: "WAIT",
+    confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+    reason: `m5_vs_h1_chop ${String(decision.reason || "").slice(0, 100)}`
+  };
+}
+
+function recordEntryThrottle(accountId, symbol, decision) {
+  const a = normalizeAction(decision?.action);
+  if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return;
+  const key = `${String(accountId || "default")}|${String(symbol || "XAUUSD").toUpperCase()}`;
+  cache.entryThrottleByAccount.set(key, Date.now());
+}
+
+function applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions) {
+  let d = decision;
+  d = normalizeStopsForDecision(d, payload, mergedRows);
+  d = applyMinConfidenceGuard(d);
+  d = applyAlignmentConflictGuard(d, trendContext, hasOpenPositions);
+  d = applyHtfDualBlockGuard(d, trendContext, hasOpenPositions);
+  d = applyM5VsH1Guard(d, trendContext, hasOpenPositions);
+  d = applyContraTrendGuard(d, trendContext, hasOpenPositions);
+  d = applyEntryCooldown(d, accountId, symbol, hasOpenPositions);
+  return d;
+}
+
+function applyContraTrendGuard(decision, trendContext, hasOpenPositions) {
+  if (!decision || hasOpenPositions) return decision;
+  const soft = String(envStr("MT4_CONTRA_TREND_SOFT_BLOCK", "true")).toLowerCase() === "true";
+  if (!soft || !trendContext) return decision;
+  const a = normalizeAction(decision.action);
+  const thr = Math.max(0.15, Math.min(0.85, envNum("MT4_CONTRA_TREND_STRENGTH", 0.35)));
+  const d1b = trendContext.d1?.bias;
+  const m5b = trendContext.m5?.bias;
+  const d1s = Number(trendContext.d1?.strength) || 0;
+  const m5s = Number(trendContext.m5?.strength) || 0;
+  const strongBear = d1b === "bearish" && d1s >= thr && m5b === "bearish" && m5s >= thr * 0.7;
+  const strongBull = d1b === "bullish" && d1s >= thr && m5b === "bullish" && m5s >= thr * 0.7;
+  if (a === "OPEN_BUY" && strongBear) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+      reason: `contra_trend_guard:avoid_buy_in_strong_bearish_htf ${String(decision.reason || "").slice(0, 120)}`
+    };
+  }
+  if (a === "OPEN_SELL" && strongBull) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.35),
+      reason: `contra_trend_guard:avoid_sell_in_strong_bullish_htf ${String(decision.reason || "").slice(0, 120)}`
+    };
+  }
+  return decision;
 }
 
 function buildSmcContext(rows) {
@@ -434,8 +810,13 @@ async function callDeepSeekGoldDecision(payload) {
     "Actions allowed: WAIT, OPEN_BUY, OPEN_SELL, CLOSE_ALL.",
     "You are responsible for both entries and exits. Manage open positions actively.",
     "When risk or momentum turns against an open position, you may use CLOSE_ALL.",
+    "Trend discipline: use trendContext.d1, .h1, and .m5. H1 is the swing; M5 is noise. If trendContext.htfVsM5 is m5_fights_h1, prefer WAIT for new entries. Do not OPEN_SELL when D1 and H1 are both clearly bullish; do not OPEN_BUY when both are clearly bearish (server may also block these).",
+    "When trendContext.alignment is conflicting, prefer WAIT for new entries unless you are managing an exit.",
+    "historyProfile.windows contains rolling stats (last15/last30/last60/all): avg/min/max for openToHigh, openToLow, lowToHigh, openToClose, and changeFromPrevClose. Use these to judge if today's move is already stretched vs typical days.",
+    "smcContext is short-term structure from recent bars; historyProfile is longer daily behaviour. Combine them; do not chase entries when price is extended beyond typical daily ranges without clear continuation.",
     "Avoid overtrading and avoid entries when spread is high or edge unclear.",
-    "Prefer WAIT when uncertain."
+    "Prefer WAIT when uncertain.",
+    "Stop/target: for OPEN_BUY/OPEN_SELL, place SL at least ~1.4× the typical M5 bar range away from entry (not a few ticks). Prefer RR ~1.5:1 or better when you set tp; do not use tp=0 unless you intend to manage exit with CLOSE_ALL only."
   ].join("\n");
   const user = [
     "Decide one action for this cycle.",
@@ -453,6 +834,7 @@ async function callDeepSeekGoldDecision(payload) {
       openPositions: Array.isArray(payload.openPositions) ? payload.openPositions.slice(0, 20) : [],
       candles: tail,
       historyProfile: payload.historyProfile || null,
+      trendContext: payload.trendContext || null,
       smcContext: payload.smcContext || null,
       pythonSmc: payload.pythonSmc || null
     })}`
@@ -545,7 +927,7 @@ async function getGoldMt4Signal(payload = {}) {
   const pairKey = `${accountId}|${symbol}|${timeframe}`;
   const key = `${pairKey}|${latestBarTime}`;
   const now = Date.now();
-  const minIntervalBaseMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 30000));
+  const minIntervalBaseMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 120000));
   const minIntervalOpenMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_OPEN_MS", 10000));
   const minIntervalMs = hasOpenPositions ? minIntervalOpenMs : minIntervalBaseMs;
   const sameBarReuse = String(envStr("MT4_REUSE_DECISION_SAME_BAR", "true")).toLowerCase() === "true";
@@ -562,27 +944,43 @@ async function getGoldMt4Signal(payload = {}) {
 
   const records = listHistoryRecords(accountId, symbol);
   const d1Rec = records.find((r) => r.timeframe === "D1");
+  const h1Rec = records.find((r) => r.timeframe === "H1");
   const tfRec = records.find((r) => r.timeframe === timeframe);
   const pgRows = await pgStore.getRecentCandles(symbol, timeframe, 2200);
   const pgD1Rows = await pgStore.getRecentCandles(symbol, "D1", 4200);
+  const pgH1Rows = await pgStore.getRecentCandles(symbol, "H1", 1500);
   const mergedRows = tfRec?.rows?.length
     ? [...tfRec.rows.slice(-2000), ...candles.map(normalizeCandleRow).filter(Boolean)].sort((a, b) => a.ts - b.ts)
     : pgRows.length
       ? [...pgRows, ...candles.map(normalizeCandleRow).filter(Boolean)].sort((a, b) => a.ts - b.ts)
       : candles.map(normalizeCandleRow).filter(Boolean);
-  const historyProfile = pgD1Rows.length
-    ? calcHistoryBehaviorStats(pgD1Rows.slice(-4000))
+  const d1ForProfile = pgD1Rows.length
+    ? pgD1Rows.slice(-4000)
     : d1Rec?.rows?.length
-      ? calcHistoryBehaviorStats(d1Rec.rows.slice(-4000))
+      ? d1Rec.rows.slice(-4000)
+      : [];
+  let historyProfile =
+    d1ForProfile.length >= 5
+      ? buildRichHistoryProfile(d1ForProfile)
       : null;
+  if (!historyProfile && d1ForProfile.length >= 30) {
+    historyProfile = { legacy: calcHistoryBehaviorStats(d1ForProfile), windows: null, trendContext: null };
+  }
+  const h1ForTrend =
+    pgH1Rows.length >= 20 ? pgH1Rows : h1Rec?.rows?.length ? h1Rec.rows.slice(-800) : [];
+  const trendContext = computeTrendContext(d1ForProfile, mergedRows, h1ForTrend);
+  if (historyProfile && typeof historyProfile === "object") {
+    historyProfile.trendContext = trendContext;
+  }
   const smcContext = buildSmcContext(mergedRows);
   const pythonSmc = await runPythonSmc(mergedRows);
   const pyPriority = String(envStr("MT4_PYTHON_SMC_PRIORITY", "true")).toLowerCase() === "true";
+  const pyMinConf = Math.max(0.5, Math.min(0.99, envNum("MT4_PYTHON_SMC_PRIORITY_MIN_CONF", 0.78)));
   if (pyPriority && (!aiFullControl || !hasOpenPositions) && pythonSmc?.ok && pythonSmc?.decision) {
     const pyAction = normalizeAction(pythonSmc.decision.action);
     const pyConf = Math.max(0, Math.min(1, Number(pythonSmc.decision.confidence) || 0));
-    if (pyAction !== "WAIT" && pyConf >= 0.7) {
-      const decision = {
+    if (pyAction !== "WAIT" && pyConf >= pyMinConf) {
+      let decision = {
         action: pyAction,
         confidence: pyConf,
         reason: String(pythonSmc.decision.reason || "python_smc_priority").slice(0, 220),
@@ -590,6 +988,8 @@ async function getGoldMt4Signal(payload = {}) {
         tp: Number(pythonSmc.decision.tp) || null,
         riskPercent: Number(pythonSmc.decision.riskPercent) > 0 ? Number(pythonSmc.decision.riskPercent) : 0.3
       };
+      decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
+      recordEntryThrottle(accountId, symbol, decision);
       cache.byKey.set(key, { ts: now, source: "python_smc_priority", decision });
       cache.byPair.set(pairKey, { ts: now, source: "python_smc_priority", decision, latestBarTime });
       return {
@@ -597,6 +997,8 @@ async function getGoldMt4Signal(payload = {}) {
         source: "python_smc_priority",
         cached: false,
         bootstrap: boot,
+        trendContext,
+        contratrendAdjusted: decision.action !== pyAction,
         decision,
         pythonSmcMeta: {
           source: pythonSmc.source || null,
@@ -633,10 +1035,14 @@ async function getGoldMt4Signal(payload = {}) {
     ...payload,
     candles: mergedRows,
     historyProfile,
+    trendContext,
     smcContext,
     pythonSmc
   });
-  const decision = ai.decision || quickFallbackDecision(payload);
+  let decision = ai.decision || quickFallbackDecision(payload);
+  const actionBeforeGuard = normalizeAction(decision.action);
+  decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
+  recordEntryThrottle(accountId, symbol, decision);
   cache.byKey.set(key, { ts: now, source: ai.source || "fallback", decision });
   cache.byPair.set(pairKey, { ts: now, source: ai.source || "fallback", decision, latestBarTime });
 
@@ -645,6 +1051,8 @@ async function getGoldMt4Signal(payload = {}) {
     source: ai.source || "fallback",
     cached: false,
     bootstrap: boot,
+    trendContext,
+    contratrendAdjusted: decision.action !== actionBeforeGuard,
     decision
   };
 }

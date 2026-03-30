@@ -1,14 +1,27 @@
 #property strict
+// TitanAI XAUUSD — ติดตั้ง: (1) ใส่ ApiKey ให้ตรงกับ MT4_SHARED_SECRET บน Render
+// (2) Tools → Options → Expert Advisors → Allow WebRequest → เพิ่มโดเมน API
+// (3) ชาร์ต M5 XAUUSD, AutoTrading เปิด, คอมไพล์ EA แล้วลากแนบ
 
+// ---------- API ----------
 input string ApiBaseUrl = "https://titan-ai-api.onrender.com";
-input string ApiKey = "T!tan_MT4_2026#XAUUSD@9qL7mP2vR";
-input int PollSeconds = 30;
-input int SlippagePoints = 30;
+input string ApiKey = "";
+input int PollSeconds = 60;
+
+// ---------- ออเดอร์ ----------
+input int SlippagePoints = 35;
 input int MaxSpreadPoints = 45;
 input int MagicNumber = 260326;
-input double FixedLot = 0.01;
+input double FixedLot = 0.10;
+input int MinStopDistancePoints = 220;
+input int MinSecondsBetweenEntries = 900;
+input int MinM5BarsBetweenNewEntries = 4;
+
+// ---------- สัญญาณ (สอดคล้องกับเซิร์ฟเวอร์: ไม่สแกลปถี่) ----------
 input bool TradeOnlyM5Close = true;
 input int CandlesToSend = 120;
+
+// ---------- Bootstrap / ประวัติ ----------
 input bool BootstrapHistoryFirst = true;
 input int BootstrapYears = 10;
 input bool BootstrapAllHistory = false;
@@ -19,14 +32,11 @@ input bool BootstrapIncludeM15M30 = true;
 input bool BootstrapIncludeM5 = true;
 input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
+
+// ---------- โหมด AI / ป้องกันกำไร ----------
 input bool AiFullControlMode = true;
-input bool EnableProfitProtect = false;
-input bool EnableSpikeGuard = true;
-input double SpikeRangeMultiplier = 2.8;
-input int SpikeLookbackBars = 24;
-input int SpikeCooldownMinutes = 8;
-input bool SpikeEmergencyClose = true;
-input int SpikeMinRangePoints = 140;
+input bool EnableProfitProtect = true;
+input bool ProfitProtectWithAiControl = true;
 input int ProfitLockStartPoints = 120;
 input int ProfitLockGivebackPoints = 60;
 input int BreakEvenAtPoints = 90;
@@ -35,7 +45,17 @@ input int TrailStartPoints = 160;
 input int TrailDistancePoints = 90;
 input int TrailStepPoints = 20;
 
+// ---------- Spike guard ----------
+input bool EnableSpikeGuard = true;
+input double SpikeRangeMultiplier = 2.8;
+input int SpikeLookbackBars = 24;
+input int SpikeCooldownMinutes = 10;
+input bool SpikeEmergencyClose = true;
+input int SpikeMinRangePoints = 140;
+
 datetime g_lastBarTime = 0;
+datetime g_lastEntryTime = 0;
+datetime g_lastOpenM5BarTime = 0;
 bool g_bootstrapInited = false;
 bool g_bootstrapDone = false;
 int g_bootstrapStage = 0; // 0=D1,1=H4,2=H1,3=M30,4=M15,5=M5,6=M1,7=done
@@ -717,10 +737,20 @@ int NextShiftAfterTs(int period, double lastTsMs) {
 
 bool ParseDecision(string json, string &action, double &sl, double &tp, string &reason) {
    action = JsonGetString(json, "action");
-   if(action == "") action = "WAIT";
    sl = JsonGetNumber(json, "sl", 0.0);
    tp = JsonGetNumber(json, "tp", 0.0);
    reason = JsonGetString(json, "reason");
+   if(action == "") {
+      int dpos = StringFind(json, "\"decision\"", 0);
+      if(dpos >= 0) {
+         string tail = StringSubstr(json, dpos);
+         action = JsonGetString(tail, "action");
+         if(sl <= 0) sl = JsonGetNumber(tail, "sl", 0.0);
+         if(tp <= 0) tp = JsonGetNumber(tail, "tp", 0.0);
+         if(reason == "") reason = JsonGetString(tail, "reason");
+      }
+   }
+   if(action == "") action = "WAIT";
    if(reason == "") reason = "no-reason";
    return true;
 }
@@ -730,16 +760,33 @@ bool OpenOrder(int type, double lot, double sl, double tp, string reason) {
       Print("TitanAI skip open (spread guard): ", CurrentSpreadPoints());
       return false;
    }
+   if(MinSecondsBetweenEntries > 0 && g_lastEntryTime > 0) {
+      int need = (int)(TimeCurrent() - g_lastEntryTime);
+      if(need < MinSecondsBetweenEntries) {
+         Print("TitanAI skip open (entry cooldown): ", need, "s < ", MinSecondsBetweenEntries, "s");
+         return false;
+      }
+   }
    double price = (type == OP_BUY ? Ask : Bid);
    lot = MathMax(MarketInfo(Symbol(), MODE_MINLOT), lot);
    lot = NormalizeDouble(lot, 2);
    sl = (sl > 0 ? NormalizeDouble(sl, Digits) : 0.0);
    tp = (tp > 0 ? NormalizeDouble(tp, Digits) : 0.0);
+   double minDist = MathMax(0, MinStopDistancePoints) * Point;
+   if(minDist > 0) {
+      if(type == OP_BUY) {
+         if(sl <= 0 || (price - sl) < minDist) sl = NormalizeDouble(price - minDist, Digits);
+      } else {
+         if(sl <= 0 || (sl - price) < minDist) sl = NormalizeDouble(price + minDist, Digits);
+      }
+   }
    int ticket = OrderSend(Symbol(), type, lot, price, SlippagePoints, sl, tp, "TitanAI", MagicNumber, 0, clrDeepSkyBlue);
    if(ticket < 0) {
       Print("TitanAI OrderSend failed err=", GetLastError(), " reason=", reason);
       return false;
    }
+   g_lastEntryTime = TimeCurrent();
+   g_lastOpenM5BarTime = iTime(Symbol(), PERIOD_M5, 0);
    SendExecution((type == OP_BUY ? "BUY" : "SELL"), lot, price, 0.0, ticket, reason);
    return true;
 }
@@ -780,6 +827,14 @@ void HandleSignal() {
       CloseAllMyPositions(reason);
       return;
    }
+   if((action == "OPEN_BUY" || action == "OPEN_SELL") && MinM5BarsBetweenNewEntries > 0 && g_lastOpenM5BarTime > 0) {
+      int sh = iBarShift(Symbol(), PERIOD_M5, g_lastOpenM5BarTime);
+      if(sh >= 0 && sh < MinM5BarsBetweenNewEntries) {
+         Print("TitanAI skip open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenNewEntries);
+         return;
+      }
+      // sh < 0: bar not in history (gap) — allow open
+   }
    if(action == "OPEN_BUY") {
       if(CountMyOpenOrders(OP_BUY) > 0) return;
       if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("flip-to-buy");
@@ -798,7 +853,10 @@ int OnInit() {
    int timerSeconds = PollSeconds;
    if(timerSeconds < 5) timerSeconds = 5;
    EventSetTimer(timerSeconds);
-   Print("TitanAI_XAUUSD_MVP initialized. baseUrl=", GetApiBaseUrl(), ". Add API URL to MT4 WebRequest whitelist.");
+   if(StringLen(ApiKey) < 8) {
+      Print("TitanAI: ApiKey is empty — set EA input ApiKey to match MT4_SHARED_SECRET on Render.");
+   }
+   Print("TitanAI_XAUUSD_MVP initialized. baseUrl=", GetApiBaseUrl(), ". WebRequest whitelist + ApiKey required.");
    return(INIT_SUCCEEDED);
 }
 
@@ -812,7 +870,7 @@ void OnTick() {
 
 void OnTimer() {
    RunSpikeGuard();
-   if(!AiFullControlMode) ManageProfitProtection();
+   if(EnableProfitProtect && (!AiFullControlMode || ProfitProtectWithAiControl)) ManageProfitProtection();
    if(BootstrapHistoryFirst && !g_bootstrapDone) {
       RunBootstrapStep();
       return;

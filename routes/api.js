@@ -758,6 +758,22 @@ router.post("/demo/auto-trading/stop", (req, res) => {
   });
 });
 
+/** Flatten decision.* to top level so MT4 EA (simple string parse) always reads action/sl/tp. */
+function flattenMt4GoldSignalResponse(out) {
+  if (!out || out.ok === false) return out;
+  const d = out.decision;
+  if (!d || typeof d !== "object") return out;
+  return {
+    ...out,
+    action: d.action != null ? d.action : "WAIT",
+    sl: d.sl,
+    tp: d.tp,
+    reason: d.reason != null ? String(d.reason) : "",
+    confidence: d.confidence,
+    riskPercent: d.riskPercent
+  };
+}
+
 router.post("/mt4/gold/signal", async (req, res) => {
   const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
   if (shared) {
@@ -771,7 +787,7 @@ router.post("/mt4/gold/signal", async (req, res) => {
     if (!out.ok) {
       return res.status(out.code || 400).json(out);
     }
-    return res.json(out);
+    return res.json(flattenMt4GoldSignalResponse(out));
   } catch (err) {
     return res.status(500).json({ ok: false, message: err.message || "mt4 signal failed" });
   }
