@@ -410,8 +410,8 @@ function computeMinStopDistancePrice(rows) {
   }
   if (n < 5) return 0;
   const avg = sum / n;
-  const mult = Math.max(0.9, envNum("MT4_MIN_SL_RANGE_MULT", 1.45));
-  const floor = Math.max(0.5, envNum("MT4_MIN_SL_PRICE_FLOOR", 2.8));
+  const mult = Math.max(0.9, envNum("MT4_MIN_SL_RANGE_MULT", 2.2));
+  const floor = Math.max(0.5, envNum("MT4_MIN_SL_PRICE_FLOOR", 6.0));
   return Math.max(floor, avg * mult);
 }
 
@@ -424,7 +424,7 @@ function normalizeStopsForDecision(decision, payload, mergedRows) {
   if (!Number.isFinite(bid) || !Number.isFinite(ask) || ask < bid) return decision;
   const minDist = computeMinStopDistancePrice(mergedRows);
   if (minDist <= 0) return decision;
-  const rr = Math.max(1.15, envNum("MT4_DEFAULT_TP_RR", 1.55));
+  const rr = Math.max(1.15, envNum("MT4_DEFAULT_TP_RR", 1.8));
   let sl = decision.sl != null ? Number(decision.sl) : NaN;
   let tp = decision.tp != null ? Number(decision.tp) : NaN;
 

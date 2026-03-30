@@ -13,14 +13,14 @@ input int SlippagePoints = 35;
 input int MaxSpreadPoints = 45;
 input int MagicNumber = 260326;
 input double FixedLot = 0.10;
-input int MinStopDistancePoints = 220;
-input int MinSecondsBetweenEntries = 900;
-input int MinM5BarsBetweenNewEntries = 4;
+input int MinStopDistancePoints = 600;
+input int MinSecondsBetweenEntries = 1200;
+input int MinM5BarsBetweenNewEntries = 6;
 input bool AllowScaleIn = true;
 input int MaxOpenBuyPositions = 2;
 input int MaxOpenSellPositions = 2;
-input int MinSecondsBetweenScaleIns = 600;
-input int MinM5BarsBetweenScaleIns = 2;
+input int MinSecondsBetweenScaleIns = 900;
+input int MinM5BarsBetweenScaleIns = 3;
 
 // ---------- สัญญาณ (สอดคล้องกับเซิร์ฟเวอร์: ไม่สแกลปถี่) ----------
 input bool TradeOnlyM5Close = true;
