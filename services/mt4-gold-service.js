@@ -761,17 +761,39 @@ async function getGoldHistoryRows(accountId = "default", symbol = "XAUUSD", time
   const s = String(symbol || "XAUUSD").toUpperCase();
   const tf = String(timeframe || "M5").toUpperCase();
   const n = Math.max(20, Math.min(Number(limit) || 2000, 10000));
+  const pgStatusAll = await pgStore.getHistoryStatus(s);
+  const tfMeta = Array.isArray(pgStatusAll) ? pgStatusAll.find((x) => String(x.timeframe).toUpperCase() === tf) : null;
   const pgRows = await pgStore.getRecentCandles(s, tf, n);
   if (Array.isArray(pgRows) && pgRows.length) {
-    return { symbol: s, timeframe: tf, rows: pgRows, source: "postgres" };
+    return {
+      symbol: s,
+      timeframe: tf,
+      rows: pgRows,
+      source: "postgres",
+      meta: {
+        requestedLimit: n,
+        returnedRows: pgRows.length,
+        totalRowsInDb: tfMeta ? Number(tfMeta.totalRows) || 0 : pgRows.length,
+        rangeFrom: tfMeta?.from || pgRows[0]?.time || null,
+        rangeTo: tfMeta?.to || pgRows[pgRows.length - 1]?.time || null
+      }
+    };
   }
   const key = historyKey(effectiveAccountId, s, tf);
   const rows = cache.historyByKey.get(key)?.rows || [];
+  const sliced = rows.slice(-n);
   return {
     symbol: s,
     timeframe: tf,
-    rows: rows.slice(-n),
-    source: "memory"
+    rows: sliced,
+    source: "memory",
+    meta: {
+      requestedLimit: n,
+      returnedRows: sliced.length,
+      totalRowsInDb: rows.length,
+      rangeFrom: rows[0]?.time || null,
+      rangeTo: rows[rows.length - 1]?.time || null
+    }
   };
 }
 

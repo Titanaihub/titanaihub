@@ -67,8 +67,11 @@
     const tf = String(timeframe || "M5").toUpperCase();
     if (tf === "M1") return 1440;
     if (tf === "M5") return 288;
+    if (tf === "M15") return 96;
+    if (tf === "M30") return 48;
     if (tf === "H1") return 24;
     if (tf === "H4") return 6;
+    if (tf === "D1") return 1;
     return 1;
   }
 
@@ -135,12 +138,17 @@
       const errCount = Array.isArray(state.payload?.errors) ? state.payload.errors.length : 0;
       const symText = String(elements.historySymbolSelect?.value || "--");
       const approxNote = state.payload?.approximate ? " · mode: long-range (approx OHLC)" : "";
+      const m = state.payload?.mt4Meta;
+      const mt4Note =
+        m && (m.rangeTo != null || m.totalRowsInDb != null)
+          ? ` · DB total ${m.totalRowsInDb ?? "?"} · oldest→newest ${m.rangeFrom ? String(m.rangeFrom).slice(0, 10) : "?"} → ${m.rangeTo ? String(m.rangeTo).slice(0, 10) : "?"}`
+          : "";
       const firstErr =
         errCount && state.payload?.errors?.[0]?.message
           ? ` · ${String(state.payload.errors[0].message).slice(0, 90)}`
           : "";
       const sourceText = String(state.payload?.source || "binance");
-      elements.historyDataStatus.textContent = `${sourceText}: ${symText} · rows ${rows.length}${errCount ? ` · errors ${errCount}` : ""}${approxNote}${firstErr}`;
+      elements.historyDataStatus.textContent = `${sourceText}: ${symText} · rows ${rows.length}${mt4Note}${errCount ? ` · errors ${errCount}` : ""}${approxNote}${firstErr}`;
     }
   }
 
@@ -168,11 +176,20 @@
         });
         const headers = getOwnerAuthHeader();
         const out = await apiGet(`/mt4/gold/history-rows?${qs.toString()}`, { headers });
+        const meta = out.meta || {};
         state.payload = {
           ok: true,
           source: `mt4-gold:${timeframe}`,
           rows: normalizeGoldRows(out.rows || [], symbol),
-          errors: []
+          errors: [],
+          mt4Meta: {
+            timeframe,
+            requestedLimit: meta.requestedLimit,
+            returnedRows: meta.returnedRows,
+            totalRowsInDb: meta.totalRowsInDb,
+            rangeFrom: meta.rangeFrom,
+            rangeTo: meta.rangeTo
+          }
         };
       } else {
         const qs = new URLSearchParams({

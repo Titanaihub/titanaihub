@@ -655,6 +655,14 @@ void PushLiveHistoryIfDue() {
       int c4 = MathMin(220, s4);
       if(c4 > 0 && UploadHistoryChunk("live_append_h4", PERIOD_H4, s4, c4, false)) ok = true;
    }
+   int barsD1 = iBars(Symbol(), PERIOD_D1);
+   if(barsD1 >= 5) {
+      int sd1 = MathMin(barsD1 - 2, 400);
+      int resumeD1 = NextShiftAfterTs(PERIOD_D1, GetRemoteLastTsMs("D1"));
+      if(resumeD1 >= 0) sd1 = MathMin(sd1, resumeD1);
+      int cd1 = MathMin(120, sd1);
+      if(cd1 > 0 && UploadHistoryChunk("live_append_d1", PERIOD_D1, sd1, cd1, false)) ok = true;
+   }
    if(ok) g_lastHistoryPushAt = TimeCurrent();
 }
 
