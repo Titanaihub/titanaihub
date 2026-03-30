@@ -939,6 +939,9 @@ async function getGoldMt4Signal(payload = {}) {
   const accountId = String(payload.accountId || "default");
   const openPositions = Array.isArray(payload.openPositions) ? payload.openPositions : [];
   const hasOpenPositions = openPositions.length > 0;
+  const wantDebug =
+    Boolean(payload.debug) ||
+    String(envStr("MT4_AI_DEBUG", "false")).toLowerCase() === "true";
   const aiFullControl = String(envStr("MT4_AI_FULL_CONTROL", "true")).toLowerCase() === "true";
   const requireBootstrap = String(envStr("MT4_REQUIRE_BOOTSTRAP", "true")).toLowerCase() === "true";
   const boot = await computeBootstrapStatus(accountId, symbol);
@@ -1107,6 +1110,14 @@ async function getGoldMt4Signal(payload = {}) {
     return { tol, clusters: centers.sort((a, b) => b.count - a.count) };
   })();
 
+  const historyProfileDebug =
+    historyProfile && typeof historyProfile === "object"
+      ? {
+          windows: historyProfile.windows || null,
+          extremes: historyProfile.extremes || null
+        }
+      : null;
+
   const pythonSmc = await runPythonSmc(mergedRows);
   const pyPriority = String(envStr("MT4_PYTHON_SMC_PRIORITY", "true")).toLowerCase() === "true";
   const pyMinConf = Math.max(0.5, Math.min(0.99, envNum("MT4_PYTHON_SMC_PRIORITY_MIN_CONF", 0.68)));
@@ -1134,6 +1145,25 @@ async function getGoldMt4Signal(payload = {}) {
         trendContext,
         contratrendAdjusted: decision.action !== pyAction,
         decision,
+        aiDebug: wantDebug
+          ? {
+              inputs: {
+                historyProfile: historyProfileDebug,
+                trendContext,
+                smcContext,
+                d1ExpectedZones,
+                slCluster,
+                openPositionsRisk,
+                pythonSmcDecision: pythonSmc?.decision || null
+              },
+              outputs: {
+                decision
+              },
+              meta: {
+                aiSource: "python_smc_priority"
+              }
+            }
+          : undefined,
         pythonSmcMeta: {
           source: pythonSmc.source || null,
           fallbackReason: pythonSmc.fallback_reason || null
@@ -1190,7 +1220,26 @@ async function getGoldMt4Signal(payload = {}) {
     bootstrap: boot,
     trendContext,
     contratrendAdjusted: decision.action !== actionBeforeGuard,
-    decision
+    decision,
+    aiDebug: wantDebug
+      ? {
+          inputs: {
+            historyProfile: historyProfileDebug,
+            trendContext,
+            smcContext,
+            d1ExpectedZones,
+            slCluster,
+            openPositionsRisk,
+            pythonSmcDecision: pythonSmc?.decision || null
+          },
+          outputs: {
+            decision
+          },
+          meta: {
+            aiSource: ai.source || "fallback"
+          }
+        }
+      : undefined
   };
 }
 

@@ -13,6 +13,8 @@
     goldTfBootstrapCards: document.getElementById("goldTfBootstrapCards"),
     goldSyncMeta: document.getElementById("goldSyncMeta"),
     goldPythonSmcPreview: document.getElementById("goldPythonSmcPreview"),
+    goldAiInputsPreview: document.getElementById("goldAiInputsPreview"),
+    goldAiDecisionPreview: document.getElementById("goldAiDecisionPreview"),
     goldExecutionBody: document.getElementById("goldExecutionBody"),
     goldHistoryBody: document.getElementById("goldHistoryBody")
   };
@@ -67,6 +69,33 @@
       <div class="stat-card"><span>TP</span><strong>${fmt(d.tp, 3)}</strong></div>
       <div class="stat-card"><span>Source</span><strong>${String(result?.source || "--")}${result?.cached ? " (cached)" : ""}</strong></div>
     `;
+  }
+
+  function renderAiAnalysis(result) {
+    if (!elements.goldAiInputsPreview || !elements.goldAiDecisionPreview) return;
+    const dbg = result?.aiDebug;
+    if (!dbg || !dbg.inputs) {
+      elements.goldAiInputsPreview.textContent = "--";
+      elements.goldAiDecisionPreview.textContent = "--";
+      return;
+    }
+    const inputsObj = dbg.inputs;
+    elements.goldAiInputsPreview.textContent = JSON.stringify(inputsObj, null, 2);
+
+    const dec = result?.decision || {};
+    const outObj = {
+      action: String(dec.action || result?.action || "--").toUpperCase(),
+      confidence: dec.confidence ?? result?.confidence ?? null,
+      sl: dec.sl ?? result?.sl ?? null,
+      tp: dec.tp ?? result?.tp ?? null,
+      reason: dec.reason ?? result?.reason ?? "--",
+      aiSource: dbg?.meta?.aiSource ?? result?.source ?? "--"
+    };
+    elements.goldAiDecisionPreview.textContent = JSON.stringify(
+      { ...outObj, outputs: dbg.outputs || null },
+      null,
+      2
+    );
   }
 
   function renderBootstrapStatus(boot, meta = {}) {
@@ -199,13 +228,15 @@
         equity: 10000,
         freeMargin: 9200,
         openPositions: [],
+        debug: true,
         candles: buildDemoCandles(120)
       };
       const out = await apiPost("/mt4/gold/signal", payload, apiKey ? { "x-mt4-key": apiKey } : {});
       renderSignal(out);
+      renderAiAnalysis(out);
       renderBootstrapStatus(out?.bootstrap || null, out || {});
       if (elements.goldStatus) {
-        elements.goldStatus.textContent = `Signal ready: ${String(out?.decision?.action || "--")}`;
+        elements.goldStatus.textContent = `Signal ready: ${String(out?.decision?.action || out?.action || "--")}`;
       }
     } catch (err) {
       if (elements.goldStatus) elements.goldStatus.textContent = `Signal failed: ${err.message || "unknown error"}`;
