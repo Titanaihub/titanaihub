@@ -63,9 +63,11 @@
     if (!el.cards) return;
     const d = out?.decision || {};
     const action = String(d.action || out?.action || "--").toUpperCase();
+    const strategyMode = String(d.strategyMode || out?.strategyMode || "--");
     const cls = action.includes("BUY") ? "pos" : action.includes("SELL") ? "neg" : "flat";
     el.cards.innerHTML = `
       <div class="stat-card"><span>Action</span><strong class="${cls}">${action}</strong></div>
+      <div class="stat-card"><span>Strategy</span><strong>${strategyMode}</strong></div>
       <div class="stat-card"><span>Confidence</span><strong>${fmt((Number(d.confidence ?? out?.confidence) || 0) * 100)}%</strong></div>
       <div class="stat-card"><span>Reason</span><strong>${String(d.reason || out?.reason || "--")}</strong></div>
       <div class="stat-card"><span>SL</span><strong>${fmt(d.sl ?? out?.sl, 3)}</strong></div>
@@ -95,7 +97,11 @@
     const py = inputs.pythonSmcDecision || null;
     const lines = [];
 
-    lines.push(`Decision: ${String(d.action || "--")} | Confidence: ${pct(d.confidence)} | Source: ${String(out?.source || "--")}`);
+    lines.push(
+      `Decision: ${String(d.action || "--")} | Strategy: ${String(d.strategyMode || out?.strategyMode || "--")} | Confidence: ${pct(
+        d.confidence
+      )} | Source: ${String(out?.source || "--")}`
+    );
     lines.push(`Reason: ${String(d.reason || "--")}`);
     lines.push(`SL/TP: ${p3(d.sl)} / ${p3(d.tp)} | Risk: ${Number(d.riskPercent ?? 0).toFixed(2)}%`);
 

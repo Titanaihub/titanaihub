@@ -792,6 +792,7 @@ function flattenMt4GoldSignalResponse(out) {
   return {
     ...out,
     action: d.action != null ? d.action : "WAIT",
+    strategyMode: d.strategyMode != null ? d.strategyMode : null,
     sl: d.sl,
     tp: d.tp,
     reason: d.reason != null ? String(d.reason) : "",

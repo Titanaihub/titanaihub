@@ -13,6 +13,12 @@ input int SlippagePoints = 35;
 input int MaxSpreadPoints = 45;
 input int MagicNumber = 260326;
 input double FixedLot = 0.10;
+input bool UseAiRiskSizing = true;
+input double AiRiskPercentDefault = 0.30;
+input double AiRiskPercentMin = 0.10;
+input double AiRiskPercentMax = 2.00;
+input bool ForceMinLotOverride = true;
+input double ForcedMinLot = 0.10;
 input int MinStopDistancePoints = 600;
 input int MinSecondsBetweenEntries = 1200;
 input int MinM5BarsBetweenNewEntries = 6;
@@ -768,11 +774,12 @@ int NextShiftAfterTs(int period, double lastTsMs) {
    return bars - 2;
 }
 
-bool ParseDecision(string json, string &action, double &sl, double &tp, string &reason) {
+bool ParseDecision(string json, string &action, double &sl, double &tp, string &reason, double &riskPercent) {
    action = JsonGetString(json, "action");
    sl = JsonGetNumber(json, "sl", 0.0);
    tp = JsonGetNumber(json, "tp", 0.0);
    reason = JsonGetString(json, "reason");
+   riskPercent = JsonGetNumber(json, "riskPercent", -1.0);
    if(action == "") {
       int dpos = StringFind(json, "\"decision\"", 0);
       if(dpos >= 0) {
@@ -781,6 +788,7 @@ bool ParseDecision(string json, string &action, double &sl, double &tp, string &
          if(sl <= 0) sl = JsonGetNumber(tail, "sl", 0.0);
          if(tp <= 0) tp = JsonGetNumber(tail, "tp", 0.0);
          if(reason == "") reason = JsonGetString(tail, "reason");
+         if(riskPercent <= 0) riskPercent = JsonGetNumber(tail, "riskPercent", -1.0);
       }
    }
    if(action == "") action = "WAIT";
@@ -788,25 +796,60 @@ bool ParseDecision(string json, string &action, double &sl, double &tp, string &
    return true;
 }
 
+double ClampLotToBroker(double lotRaw) {
+   double minLot = MarketInfo(Symbol(), MODE_MINLOT);
+   double maxLot = MarketInfo(Symbol(), MODE_MAXLOT);
+   double step = MarketInfo(Symbol(), MODE_LOTSTEP);
+   if(ForceMinLotOverride && ForcedMinLot > 0) minLot = MathMax(minLot, ForcedMinLot);
+   if(step <= 0) step = 0.01;
+   double lot = MathMax(minLot, MathMin(maxLot, lotRaw));
+   lot = MathFloor(lot / step) * step;
+   lot = NormalizeDouble(lot, 2);
+   if(lot < minLot) lot = minLot;
+   if(lot > maxLot) lot = maxLot;
+   return lot;
+}
+
+double ComputeLotByRiskPercent(int type, double sl, double fallbackLot, double riskPercent) {
+   if(!UseAiRiskSizing) return ClampLotToBroker(fallbackLot);
+   if(riskPercent <= 0) riskPercent = AiRiskPercentDefault;
+   riskPercent = MathMax(AiRiskPercentMin, MathMin(AiRiskPercentMax, riskPercent));
+   double entry = (type == OP_BUY ? Ask : Bid);
+   if(entry <= 0 || sl <= 0) return ClampLotToBroker(fallbackLot);
+   double slDist = MathAbs(entry - sl);
+   if(slDist <= (Point * 5.0)) return ClampLotToBroker(fallbackLot);
+
+   double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   if(tickValue <= 0 || tickSize <= 0) return ClampLotToBroker(fallbackLot);
+   double moneyPerPricePerLot = tickValue / tickSize;
+   if(moneyPerPricePerLot <= 0) return ClampLotToBroker(fallbackLot);
+
+   double equity = AccountEquity();
+   double riskMoney = equity * (riskPercent / 100.0);
+   if(riskMoney <= 0) return ClampLotToBroker(fallbackLot);
+
+   double lot = riskMoney / (slDist * moneyPerPricePerLot);
+   return ClampLotToBroker(lot);
+}
+
 bool OpenOrder(int type, double lot, double sl, double tp, string reason, bool isScaleIn) {
-   if(CurrentSpreadPoints() > MaxSpreadPoints) {
-      Print("TitanAI skip open (spread guard): ", CurrentSpreadPoints());
-      return false;
-   }
-   if(isScaleIn) {
-      if(MinSecondsBetweenScaleIns > 0 && g_lastScaleInTime > 0) {
-         int need2 = (int)(TimeCurrent() - g_lastScaleInTime);
-         if(need2 < MinSecondsBetweenScaleIns) {
-            Print("TitanAI skip scale open (cooldown): ", need2, "s < ", MinSecondsBetweenScaleIns, "s");
-            return false;
+   if(!AiFullControlMode) {
+      if(isScaleIn) {
+         if(MinSecondsBetweenScaleIns > 0 && g_lastScaleInTime > 0) {
+            int need2 = (int)(TimeCurrent() - g_lastScaleInTime);
+            if(need2 < MinSecondsBetweenScaleIns) {
+               Print("TitanAI skip scale open (cooldown): ", need2, "s < ", MinSecondsBetweenScaleIns, "s");
+               return false;
+            }
          }
-      }
-   } else {
-      if(MinSecondsBetweenEntries > 0 && g_lastEntryTime > 0) {
-         int need = (int)(TimeCurrent() - g_lastEntryTime);
-         if(need < MinSecondsBetweenEntries) {
-            Print("TitanAI skip open (entry cooldown): ", need, "s < ", MinSecondsBetweenEntries, "s");
-            return false;
+      } else {
+         if(MinSecondsBetweenEntries > 0 && g_lastEntryTime > 0) {
+            int need = (int)(TimeCurrent() - g_lastEntryTime);
+            if(need < MinSecondsBetweenEntries) {
+               Print("TitanAI skip open (entry cooldown): ", need, "s < ", MinSecondsBetweenEntries, "s");
+               return false;
+            }
          }
       }
    }
@@ -815,12 +858,14 @@ bool OpenOrder(int type, double lot, double sl, double tp, string reason, bool i
    lot = NormalizeDouble(lot, 2);
    sl = (sl > 0 ? NormalizeDouble(sl, Digits) : 0.0);
    tp = (tp > 0 ? NormalizeDouble(tp, Digits) : 0.0);
-   double minDist = MathMax(0, MinStopDistancePoints) * Point;
-   if(minDist > 0) {
-      if(type == OP_BUY) {
-         if(sl <= 0 || (price - sl) < minDist) sl = NormalizeDouble(price - minDist, Digits);
-      } else {
-         if(sl <= 0 || (sl - price) < minDist) sl = NormalizeDouble(price + minDist, Digits);
+   if(!AiFullControlMode) {
+      double minDist = MathMax(0, MinStopDistancePoints) * Point;
+      if(minDist > 0) {
+         if(type == OP_BUY) {
+            if(sl <= 0 || (price - sl) < minDist) sl = NormalizeDouble(price - minDist, Digits);
+         } else {
+            if(sl <= 0 || (sl - price) < minDist) sl = NormalizeDouble(price + minDist, Digits);
+         }
       }
    }
    int ticket = OrderSend(Symbol(), type, lot, price, SlippagePoints, sl, tp, "TitanAI", MagicNumber, 0, clrDeepSkyBlue);
@@ -858,8 +903,10 @@ void SendExecution(string orderType, double lots, double price, double pnl, int 
 void HandleSignal() {
    if(!IsTradeAllowed()) return;
    if(!IsTradeSymbolAllowed()) return;
-   if(TradeOnlyM5Close && !IsNewBar()) return;
-   if(EnableSpikeGuard && g_spikeCooldownUntil > TimeCurrent()) return;
+   if(!AiFullControlMode) {
+      if(TradeOnlyM5Close && !IsNewBar()) return;
+      if(EnableSpikeGuard && g_spikeCooldownUntil > TimeCurrent()) return;
+   }
 
    string payload = BuildSignalPayload();
    string rsp = "";
@@ -867,7 +914,8 @@ void HandleSignal() {
 
    string action, reason;
    double sl, tp;
-   ParseDecision(rsp, action, sl, tp, reason);
+   double riskPercent = -1.0;
+   ParseDecision(rsp, action, sl, tp, reason, riskPercent);
    action = Upper(action);
 
    if(action == "WAIT") return;
@@ -876,51 +924,65 @@ void HandleSignal() {
       return;
    }
 
-  // Min bar gap for scale-in (different from new entry).
-  if((action == "SCALE_IN_BUY" || action == "SCALE_IN_SELL") && MinM5BarsBetweenScaleIns > 0 && g_lastScaleInM5BarTime > 0) {
-     int sh = iBarShift(Symbol(), PERIOD_M5, g_lastScaleInM5BarTime);
-     if(sh >= 0 && sh < MinM5BarsBetweenScaleIns) {
-        Print("TitanAI skip scale open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenScaleIns);
-        return;
+  if(!AiFullControlMode) {
+     // Min bar gap for scale-in (different from new entry).
+     if((action == "SCALE_IN_BUY" || action == "SCALE_IN_SELL") && MinM5BarsBetweenScaleIns > 0 && g_lastScaleInM5BarTime > 0) {
+        int sh = iBarShift(Symbol(), PERIOD_M5, g_lastScaleInM5BarTime);
+        if(sh >= 0 && sh < MinM5BarsBetweenScaleIns) {
+           Print("TitanAI skip scale open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenScaleIns);
+           return;
+        }
+        // sh < 0: bar not in history (gap) — allow open
      }
-     // sh < 0: bar not in history (gap) — allow open
-  }
 
-  // Min bar gap for brand-new entries.
-  if((action == "OPEN_BUY" || action == "OPEN_SELL") && MinM5BarsBetweenNewEntries > 0 && g_lastOpenM5BarTime > 0) {
-     int sh = iBarShift(Symbol(), PERIOD_M5, g_lastOpenM5BarTime);
-     if(sh >= 0 && sh < MinM5BarsBetweenNewEntries) {
-        Print("TitanAI skip open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenNewEntries);
-        return;
+     // Min bar gap for brand-new entries.
+     if((action == "OPEN_BUY" || action == "OPEN_SELL") && MinM5BarsBetweenNewEntries > 0 && g_lastOpenM5BarTime > 0) {
+        int sh2 = iBarShift(Symbol(), PERIOD_M5, g_lastOpenM5BarTime);
+        if(sh2 >= 0 && sh2 < MinM5BarsBetweenNewEntries) {
+           Print("TitanAI skip open (min M5 bars): ", sh2, " need>= ", MinM5BarsBetweenNewEntries);
+           return;
+        }
+        // sh < 0: bar not in history (gap) — allow open
      }
-     // sh < 0: bar not in history (gap) — allow open
   }
 
   if(action == "SCALE_IN_BUY") {
-     if(!AllowScaleIn) return;
-     if(CountMyOpenOrders(OP_BUY) >= MaxOpenBuyPositions) return;
-     if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("scale-in-buy_close_opposite");
-     OpenOrder(OP_BUY, FixedLot, sl, tp, reason, true);
+     if(!AiFullControlMode) {
+        if(!AllowScaleIn) return;
+        if(CountMyOpenOrders(OP_BUY) >= MaxOpenBuyPositions) return;
+        if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("scale-in-buy_close_opposite");
+     }
+     double lotSb = ComputeLotByRiskPercent(OP_BUY, sl, FixedLot, riskPercent);
+     OpenOrder(OP_BUY, lotSb, sl, tp, reason, true);
      return;
   }
   if(action == "SCALE_IN_SELL") {
-     if(!AllowScaleIn) return;
-     if(CountMyOpenOrders(OP_SELL) >= MaxOpenSellPositions) return;
-     if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("scale-in-sell_close_opposite");
-     OpenOrder(OP_SELL, FixedLot, sl, tp, reason, true);
+     if(!AiFullControlMode) {
+        if(!AllowScaleIn) return;
+        if(CountMyOpenOrders(OP_SELL) >= MaxOpenSellPositions) return;
+        if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("scale-in-sell_close_opposite");
+     }
+     double lotSs = ComputeLotByRiskPercent(OP_SELL, sl, FixedLot, riskPercent);
+     OpenOrder(OP_SELL, lotSs, sl, tp, reason, true);
      return;
   }
 
   if(action == "OPEN_BUY") {
-     if(CountMyOpenOrders(OP_BUY) > 0) return;
-     if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("flip-to-buy");
-     OpenOrder(OP_BUY, FixedLot, sl, tp, reason, false);
+     if(!AiFullControlMode) {
+        if(CountMyOpenOrders(OP_BUY) > 0) return;
+        if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("flip-to-buy");
+     }
+     double lotOb = ComputeLotByRiskPercent(OP_BUY, sl, FixedLot, riskPercent);
+     OpenOrder(OP_BUY, lotOb, sl, tp, reason, false);
      return;
   }
   if(action == "OPEN_SELL") {
-     if(CountMyOpenOrders(OP_SELL) > 0) return;
-     if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("flip-to-sell");
-     OpenOrder(OP_SELL, FixedLot, sl, tp, reason, false);
+     if(!AiFullControlMode) {
+        if(CountMyOpenOrders(OP_SELL) > 0) return;
+        if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("flip-to-sell");
+     }
+     double lotOs = ComputeLotByRiskPercent(OP_SELL, sl, FixedLot, riskPercent);
+     OpenOrder(OP_SELL, lotOs, sl, tp, reason, false);
      return;
   }
 }
@@ -945,8 +1007,10 @@ void OnTick() {
 }
 
 void OnTimer() {
-   RunSpikeGuard();
-   if(EnableProfitProtect && (!AiFullControlMode || ProfitProtectWithAiControl)) ManageProfitProtection();
+   if(!AiFullControlMode) {
+      RunSpikeGuard();
+      if(EnableProfitProtect) ManageProfitProtection();
+   }
    if(BootstrapHistoryFirst && !g_bootstrapDone) {
       RunBootstrapStep();
       return;
