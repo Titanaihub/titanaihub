@@ -16,6 +16,11 @@ input double FixedLot = 0.10;
 input int MinStopDistancePoints = 220;
 input int MinSecondsBetweenEntries = 900;
 input int MinM5BarsBetweenNewEntries = 4;
+input bool AllowScaleIn = true;
+input int MaxOpenBuyPositions = 2;
+input int MaxOpenSellPositions = 2;
+input int MinSecondsBetweenScaleIns = 600;
+input int MinM5BarsBetweenScaleIns = 2;
 
 // ---------- สัญญาณ (สอดคล้องกับเซิร์ฟเวอร์: ไม่สแกลปถี่) ----------
 input bool TradeOnlyM5Close = true;
@@ -57,6 +62,8 @@ input int SpikeMinRangePoints = 140;
 datetime g_lastBarTime = 0;
 datetime g_lastEntryTime = 0;
 datetime g_lastOpenM5BarTime = 0;
+datetime g_lastScaleInTime = 0;
+datetime g_lastScaleInM5BarTime = 0;
 bool g_bootstrapInited = false;
 bool g_bootstrapDone = false;
 int g_bootstrapStage = 0; // 0=D1,1=H4,2=H1,3=M30,4=M15,5=M5,6=M1,7=done
@@ -781,16 +788,26 @@ bool ParseDecision(string json, string &action, double &sl, double &tp, string &
    return true;
 }
 
-bool OpenOrder(int type, double lot, double sl, double tp, string reason) {
+bool OpenOrder(int type, double lot, double sl, double tp, string reason, bool isScaleIn) {
    if(CurrentSpreadPoints() > MaxSpreadPoints) {
       Print("TitanAI skip open (spread guard): ", CurrentSpreadPoints());
       return false;
    }
-   if(MinSecondsBetweenEntries > 0 && g_lastEntryTime > 0) {
-      int need = (int)(TimeCurrent() - g_lastEntryTime);
-      if(need < MinSecondsBetweenEntries) {
-         Print("TitanAI skip open (entry cooldown): ", need, "s < ", MinSecondsBetweenEntries, "s");
-         return false;
+   if(isScaleIn) {
+      if(MinSecondsBetweenScaleIns > 0 && g_lastScaleInTime > 0) {
+         int need2 = (int)(TimeCurrent() - g_lastScaleInTime);
+         if(need2 < MinSecondsBetweenScaleIns) {
+            Print("TitanAI skip scale open (cooldown): ", need2, "s < ", MinSecondsBetweenScaleIns, "s");
+            return false;
+         }
+      }
+   } else {
+      if(MinSecondsBetweenEntries > 0 && g_lastEntryTime > 0) {
+         int need = (int)(TimeCurrent() - g_lastEntryTime);
+         if(need < MinSecondsBetweenEntries) {
+            Print("TitanAI skip open (entry cooldown): ", need, "s < ", MinSecondsBetweenEntries, "s");
+            return false;
+         }
       }
    }
    double price = (type == OP_BUY ? Ask : Bid);
@@ -811,8 +828,13 @@ bool OpenOrder(int type, double lot, double sl, double tp, string reason) {
       Print("TitanAI OrderSend failed err=", GetLastError(), " reason=", reason);
       return false;
    }
-   g_lastEntryTime = TimeCurrent();
-   g_lastOpenM5BarTime = iTime(Symbol(), PERIOD_M5, 0);
+   if(isScaleIn) {
+      g_lastScaleInTime = TimeCurrent();
+      g_lastScaleInM5BarTime = iTime(Symbol(), PERIOD_M5, 0);
+   } else {
+      g_lastEntryTime = TimeCurrent();
+      g_lastOpenM5BarTime = iTime(Symbol(), PERIOD_M5, 0);
+   }
    SendExecution((type == OP_BUY ? "BUY" : "SELL"), lot, price, 0.0, ticket, reason);
    return true;
 }
@@ -853,26 +875,54 @@ void HandleSignal() {
       CloseAllMyPositions(reason);
       return;
    }
-   if((action == "OPEN_BUY" || action == "OPEN_SELL") && MinM5BarsBetweenNewEntries > 0 && g_lastOpenM5BarTime > 0) {
-      int sh = iBarShift(Symbol(), PERIOD_M5, g_lastOpenM5BarTime);
-      if(sh >= 0 && sh < MinM5BarsBetweenNewEntries) {
-         Print("TitanAI skip open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenNewEntries);
-         return;
-      }
-      // sh < 0: bar not in history (gap) — allow open
-   }
-   if(action == "OPEN_BUY") {
-      if(CountMyOpenOrders(OP_BUY) > 0) return;
-      if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("flip-to-buy");
-      OpenOrder(OP_BUY, FixedLot, sl, tp, reason);
-      return;
-   }
-   if(action == "OPEN_SELL") {
-      if(CountMyOpenOrders(OP_SELL) > 0) return;
-      if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("flip-to-sell");
-      OpenOrder(OP_SELL, FixedLot, sl, tp, reason);
-      return;
-   }
+
+  // Min bar gap for scale-in (different from new entry).
+  if((action == "SCALE_IN_BUY" || action == "SCALE_IN_SELL") && MinM5BarsBetweenScaleIns > 0 && g_lastScaleInM5BarTime > 0) {
+     int sh = iBarShift(Symbol(), PERIOD_M5, g_lastScaleInM5BarTime);
+     if(sh >= 0 && sh < MinM5BarsBetweenScaleIns) {
+        Print("TitanAI skip scale open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenScaleIns);
+        return;
+     }
+     // sh < 0: bar not in history (gap) — allow open
+  }
+
+  // Min bar gap for brand-new entries.
+  if((action == "OPEN_BUY" || action == "OPEN_SELL") && MinM5BarsBetweenNewEntries > 0 && g_lastOpenM5BarTime > 0) {
+     int sh = iBarShift(Symbol(), PERIOD_M5, g_lastOpenM5BarTime);
+     if(sh >= 0 && sh < MinM5BarsBetweenNewEntries) {
+        Print("TitanAI skip open (min M5 bars): ", sh, " need>= ", MinM5BarsBetweenNewEntries);
+        return;
+     }
+     // sh < 0: bar not in history (gap) — allow open
+  }
+
+  if(action == "SCALE_IN_BUY") {
+     if(!AllowScaleIn) return;
+     if(CountMyOpenOrders(OP_BUY) >= MaxOpenBuyPositions) return;
+     if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("scale-in-buy_close_opposite");
+     OpenOrder(OP_BUY, FixedLot, sl, tp, reason, true);
+     return;
+  }
+  if(action == "SCALE_IN_SELL") {
+     if(!AllowScaleIn) return;
+     if(CountMyOpenOrders(OP_SELL) >= MaxOpenSellPositions) return;
+     if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("scale-in-sell_close_opposite");
+     OpenOrder(OP_SELL, FixedLot, sl, tp, reason, true);
+     return;
+  }
+
+  if(action == "OPEN_BUY") {
+     if(CountMyOpenOrders(OP_BUY) > 0) return;
+     if(CountMyOpenOrders(OP_SELL) > 0) CloseAllMyPositions("flip-to-buy");
+     OpenOrder(OP_BUY, FixedLot, sl, tp, reason, false);
+     return;
+  }
+  if(action == "OPEN_SELL") {
+     if(CountMyOpenOrders(OP_SELL) > 0) return;
+     if(CountMyOpenOrders(OP_BUY) > 0) CloseAllMyPositions("flip-to-sell");
+     OpenOrder(OP_SELL, FixedLot, sl, tp, reason, false);
+     return;
+  }
 }
 
 int OnInit() {
