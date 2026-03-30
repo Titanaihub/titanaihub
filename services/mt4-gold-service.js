@@ -433,7 +433,7 @@ function applyMinConfidenceGuard(decision) {
   if (!decision) return decision;
   const a = normalizeAction(decision.action);
   if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
-  const minC = Math.max(0, Math.min(1, envNum("MT4_MIN_ENTRY_CONFIDENCE", 0.52)));
+  const minC = Math.max(0, Math.min(1, envNum("MT4_MIN_ENTRY_CONFIDENCE", 0.44)));
   const c = Number(decision.confidence) || 0;
   if (c < minC) {
     return {
@@ -471,7 +471,7 @@ function applyEntryCooldown(decision, accountId, symbol, hasOpenPositions) {
   if (!decision || hasOpenPositions) return decision;
   const a = normalizeAction(decision.action);
   if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
-  const minMs = Math.max(0, envNum("MT4_MIN_MS_BETWEEN_NEW_ENTRIES", 720000));
+  const minMs = Math.max(0, envNum("MT4_MIN_MS_BETWEEN_NEW_ENTRIES", 600000));
   if (minMs <= 0) return decision;
   const key = `${String(accountId || "default")}|${String(symbol || "XAUUSD").toUpperCase()}`;
   const last = cache.entryThrottleByAccount.get(key) || 0;
@@ -495,7 +495,7 @@ function applyHtfDualBlockGuard(decision, trendContext, hasOpenPositions) {
   if (!soft || !trendContext) return decision;
   const a = normalizeAction(decision.action);
   if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
-  const thr = Math.max(0.1, Math.min(0.85, envNum("MT4_HTF_DUAL_BLOCK_STRENGTH", 0.22)));
+  const thr = Math.max(0.1, Math.min(0.85, envNum("MT4_HTF_DUAL_BLOCK_STRENGTH", 0.32)));
   const d1b = trendContext.d1?.bias;
   const h1b = trendContext.h1?.bias;
   const d1s = Number(trendContext.d1?.strength) || 0;
@@ -530,7 +530,7 @@ function applyM5VsH1Guard(decision, trendContext, hasOpenPositions) {
   if (a !== "OPEN_BUY" && a !== "OPEN_SELL") return decision;
   const h1s = Number(trendContext.h1?.strength) || 0;
   const m5s = Number(trendContext.m5?.strength) || 0;
-  const need = Math.max(0.12, Math.min(0.9, envNum("MT4_M5_VS_H1_MIN_STRENGTH", 0.26)));
+  const need = Math.max(0.12, Math.min(0.9, envNum("MT4_M5_VS_H1_MIN_STRENGTH", 0.4)));
   if (h1s < need || m5s < need) return decision;
   return {
     ...decision,
@@ -790,8 +790,8 @@ function shouldSkipDeepSeek(payload) {
   const spreadPoints = Number(payload?.spreadPoints || 0);
   const spreadGuard = Math.max(20, envNum("MT4_TOKEN_SAVER_MAX_SPREAD_POINTS", 35));
   if (spreadPoints > spreadGuard) return { skip: true, reason: "token_saver_spread_high" };
-  const quietImpulse = impulseAbs < envNum("MT4_TOKEN_SAVER_IMPULSE_MIN", 0.00035);
-  const quietVol = avgAbsRet < envNum("MT4_TOKEN_SAVER_AVGRET_MIN", 0.00022);
+  const quietImpulse = impulseAbs < envNum("MT4_TOKEN_SAVER_IMPULSE_MIN", 0.00028);
+  const quietVol = avgAbsRet < envNum("MT4_TOKEN_SAVER_AVGRET_MIN", 0.00016);
   if (quietImpulse && quietVol) return { skip: true, reason: "token_saver_quiet_market" };
   return { skip: false, reason: "" };
 }
@@ -814,6 +814,7 @@ async function callDeepSeekGoldDecision(payload) {
     "When trendContext.alignment is conflicting, prefer WAIT for new entries unless you are managing an exit.",
     "historyProfile.windows contains rolling stats (last15/last30/last60/all): avg/min/max for openToHigh, openToLow, lowToHigh, openToClose, and changeFromPrevClose. Use these to judge if today's move is already stretched vs typical days.",
     "smcContext is short-term structure from recent bars; historyProfile is longer daily behaviour. Combine them; do not chase entries when price is extended beyond typical daily ranges without clear continuation.",
+    "When pythonSmc (if present) aligns with trendContext and historyProfile suggests a normal (not stretched) day, prefer a decisive OPEN_BUY or OPEN_SELL with confidence>=0.5 over repeated WAIT — endless WAIT is wrong if SMC + HTF agree.",
     "Avoid overtrading and avoid entries when spread is high or edge unclear.",
     "Prefer WAIT when uncertain.",
     "Stop/target: for OPEN_BUY/OPEN_SELL, place SL at least ~1.4× the typical M5 bar range away from entry (not a few ticks). Prefer RR ~1.5:1 or better when you set tp; do not use tp=0 unless you intend to manage exit with CLOSE_ALL only."
@@ -927,7 +928,7 @@ async function getGoldMt4Signal(payload = {}) {
   const pairKey = `${accountId}|${symbol}|${timeframe}`;
   const key = `${pairKey}|${latestBarTime}`;
   const now = Date.now();
-  const minIntervalBaseMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 120000));
+  const minIntervalBaseMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_MS", 90000));
   const minIntervalOpenMs = Math.max(3000, envNum("MT4_MIN_CALL_INTERVAL_OPEN_MS", 10000));
   const minIntervalMs = hasOpenPositions ? minIntervalOpenMs : minIntervalBaseMs;
   const sameBarReuse = String(envStr("MT4_REUSE_DECISION_SAME_BAR", "true")).toLowerCase() === "true";
@@ -975,7 +976,7 @@ async function getGoldMt4Signal(payload = {}) {
   const smcContext = buildSmcContext(mergedRows);
   const pythonSmc = await runPythonSmc(mergedRows);
   const pyPriority = String(envStr("MT4_PYTHON_SMC_PRIORITY", "true")).toLowerCase() === "true";
-  const pyMinConf = Math.max(0.5, Math.min(0.99, envNum("MT4_PYTHON_SMC_PRIORITY_MIN_CONF", 0.78)));
+  const pyMinConf = Math.max(0.5, Math.min(0.99, envNum("MT4_PYTHON_SMC_PRIORITY_MIN_CONF", 0.68)));
   if (pyPriority && (!aiFullControl || !hasOpenPositions) && pythonSmc?.ok && pythonSmc?.decision) {
     const pyAction = normalizeAction(pythonSmc.decision.action);
     const pyConf = Math.max(0, Math.min(1, Number(pythonSmc.decision.confidence) || 0));
