@@ -11,7 +11,7 @@ app.use(
   cors({
     origin: true,
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-mt4-key"],
     credentials: true
   })
 );

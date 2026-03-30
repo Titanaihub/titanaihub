@@ -164,18 +164,11 @@ window.TitanChat = (() => {
     }
 
     try {
-      if (!appState.authToken) throw new Error("Session expired. Please login again.");
-
-      const data = await apiPost(
-        "/chat",
-        {
-          question,
-          snapshot: buildChatSnapshot(appState.snapshot)
-        },
-        {
-          Authorization: `Bearer ${appState.authToken}`
-        }
-      );
+      const headers = appState.authToken ? { Authorization: `Bearer ${appState.authToken}` } : {};
+      const data = await apiPost("/chat", {
+        question,
+        snapshot: buildChatSnapshot(appState.snapshot)
+      }, headers);
 
       addChatMessage(elements, "ai", data?.reply || "No reply.");
     } catch (err) {
@@ -239,9 +232,24 @@ window.TitanChat = (() => {
     try {
       raw = localStorage.getItem(AUTH_STORAGE_KEY);
     } catch (_) {
+      raw = null;
+    }
+    if (!raw) {
+      try {
+        const data = await apiGet("/auth/session");
+        if (data?.ok) {
+          appState.loggedIn = true;
+          appState.authToken = null;
+          appState.authRole = data.role || "owner";
+          updateChatUi(elements, appState);
+          if (window.TitanDemoTrading?.onLoginStateChange) {
+            await window.TitanDemoTrading.onLoginStateChange(elements, appState);
+          }
+          return true;
+        }
+      } catch (_) {}
       return false;
     }
-    if (!raw) return false;
 
     let parsed = null;
     try {

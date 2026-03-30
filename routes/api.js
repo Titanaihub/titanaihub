@@ -60,6 +60,7 @@ const authTokens = new Map(); // token -> { role, expiresAt }
 const OWNER_USERNAME = process.env.OWNER_USERNAME || "";
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "";
 const AUTH_TOKEN_TTL_MS = Number(process.env.AUTH_TOKEN_TTL_MS || 7 * 24 * 60 * 60 * 1000);
+const SINGLE_USER_MODE = String(process.env.SINGLE_USER_MODE || "true").toLowerCase() === "true";
 
 function getBearerToken(req) {
   const auth = String(req.headers.authorization || "");
@@ -69,6 +70,9 @@ function getBearerToken(req) {
 }
 
 function verifyAuth(req) {
+  if (SINGLE_USER_MODE) {
+    return { role: "owner", expiresAt: Date.now() + AUTH_TOKEN_TTL_MS };
+  }
   const token = getBearerToken(req);
   if (!token) return null;
 
@@ -88,10 +92,22 @@ function verifyAuth(req) {
 }
 
 function verifyMt4Key(req) {
+  if (SINGLE_USER_MODE) return true;
   const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
   if (!shared) return false;
   const token = String(req.headers["x-mt4-key"] || req.query?.apiKey || "").trim();
   return token === shared;
+}
+
+function mt4KeyUnauthorized(req, source = "body") {
+  if (SINGLE_USER_MODE) return false;
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (!shared) return false;
+  const token =
+    source === "query"
+      ? String(req.headers["x-mt4-key"] || req.query?.apiKey || "")
+      : String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
+  return token !== shared;
 }
 
 /** Allow Gold Lab / History Data reads without owner login: Bearer owner, X-MT4-Key, or public when MT4_GOLD_PUBLIC_READ=true. */
@@ -404,6 +420,16 @@ router.get("/auth/session", (req, res) => {
 });
 
 router.post("/login", (req, res) => {
+  if (SINGLE_USER_MODE) {
+    const token = issueToken("owner");
+    return res.json({
+      ok: true,
+      success: true,
+      role: "owner",
+      token,
+      message: "Single-user mode: login bypassed"
+    });
+  }
   const { username, password } = req.body || {};
 
   const u = String(username || "");
@@ -775,13 +801,7 @@ function flattenMt4GoldSignalResponse(out) {
 }
 
 router.post("/mt4/gold/signal", async (req, res) => {
-  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
-  if (shared) {
-    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
-    if (token !== shared) {
-      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
-    }
-  }
+  if (mt4KeyUnauthorized(req, "body")) return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
   try {
     const out = await getGoldMt4Signal(req.body || {});
     if (!out.ok) {
@@ -794,13 +814,7 @@ router.post("/mt4/gold/signal", async (req, res) => {
 });
 
 router.post("/mt4/gold/history-upload", async (req, res) => {
-  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
-  if (shared) {
-    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
-    if (token !== shared) {
-      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
-    }
-  }
+  if (mt4KeyUnauthorized(req, "body")) return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
   try {
     const out = await uploadGoldHistory(req.body || {});
     if (!out.ok) return res.status(out.code || 400).json(out);
@@ -811,13 +825,7 @@ router.post("/mt4/gold/history-upload", async (req, res) => {
 });
 
 router.post("/mt4/gold/execution", (req, res) => {
-  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
-  if (shared) {
-    const token = String(req.headers["x-mt4-key"] || req.body?.apiKey || "");
-    if (token !== shared) {
-      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
-    }
-  }
+  if (mt4KeyUnauthorized(req, "body")) return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
   try {
     const r = saveMt4Execution(req.body || {});
     return res.json(r);
@@ -862,13 +870,7 @@ router.get("/mt4/gold/history-status", async (req, res) => {
 });
 
 router.get("/mt4/gold/sync-state", async (req, res) => {
-  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
-  if (shared) {
-    const token = String(req.headers["x-mt4-key"] || req.query?.apiKey || "");
-    if (token !== shared) {
-      return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
-    }
-  }
+  if (mt4KeyUnauthorized(req, "query")) return res.status(401).json({ ok: false, message: "Unauthorized MT4 key" });
   const symbol = String(req.query.symbol || "XAUUSD").toUpperCase();
   const timeframe = String(req.query.timeframe || "D1").toUpperCase();
   const accountId = String(req.query.accountId || "default");
