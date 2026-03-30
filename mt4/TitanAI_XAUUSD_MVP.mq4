@@ -32,6 +32,7 @@ input bool BootstrapIncludeM15M30 = true;
 input bool BootstrapIncludeM5 = true;
 input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
+input bool PostBootstrapSeedHistory = true;
 
 // ---------- โหมด AI / ป้องกันกำไร ----------
 input bool AiFullControlMode = true;
@@ -69,6 +70,7 @@ int g_bootstrapShiftM1 = 0;
 datetime g_lastHistoryPushAt = 0;
 datetime g_spikeCooldownUntil = 0;
 datetime g_lastSpikeBarTime = 0;
+bool g_postBootstrapSeedDone = false;
 int g_profitTrackTickets[300];
 double g_profitTrackMaxPts[300];
 
@@ -538,7 +540,7 @@ void InitBootstrapState() {
    if(g_bootstrapDone) {
       Print("TitanAI bootstrap skipped (no available bars in enabled timeframes).");
    } else {
-      Print("TitanAI bootstrap start D1 rows=", g_bootstrapShiftD1);
+      Print("TitanAI bootstrap: D1 startShift=", g_bootstrapShiftD1, " (bars to upload from D1; 0 means full incremental sync — D1/H1 seed runs after bootstrap if enabled)");
    }
 }
 
@@ -621,6 +623,30 @@ void RunBootstrapStep() {
          Print("TitanAI bootstrap stage advanced to ", g_bootstrapStage);
       }
    }
+}
+
+void RunPostBootstrapSeedOnce() {
+   if(!PostBootstrapSeedHistory || g_postBootstrapSeedDone) return;
+   if(!g_bootstrapDone) return;
+   int barsD1 = iBars(Symbol(), PERIOD_D1);
+   if(barsD1 < 25) {
+      Print("TitanAI: WARNING — only ", barsD1, " D1 bars in terminal. Right-click chart -> Refresh, or open a daily chart to load history for trend context.");
+      g_postBootstrapSeedDone = true;
+      return;
+   }
+   int sd1 = MathMin(barsD1 - 2, 400);
+   int cd1 = MathMin(150, sd1);
+   bool okD1 = false;
+   if(cd1 > 0) okD1 = UploadHistoryChunk("ea_seed_d1_trend", PERIOD_D1, sd1, cd1, false);
+   int barsH1 = iBars(Symbol(), PERIOD_H1);
+   bool okH1 = false;
+   if(barsH1 >= 40) {
+      int sh = MathMin(barsH1 - 2, 400);
+      int ch = MathMin(240, sh);
+      if(ch > 0) okH1 = UploadHistoryChunk("ea_seed_h1_trend", PERIOD_H1, sh, ch, false);
+   }
+   g_postBootstrapSeedDone = true;
+   Print("TitanAI: trend seed done — D1 ", (okD1 ? "ok" : "fail"), " (", cd1, " bars), H1 ", (okH1 ? "ok" : "skip/fail"));
 }
 
 void PushLiveHistoryIfDue() {
@@ -875,6 +901,7 @@ void OnTimer() {
       RunBootstrapStep();
       return;
    }
+   RunPostBootstrapSeedOnce();
    PushLiveHistoryIfDue();
    HandleSignal();
 }
