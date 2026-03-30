@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gild Trade · Titan AI Hub</title>
+  <link rel="icon" type="image/png" href="./titan-logo.png" />
+  <link rel="shortcut icon" type="image/png" href="./titan-logo.png" />
+  <link rel="stylesheet" href="./styles.css?v=2617" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark brand-mark-image">
+          <img src="./titan-logo.png" alt="Titan AI Hub Logo" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Titan AI Hub</h1>
+          <p>Gild Trade · AI explainable signal (XAUUSD)</p>
+        </div>
+      </div>
+      <div class="topbar-metrics">
+        <a class="tab-btn" href="./gold.html?v=1">Gold Lab</a>
+        <a class="tab-btn" href="./history-data.html?v=1">History Data</a>
+        <a class="tab-btn" href="./smc.html?v=1" target="_blank" rel="noopener noreferrer">SMC Lab</a>
+        <a class="tab-btn" href="./index.html?v=1">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel panel-full">
+        <div class="section-head">
+          <div>
+            <h2>Gild Trade</h2>
+            <p>ดูข้อมูลที่ AI ได้รับ และผลวิเคราะห์/คำสั่งเทรดแบบละเอียด</p>
+          </div>
+        </div>
+
+        <div class="history-toolbar">
+          <label for="gildApiKeyInput" class="history-toolbar-label">MT4 API Key</label>
+          <input id="gildApiKeyInput" class="input input-inline history-symbol-input" type="text" placeholder="MT4_SHARED_SECRET" />
+          <label for="gildAccountInput" class="history-toolbar-label">Account</label>
+          <input id="gildAccountInput" class="input input-inline history-symbol-input" type="text" placeholder="default" value="web-test" />
+          <button id="gildRunBtn" class="btn btn-secondary" type="button">Run AI Analysis</button>
+          <span id="gildStatus" class="demo-trading-status">Ready</span>
+        </div>
+
+        <div id="gildSignalCards" class="demo-trading-summary">
+          <div class="stat-card"><span>Action</span><strong>--</strong></div>
+          <div class="stat-card"><span>Confidence</span><strong>--</strong></div>
+          <div class="stat-card"><span>Reason</span><strong>--</strong></div>
+          <div class="stat-card"><span>SL</span><strong>--</strong></div>
+          <div class="stat-card"><span>TP</span><strong>--</strong></div>
+          <div class="stat-card"><span>Source</span><strong>--</strong></div>
+        </div>
+
+        <div class="demo-trading-preview-wrap" style="margin-top: 10px;">
+          <span class="demo-trading-preview-label">Payload sent to AI (signal request)</span>
+          <pre id="gildPayloadPreview" class="raw-box demo-decision-preview">--</pre>
+        </div>
+
+        <div class="demo-trading-preview-wrap" style="margin-top: 10px;">
+          <span class="demo-trading-preview-label">AI Inputs (SMC / History / Zones / SL cluster)</span>
+          <pre id="gildInputsPreview" class="raw-box demo-decision-preview">--</pre>
+        </div>
+
+        <div class="demo-trading-preview-wrap" style="margin-top: 10px;">
+          <span class="demo-trading-preview-label">AI Output (decision)</span>
+          <pre id="gildDecisionPreview" class="raw-box demo-decision-preview">--</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./js/config.js?v=2602"></script>
+  <script src="./js/api-client.js?v=2602"></script>
+  <script src="./js/gild-trade-page.js?v=1"></script>
+</body>
+</html>
