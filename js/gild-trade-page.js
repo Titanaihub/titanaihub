@@ -7,6 +7,7 @@
     runBtn: document.getElementById("gildRunBtn"),
     status: document.getElementById("gildStatus"),
     cards: document.getElementById("gildSignalCards"),
+    humanSummary: document.getElementById("gildHumanSummary"),
     payload: document.getElementById("gildPayloadPreview"),
     inputs: document.getElementById("gildInputsPreview"),
     decision: document.getElementById("gildDecisionPreview")
@@ -71,6 +72,67 @@
       <div class="stat-card"><span>TP</span><strong>${fmt(d.tp ?? out?.tp, 3)}</strong></div>
       <div class="stat-card"><span>Source</span><strong>${String(out?.source || "--")}${out?.cached ? " (cached)" : ""}</strong></div>
     `;
+  }
+
+  function p3(x) {
+    const n = Number(x);
+    return Number.isFinite(n) ? n.toFixed(3) : "--";
+  }
+
+  function pct(x) {
+    const n = Number(x);
+    return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : "--";
+  }
+
+  function summarizeHuman(out) {
+    const d = out?.decision || {};
+    const dbg = out?.aiDebug || {};
+    const inputs = dbg.inputs || {};
+    const trend = inputs.trendContext || {};
+    const smc = inputs.smcContext || {};
+    const hz = inputs.historyProfile?.windows?.last30 || inputs.historyProfile?.windows?.last15 || inputs.historyProfile?.windows?.all || null;
+    const zones = inputs.d1ExpectedZones || null;
+    const py = inputs.pythonSmcDecision || null;
+    const lines = [];
+
+    lines.push(`Decision: ${String(d.action || "--")} | Confidence: ${pct(d.confidence)} | Source: ${String(out?.source || "--")}`);
+    lines.push(`Reason: ${String(d.reason || "--")}`);
+    lines.push(`SL/TP: ${p3(d.sl)} / ${p3(d.tp)} | Risk: ${Number(d.riskPercent ?? 0).toFixed(2)}%`);
+
+    const d1 = trend?.d1 ? `${trend.d1.bias} (${p3(trend.d1.strength)})` : "--";
+    const h1 = trend?.h1 ? `${trend.h1.bias} (${p3(trend.h1.strength)})` : "--";
+    const m5 = trend?.m5 ? `${trend.m5.bias} (${p3(trend.m5.strength)})` : "--";
+    lines.push(`Trend: D1=${d1}, H1=${h1}, M5=${m5}, alignment=${String(trend.alignment || "--")}`);
+
+    lines.push(
+      `SMC: support=${p3(smc.nearestSupport)}, resistance=${p3(smc.nearestResistance)}, refHigh=${p3(smc.refHigh)}, refLow=${p3(smc.refLow)}`
+    );
+
+    if (hz) {
+      lines.push(
+        `History(${hz.label || "window"}): open→high avg=${Number(hz.openToHighPct?.avg || 0).toFixed(3)}%, open→low avg=${Number(hz.openToLowPct?.avg || 0).toFixed(3)}%, open→close avg=${Number(hz.openToClosePct?.avg || 0).toFixed(3)}%`
+      );
+    } else {
+      lines.push("History: --");
+    }
+
+    if (zones) {
+      lines.push(
+        `Expected zones(D1 ${zones.window || "--"}): high avg=${p3(zones.expectedHigh?.avg)} [${p3(zones.expectedHigh?.min)}..${p3(zones.expectedHigh?.max)}], low avg=${p3(zones.expectedLow?.avg)} [${p3(zones.expectedLow?.min)}..${p3(zones.expectedLow?.max)}]`
+      );
+    } else {
+      lines.push("Expected zones: --");
+    }
+
+    if (py) {
+      lines.push(`Python SMC: action=${String(py.action || "--")}, conf=${pct(py.confidence)}, reason=${String(py.reason || "--")}`);
+    }
+
+    if (out?.contratrendAdjusted === true) {
+      lines.push("Guard impact: adjusted by risk/trend guard (contratrendAdjusted=true)");
+    }
+
+    return lines.join("\n");
   }
 
   async function buildSignalPayload() {
@@ -139,6 +201,7 @@
       if (el.payload) el.payload.textContent = JSON.stringify(payload, null, 2);
       const out = await apiPost("/mt4/gold/signal", payload, { "x-mt4-key": apiKey });
       renderCards(out);
+      if (el.humanSummary) el.humanSummary.textContent = summarizeHuman(out);
       el.inputs.textContent = JSON.stringify(out?.aiDebug?.inputs || {}, null, 2);
       el.decision.textContent = JSON.stringify(
         {
@@ -173,6 +236,9 @@
           null,
           2
         );
+      }
+      if (el.humanSummary) {
+        el.humanSummary.textContent = `Decision: WAIT\nReason: ${err.message || "failed"}\nHint: ตรวจ key/สิทธิ์/การเชื่อมต่อ API`;
       }
     }
   }
