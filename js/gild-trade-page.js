@@ -39,6 +39,12 @@
     }
   }
 
+  function normalizeKey(raw) {
+    return String(raw || "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+  }
+
   function buildDemoCandles(count = 180) {
     const now = Date.now();
     return Array.from({ length: count }).map((_, i) => {
@@ -121,9 +127,17 @@
     try {
       const { apiPost } = window.TitanApi;
       const payload = await buildSignalPayload();
-      const apiKey = getApiKey();
-      el.payload.textContent = JSON.stringify(payload, null, 2);
-      const out = await apiPost("/mt4/gold/signal", payload, apiKey ? { "x-mt4-key": apiKey } : {});
+      const apiKey = normalizeKey(getApiKey());
+      if (!apiKey) {
+        throw new Error("MT4 API Key is empty");
+      }
+      if (el.apiKey) el.apiKey.value = apiKey;
+      try {
+        localStorage.setItem(MT4_KEY_STORAGE, apiKey);
+      } catch (_) {}
+      payload.apiKey = apiKey;
+      if (el.payload) el.payload.textContent = JSON.stringify(payload, null, 2);
+      const out = await apiPost("/mt4/gold/signal", payload, { "x-mt4-key": apiKey });
       renderCards(out);
       el.inputs.textContent = JSON.stringify(out?.aiDebug?.inputs || {}, null, 2);
       el.decision.textContent = JSON.stringify(
@@ -135,7 +149,7 @@
         null,
         2
       );
-      if (el.status) el.status.textContent = "AI analysis ready";
+      if (el.status) el.status.textContent = `AI analysis ready (key len=${apiKey.length})`;
     } catch (err) {
       if (el.status) el.status.textContent = `Failed: ${err.message || "unknown error"}`;
       if (el.inputs) {
@@ -143,7 +157,7 @@
           {
             ok: false,
             message: err.message || "failed",
-            hint: "ตรวจ MT4 API Key (MT4_SHARED_SECRET) และสิทธิ์อ่าน Gold API"
+            hint: "ตรวจ MT4 API Key ให้เป็นค่า MT4_SHARED_SECRET แบบตรงตัวอักษร"
           },
           null,
           2
