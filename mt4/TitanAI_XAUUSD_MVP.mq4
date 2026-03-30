@@ -21,6 +21,12 @@ input bool BootstrapIncludeM1 = true;
 input bool IncrementalSyncResume = true;
 input bool AiFullControlMode = true;
 input bool EnableProfitProtect = false;
+input bool EnableSpikeGuard = true;
+input double SpikeRangeMultiplier = 2.8;
+input int SpikeLookbackBars = 24;
+input int SpikeCooldownMinutes = 8;
+input bool SpikeEmergencyClose = true;
+input int SpikeMinRangePoints = 140;
 input int ProfitLockStartPoints = 120;
 input int ProfitLockGivebackPoints = 60;
 input int BreakEvenAtPoints = 90;
@@ -41,6 +47,8 @@ int g_bootstrapShiftM15 = 0;
 int g_bootstrapShiftM5 = 0;
 int g_bootstrapShiftM1 = 0;
 datetime g_lastHistoryPushAt = 0;
+datetime g_spikeCooldownUntil = 0;
+datetime g_lastSpikeBarTime = 0;
 int g_profitTrackTickets[300];
 double g_profitTrackMaxPts[300];
 
@@ -142,6 +150,48 @@ void ManageProfitProtection() {
          if(betterTrail) ModifyOrderSL(ticket, trailSL);
       }
    }
+}
+
+double RangePointsByShift(int period, int shift) {
+   double h = iHigh(Symbol(), period, shift);
+   double l = iLow(Symbol(), period, shift);
+   if(h <= 0 || l <= 0 || h < l) return 0.0;
+   return (h - l) / Point;
+}
+
+double AvgRangePoints(int period, int lookback) {
+   int n = MathMax(5, lookback);
+   double sum = 0.0;
+   int cnt = 0;
+   for(int i = 2; i < 2 + n; i++) {
+      double rp = RangePointsByShift(period, i);
+      if(rp <= 0) continue;
+      sum += rp;
+      cnt++;
+   }
+   if(cnt <= 0) return 0.0;
+   return sum / cnt;
+}
+
+void RunSpikeGuard() {
+   if(!EnableSpikeGuard) return;
+   datetime barTime = iTime(Symbol(), PERIOD_M5, 1);
+   if(barTime <= 0) return;
+   if(g_lastSpikeBarTime == barTime) return;
+   g_lastSpikeBarTime = barTime;
+
+   double lastRange = RangePointsByShift(PERIOD_M5, 1);
+   double avgRange = AvgRangePoints(PERIOD_M5, SpikeLookbackBars);
+   double mult = MathMax(1.2, SpikeRangeMultiplier);
+   bool isSpike = (lastRange >= MathMax(SpikeMinRangePoints, avgRange * mult));
+   if(!isSpike) return;
+
+   g_spikeCooldownUntil = TimeCurrent() + MathMax(1, SpikeCooldownMinutes) * 60;
+   Print("TitanAI spike guard triggered: lastRangePts=", lastRange, " avgRangePts=", avgRange, " cooldownUntil=", TimeToString(g_spikeCooldownUntil, TIME_DATE|TIME_SECONDS));
+
+   if(!SpikeEmergencyClose) return;
+   if(CountMyOpenOrders() <= 0) return;
+   CloseAllMyPositions("spike_emergency_close");
 }
 
 string JsonEscape(string s) {
@@ -706,6 +756,7 @@ void HandleSignal() {
    if(!IsTradeAllowed()) return;
    if(!IsTradeSymbolAllowed()) return;
    if(TradeOnlyM5Close && !IsNewBar()) return;
+   if(EnableSpikeGuard && g_spikeCooldownUntil > TimeCurrent()) return;
 
    string payload = BuildSignalPayload();
    string rsp = "";
@@ -752,6 +803,7 @@ void OnTick() {
 }
 
 void OnTimer() {
+   RunSpikeGuard();
    if(!AiFullControlMode) ManageProfitProtection();
    if(BootstrapHistoryFirst && !g_bootstrapDone) {
       RunBootstrapStep();
