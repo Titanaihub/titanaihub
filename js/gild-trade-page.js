@@ -138,8 +138,28 @@
       if (el.status) el.status.textContent = "AI analysis ready";
     } catch (err) {
       if (el.status) el.status.textContent = `Failed: ${err.message || "unknown error"}`;
-      if (el.inputs) el.inputs.textContent = "--";
-      if (el.decision) el.decision.textContent = JSON.stringify({ ok: false, message: err.message || "failed" }, null, 2);
+      if (el.inputs) {
+        el.inputs.textContent = JSON.stringify(
+          {
+            ok: false,
+            message: err.message || "failed",
+            hint: "ตรวจ MT4 API Key (MT4_SHARED_SECRET) และสิทธิ์อ่าน Gold API"
+          },
+          null,
+          2
+        );
+      }
+      if (el.decision) {
+        el.decision.textContent = JSON.stringify(
+          {
+            ok: false,
+            message: err.message || "failed",
+            action: "WAIT"
+          },
+          null,
+          2
+        );
+      }
     }
   }
 
@@ -159,4 +179,6 @@
   });
 
   el.runBtn?.addEventListener("click", () => run().catch(() => {}));
+  // Auto-load once so user immediately sees either analysis or explicit error reason.
+  run().catch(() => {});
 })();
