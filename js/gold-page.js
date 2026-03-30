@@ -1,4 +1,6 @@
 (() => {
+  const MT4_KEY_STORAGE = "titan_mt4_api_key";
+
   const elements = {
     goldApiKeyInput: document.getElementById("goldApiKeyInput"),
     goldRunSignalBtn: document.getElementById("goldRunSignalBtn"),
@@ -34,6 +36,24 @@
     }
   }
 
+  function getEffectiveMt4Key() {
+    const fromInput = String(elements.goldApiKeyInput?.value || "").trim();
+    if (fromInput) return fromInput;
+    try {
+      return String(localStorage.getItem(MT4_KEY_STORAGE) || "").trim();
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /** Owner Bearer + optional MT4 key for Gold dashboard GET/POST (no login required if server allows public read). */
+  function getGoldReadHeaders() {
+    const h = { ...getOwnerAuthHeader() };
+    const k = getEffectiveMt4Key();
+    if (k) h["x-mt4-key"] = k;
+    return h;
+  }
+
   function renderSignal(result) {
     if (!elements.goldSignalCards) return;
     const d = result?.decision || {};
@@ -62,8 +82,9 @@
     `;
     if (elements.goldSyncMeta) {
       const mode = meta?.globalHistoryMode ? "global" : "by-account";
+      const persist = String(meta?.sync?.persistence || "disk_file");
       const persistedAt = String(meta?.sync?.persistedAt || "--");
-      elements.goldSyncMeta.textContent = `Sync mode: ${mode} | Persistence: disk_file | Last persisted: ${persistedAt}`;
+      elements.goldSyncMeta.textContent = `Sync mode: ${mode} | Persistence: ${persist} | Last persisted: ${persistedAt}`;
     }
   }
 
@@ -195,7 +216,7 @@
     if (elements.goldStatus) elements.goldStatus.textContent = "Running Python SMC test...";
     try {
       const { apiPost } = window.TitanApi;
-      const headers = getOwnerAuthHeader();
+      const headers = getGoldReadHeaders();
       const out = await apiPost("/mt4/gold/python-smc-test", { candles: buildDemoCandles(220) }, headers);
       if (elements.goldPythonSmcPreview) {
         elements.goldPythonSmcPreview.textContent = JSON.stringify(out?.pythonSmc || out, null, 2);
@@ -213,20 +234,20 @@
     if (elements.goldStatus) elements.goldStatus.textContent = "Loading execution log...";
     try {
       const { apiGet } = window.TitanApi;
-      const headers = getOwnerAuthHeader();
+      const headers = getGoldReadHeaders();
       const out = await apiGet("/mt4/gold/execution-log?limit=40", { headers });
       renderExecution(out?.rows || []);
       if (elements.goldStatus) elements.goldStatus.textContent = "Execution log updated";
     } catch (err) {
       renderExecution([]);
-      if (elements.goldStatus) elements.goldStatus.textContent = `Execution log failed: ${err.message || "login required"}`;
+      if (elements.goldStatus) elements.goldStatus.textContent = `Execution log failed: ${err.message || "unauthorized"}`;
     }
   }
 
   async function loadHistoryStatus() {
     try {
       const { apiGet } = window.TitanApi;
-      const headers = getOwnerAuthHeader();
+      const headers = getGoldReadHeaders();
       const out = await apiGet("/mt4/gold/history-status", { headers });
       renderHistoryStatus(out?.rows || []);
       renderBootstrapStatus(out?.bootstrap || null, out || {});
@@ -237,6 +258,20 @@
       renderTfBootstrapStatus([], null);
     }
   }
+
+  try {
+    const saved = localStorage.getItem(MT4_KEY_STORAGE);
+    if (saved && elements.goldApiKeyInput && !String(elements.goldApiKeyInput.value || "").trim()) {
+      elements.goldApiKeyInput.value = saved;
+    }
+  } catch (_) {}
+  elements.goldApiKeyInput?.addEventListener("change", () => {
+    const v = String(elements.goldApiKeyInput.value || "").trim();
+    try {
+      if (v) localStorage.setItem(MT4_KEY_STORAGE, v);
+      else localStorage.removeItem(MT4_KEY_STORAGE);
+    } catch (_) {}
+  });
 
   elements.goldRunSignalBtn?.addEventListener("click", () => runSignalTest().catch(() => {}));
   elements.goldRunPythonSmcBtn?.addEventListener("click", () => runPythonSmcTest().catch(() => {}));

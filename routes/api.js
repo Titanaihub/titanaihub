@@ -87,6 +87,22 @@ function verifyAuth(req) {
   return rec;
 }
 
+function verifyMt4Key(req) {
+  const shared = String(process.env.MT4_SHARED_SECRET || "").trim();
+  if (!shared) return false;
+  const token = String(req.headers["x-mt4-key"] || req.query?.apiKey || "").trim();
+  return token === shared;
+}
+
+/** Allow Gold Lab / History Data reads without owner login: Bearer owner, X-MT4-Key, or public when MT4_GOLD_PUBLIC_READ=true. */
+function allowGoldDashboardRead(req) {
+  const auth = verifyAuth(req);
+  if (auth && auth.role === "owner") return true;
+  if (verifyMt4Key(req)) return true;
+  if (String(process.env.MT4_GOLD_PUBLIC_READ || "true").toLowerCase() === "true") return true;
+  return false;
+}
+
 function issueToken(role) {
   const token = crypto.randomBytes(32).toString("hex");
   authTokens.set(token, {
@@ -795,12 +811,11 @@ router.post("/mt4/gold/execution", (req, res) => {
 });
 
 router.get("/mt4/gold/execution-log", (req, res) => {
-  const auth = verifyAuth(req);
-  if (!auth || auth.role !== "owner") {
+  if (!allowGoldDashboardRead(req)) {
     return res.status(401).json({
       ok: false,
       error: true,
-      message: "Unauthorized: owner login required"
+      message: "Unauthorized: set MT4_GOLD_PUBLIC_READ=true, use X-MT4-Key, or owner login"
     });
   }
   const limit = sanitizeInt(req.query.limit, 30);
@@ -811,12 +826,11 @@ router.get("/mt4/gold/execution-log", (req, res) => {
 });
 
 router.get("/mt4/gold/history-status", async (req, res) => {
-  const auth = verifyAuth(req);
-  if (!auth || auth.role !== "owner") {
+  if (!allowGoldDashboardRead(req)) {
     return res.status(401).json({
       ok: false,
       error: true,
-      message: "Unauthorized: owner login required"
+      message: "Unauthorized: set MT4_GOLD_PUBLIC_READ=true, use X-MT4-Key, or owner login"
     });
   }
   const accountId = String(req.query.accountId || "default");
@@ -852,12 +866,11 @@ router.get("/mt4/gold/sync-state", async (req, res) => {
 });
 
 router.get("/mt4/gold/history-rows", async (req, res) => {
-  const auth = verifyAuth(req);
-  if (!auth || auth.role !== "owner") {
+  if (!allowGoldDashboardRead(req)) {
     return res.status(401).json({
       ok: false,
       error: true,
-      message: "Unauthorized: owner login required"
+      message: "Unauthorized: set MT4_GOLD_PUBLIC_READ=true, use X-MT4-Key, or owner login"
     });
   }
   const accountId = String(req.query.accountId || "default");
@@ -872,12 +885,11 @@ router.get("/mt4/gold/history-rows", async (req, res) => {
 });
 
 router.post("/mt4/gold/python-smc-test", async (req, res) => {
-  const auth = verifyAuth(req);
-  if (!auth || auth.role !== "owner") {
+  if (!allowGoldDashboardRead(req)) {
     return res.status(401).json({
       ok: false,
       error: true,
-      message: "Unauthorized: owner login required"
+      message: "Unauthorized: set MT4_GOLD_PUBLIC_READ=true, use X-MT4-Key, or owner login"
     });
   }
   try {

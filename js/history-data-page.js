@@ -1,8 +1,11 @@
 (() => {
+  const MT4_KEY_STORAGE = "titan_mt4_api_key";
+
   const elements = {
     historySourceSelect: document.getElementById("historySourceSelect"),
     historySymbolSelect: document.getElementById("historySymbolSelect"),
     historyGoldTfSelect: document.getElementById("historyGoldTfSelect"),
+    historyMt4KeyInput: document.getElementById("historyMt4KeyInput"),
     historyDaysSelect: document.getElementById("historyDaysSelect"),
     historyRefreshBtn: document.getElementById("historyRefreshBtn"),
     historyDataStatus: document.getElementById("historyDataStatus"),
@@ -61,6 +64,18 @@
     } catch (_) {
       return {};
     }
+  }
+
+  function getGoldReadHeaders() {
+    const h = { ...getOwnerAuthHeader() };
+    let k = "";
+    try {
+      k = String(elements.historyMt4KeyInput?.value || "").trim() || String(localStorage.getItem(MT4_KEY_STORAGE) || "").trim();
+    } catch (_) {
+      k = "";
+    }
+    if (k) h["x-mt4-key"] = k;
+    return h;
   }
 
   function barsPerDay(timeframe) {
@@ -174,7 +189,7 @@
           timeframe,
           limit: String(limit)
         });
-        const headers = getOwnerAuthHeader();
+        const headers = getGoldReadHeaders();
         const out = await apiGet(`/mt4/gold/history-rows?${qs.toString()}`, { headers });
         const meta = out.meta || {};
         state.payload = {
@@ -216,6 +231,19 @@
   }
 
   function bind() {
+    try {
+      const saved = localStorage.getItem(MT4_KEY_STORAGE);
+      if (saved && elements.historyMt4KeyInput && !String(elements.historyMt4KeyInput.value || "").trim()) {
+        elements.historyMt4KeyInput.value = saved;
+      }
+    } catch (_) {}
+    elements.historyMt4KeyInput?.addEventListener("change", () => {
+      const v = String(elements.historyMt4KeyInput.value || "").trim();
+      try {
+        if (v) localStorage.setItem(MT4_KEY_STORAGE, v);
+        else localStorage.removeItem(MT4_KEY_STORAGE);
+      } catch (_) {}
+    });
     if (elements.historyRefreshBtn) {
       elements.historyRefreshBtn.addEventListener("click", () => {
         loadHistory().catch(() => {});
