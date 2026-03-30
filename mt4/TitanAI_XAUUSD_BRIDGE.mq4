@@ -20,6 +20,10 @@ input bool ForceMinLotOverride = true;
 input double ForcedMinLot = 0.10;
 input bool AllowScaleIn = true;
 input int MaxOpenPositionsPerSide = 10;
+// If false (default): EA does not block same-side adds by distance — spacing is the AI's job via SCALE_IN_* / reason.
+// If true: mechanical guard uses MinDollarsBetweenSameSideAdds (safety net only).
+input bool EnforceMinSpacingSameSide = false;
+input double MinDollarsBetweenSameSideAdds = 6.0;
 
 string JsonEscape(string s) {
    string out = s;
@@ -69,6 +73,31 @@ int CountMyOpenOrders(int type = -1) {
       cnt++;
    }
    return cnt;
+}
+
+double WeightedAvgEntry(int type) {
+   double sum = 0.0;
+   double lots = 0.0;
+   for(int i = OrdersTotal() - 1; i >= 0; i--) {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != Symbol()) continue;
+      if(OrderMagicNumber() != MagicNumber) continue;
+      if(OrderType() != type) continue;
+      double l = OrderLots();
+      sum += OrderOpenPrice() * l;
+      lots += l;
+   }
+   if(lots <= 0) return 0.0;
+   return sum / lots;
+}
+
+bool TooCloseSameSide(int type, double minDollars) {
+   if(CountMyOpenOrders(type) <= 0) return false;
+   if(minDollars <= 0) return false;
+   double avg = WeightedAvgEntry(type);
+   if(avg <= 0) return false;
+   double px = (type == OP_BUY ? Ask : Bid);
+   return (MathAbs(px - avg) < minDollars);
 }
 
 void SendExecution(string orderType, double lots, double price, double pnl, int ticket, string comment) {
@@ -135,7 +164,8 @@ string BuildOpenPositionsJson() {
       arr += "\"entry\":" + NumToStr(OrderOpenPrice(), Digits) + ",";
       arr += "\"sl\":" + NumToStr(OrderStopLoss(), Digits) + ",";
       arr += "\"tp\":" + NumToStr(OrderTakeProfit(), Digits) + ",";
-      arr += "\"profit\":" + NumToStr(OrderProfit() + OrderSwap() + OrderCommission(), 2);
+      arr += "\"profit\":" + NumToStr(OrderProfit() + OrderSwap() + OrderCommission(), 2) + ",";
+      arr += "\"minutesOpen\":" + IntegerToString((int)((TimeCurrent() - OrderOpenTime()) / 60));
       arr += "}";
    }
    arr += "]";
@@ -361,6 +391,10 @@ void HandleSignal() {
    if(action == "SCALE_IN_BUY") {
       if(!AllowScaleIn) return;
       if(CountMyOpenOrders(OP_BUY) >= MaxOpenPositionsPerSide) return;
+      if(EnforceMinSpacingSameSide && CountMyOpenOrders(OP_BUY) > 0 && TooCloseSameSide(OP_BUY, MinDollarsBetweenSameSideAdds)) {
+         Print("Bridge skip SCALE_IN_BUY: too close to avg entry (< ", MinDollarsBetweenSameSideAdds, " )");
+         return;
+      }
       double lotSb = ComputeLotByRiskPercent(OP_BUY, sl, FixedLot, riskPercent);
       OpenOrder(OP_BUY, lotSb, sl, tp, reason);
       return;
@@ -368,16 +402,36 @@ void HandleSignal() {
    if(action == "SCALE_IN_SELL") {
       if(!AllowScaleIn) return;
       if(CountMyOpenOrders(OP_SELL) >= MaxOpenPositionsPerSide) return;
+      if(EnforceMinSpacingSameSide && CountMyOpenOrders(OP_SELL) > 0 && TooCloseSameSide(OP_SELL, MinDollarsBetweenSameSideAdds)) {
+         Print("Bridge skip SCALE_IN_SELL: too close to avg entry (< ", MinDollarsBetweenSameSideAdds, " )");
+         return;
+      }
       double lotSs = ComputeLotByRiskPercent(OP_SELL, sl, FixedLot, riskPercent);
       OpenOrder(OP_SELL, lotSs, sl, tp, reason);
       return;
    }
    if(action == "OPEN_BUY") {
+      if(CountMyOpenOrders(OP_BUY) > 0) {
+         if(!AllowScaleIn) return;
+         if(EnforceMinSpacingSameSide && TooCloseSameSide(OP_BUY, MinDollarsBetweenSameSideAdds)) {
+            Print("Bridge skip OPEN_BUY (already longs): too close to avg entry — use SCALE_IN_BUY after price moves or CLOSE_ALL");
+            return;
+         }
+         if(CountMyOpenOrders(OP_BUY) >= MaxOpenPositionsPerSide) return;
+      }
       double lotOb = ComputeLotByRiskPercent(OP_BUY, sl, FixedLot, riskPercent);
       OpenOrder(OP_BUY, lotOb, sl, tp, reason);
       return;
    }
    if(action == "OPEN_SELL") {
+      if(CountMyOpenOrders(OP_SELL) > 0) {
+         if(!AllowScaleIn) return;
+         if(EnforceMinSpacingSameSide && TooCloseSameSide(OP_SELL, MinDollarsBetweenSameSideAdds)) {
+            Print("Bridge skip OPEN_SELL (already shorts): too close to avg entry — use SCALE_IN_SELL after price moves or CLOSE_ALL");
+            return;
+         }
+         if(CountMyOpenOrders(OP_SELL) >= MaxOpenPositionsPerSide) return;
+      }
       double lotOs = ComputeLotByRiskPercent(OP_SELL, sl, FixedLot, riskPercent);
       OpenOrder(OP_SELL, lotOs, sl, tp, reason);
       return;

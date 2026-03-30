@@ -658,6 +658,26 @@ function applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, a
   return d;
 }
 
+/** Optional: block CLOSE_ALL until youngest leg has aged (min minutes). Default off (0). Reduces churny exits. */
+function applySoftCloseAllHoldGuard(decision, positionHoldSummary) {
+  if (!decision || !isAiFirstMode()) return decision;
+  const a = normalizeAction(decision.action);
+  if (a !== "CLOSE_ALL") return decision;
+  const minM = Math.max(0, envNum("MT4_AI_MIN_MINUTES_BEFORE_CLOSE_ALL", 0));
+  if (minM <= 0 || !positionHoldSummary) return decision;
+  const y = positionHoldSummary.youngestMinutes;
+  if (!Number.isFinite(y)) return decision;
+  if (y < minM) {
+    return {
+      ...decision,
+      action: "WAIT",
+      confidence: Math.min(Number(decision.confidence) || 0, 0.42),
+      reason: `close_hold_guard: youngest leg ${y}m < ${minM}m — ${String(decision.reason || "").slice(0, 130)}`
+    };
+  }
+  return decision;
+}
+
 function applyContraTrendGuard(decision, trendContext, hasOpenPositions) {
   if (!decision) return decision;
   const a = normalizeAction(decision.action);
@@ -909,7 +929,10 @@ async function callDeepSeekGoldDecision(payload) {
   const maxM15 = Math.max(20, Math.min(120, envNum("MT4_DEEPSEEK_CANDLES_M15_MAX", 48)));
   const m15Tail = m15Rows.slice(-maxM15);
   const system = [
-    "You are an intraday XAUUSD (MT4) assistant.",
+    "You are a senior XAUUSD market analyst and professional discretionary trader: disciplined, calm, and evidence-led — not a gambler or a noisy scalper.",
+    "Act like a mentor: every decision should reflect clear logic — thesis (bullish/bearish/neutral), key levels (support/resistance, SMC), time horizon (M5 vs M15), and what would invalidate the trade.",
+    "Risk management first: respect account equity, spread, and openPositionsRisk. Size riskPercent to the quality of the setup; never imply reckless leverage.",
+    "Professional tone in `reason`: short but structured — e.g. thesis | key levels | invalidation | why this action now. No filler, no hype.",
     "Think like a discretionary trader/analyst, not a fixed-rule Expert Advisor. trendContext and stats are inputs for judgment, not automatic blocks.",
     "Return JSON only.",
     "Actions allowed: WAIT, OPEN_BUY, OPEN_SELL, SCALE_IN_BUY, SCALE_IN_SELL, CLOSE_ALL.",
@@ -928,14 +951,18 @@ async function callDeepSeekGoldDecision(payload) {
     "Avoid blind overtrading; but do not freeze forever. If setup quality is good, take action decisively.",
     "Prefer WAIT only when edge is genuinely weak.",
     "Exit discipline for open positions: avoid micro-scalping exits. Do not close only because of tiny fluctuation. Use tradePaceContext.minMeaningfulMove as noise threshold and prefer CLOSE_ALL only when structure invalidates, stop-run risk rises, or expected edge clearly deteriorates.",
+    "Anti-churn: do not exit out of impatience. Small floating loss with young legs (see positionHoldSummary.youngestMinutes) is normal noise — WAIT unless M15 or SMC invalidates your thesis. Death-by-a-thousand-cuts is a failure mode to avoid.",
+    "CLOSE_ALL is for clear thesis failure or emergency (e.g. stop-run into your cluster), not for 'slightly red' after 1–3 minutes. Prefer letting the trade breathe through at least one M15 bar when possible.",
     "Multi-timeframe workflow (when candlesM15 is present): M5 candles = entry timing and micro-structure; M15 candles + smcContextM15 = swing bias, hold vs exit, and whether to scale in. Roughly 3 M5 bars = 1 M15 bar — judge PnL path on M15, not every M5 tick.",
-    "Multi-leg positions: OPEN_* for first leg; SCALE_IN_* for additional legs when M15 trend and risk still align. Avoid flipping direction every few minutes.",
+    "Multi-leg positions: OPEN_BUY/OPEN_SELL mean a new entry on that side; first leg when flat on that side. Use SCALE_IN_* for deliberate adds after price moves (do not spam OPEN_* every poll).",
+    "Hedging is allowed: you may hold BUY and SELL at the same time if your thesis requires it; say so in reason. To flatten everything at once use CLOSE_ALL.",
+    "You choose spacing between legs yourself (OPEN_* vs SCALE_IN_* and when). Optional EA setting can enforce min distance if the user turns it on; default is off so you decide.",
     "Stop/target: for OPEN_BUY/OPEN_SELL/SCALE_IN_BUY/SCALE_IN_SELL, place SL at least ~1.4× the typical M5 bar range away from the intended add-entry price (not a few ticks). Prefer RR ~1.5:1 or better when you set tp; do not use tp=0 unless you intend to manage exit with CLOSE_ALL only."
   ].join("\n");
   const user = [
-    "Decide one action for this cycle.",
+    "Decide one action for this cycle as the lead analyst: justify like a pro (thesis, levels, invalidation, risk).",
     "Schema:",
-    '{ "action":"WAIT|OPEN_BUY|OPEN_SELL|SCALE_IN_BUY|SCALE_IN_SELL|CLOSE_ALL", "strategyMode":"trend_follow|reversal|range|breakout|grid|martingale|hybrid", "confidence":0.0, "reason":"...", "sl":0, "tp":0, "riskPercent":0.3 }',
+    '{ "action":"WAIT|OPEN_BUY|OPEN_SELL|SCALE_IN_BUY|SCALE_IN_SELL|CLOSE_ALL", "strategyMode":"trend_follow|reversal|range|breakout|grid|martingale|hybrid", "confidence":0.0, "reason":"pro thesis|levels|invalidation|risk note (one line, dense)", "sl":0, "tp":0, "riskPercent":0.3 }',
     "",
     `Payload: ${JSON.stringify({
       symbol: payload.symbol,
@@ -956,6 +983,7 @@ async function callDeepSeekGoldDecision(payload) {
       slCluster: payload.slCluster || null,
       openPositionsRisk: payload.openPositionsRisk || null,
       tradePaceContext: payload.tradePaceContext || null,
+      positionHoldSummary: payload.positionHoldSummary || null,
       d1ExpectedZones: payload.d1ExpectedZones || null,
       pythonSmc: payload.pythonSmc || null
     })}`
@@ -964,7 +992,7 @@ async function callDeepSeekGoldDecision(payload) {
   const body = {
     model: DEEPSEEK_MODEL,
     stream: false,
-    temperature: 0.35,
+    temperature: 0.28,
     messages: [
       { role: "system", content: system },
       { role: "user", content: user }
@@ -1179,8 +1207,8 @@ async function getGoldMt4Signal(payload = {}) {
     const median = sorted[Math.floor(sorted.length / 2)] || 0;
     const avg = ranges.reduce((s, x) => s + x, 0) / Math.max(1, ranges.length);
     const minMeaningfulMove = Math.max(
-      envNum("MT4_AI_MIN_MEANINGFUL_MOVE_PRICE", 1.5),
-      median * envNum("MT4_AI_MIN_MEANINGFUL_MOVE_RANGE_MULT", 1.8)
+      envNum("MT4_AI_MIN_MEANINGFUL_MOVE_PRICE", 2.5),
+      median * envNum("MT4_AI_MIN_MEANINGFUL_MOVE_RANGE_MULT", 2.0)
     );
     return {
       m5RangeMedian: median,
@@ -1197,6 +1225,26 @@ async function getGoldMt4Signal(payload = {}) {
     manageTimeframe: "M15",
     note: "Entry timing on M5; hold/scale/close bias on M15 (~3× M5 per M15 bar). Multi-leg: SCALE_IN when aligned."
   };
+
+  const positionHoldSummary = (() => {
+    const list = Array.isArray(openPositions) ? openPositions : [];
+    const ages = [];
+    let totalFloating = 0;
+    for (const p of list) {
+      const m = Number(p?.minutesOpen);
+      if (Number.isFinite(m) && m >= 0) ages.push(m);
+      const pr = Number(p?.profit);
+      if (Number.isFinite(pr)) totalFloating += pr;
+    }
+    if (!ages.length) return null;
+    return {
+      legCount: ages.length,
+      youngestMinutes: Math.min(...ages),
+      oldestMinutes: Math.max(...ages),
+      totalFloatingProfit: Number(totalFloating.toFixed(2)),
+      note: "Young legs: do not CLOSE_ALL from impatience or tiny MAE; need invalidation on M15 or clear stop-run risk."
+    };
+  })();
 
   const slCluster = (() => {
     const bid = Number(payload?.bid);
@@ -1254,6 +1302,7 @@ async function getGoldMt4Signal(payload = {}) {
         metaAsk: ask
       };
       decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
+      decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary);
       recordEntryThrottle(accountId, symbol, decision);
       const publicDecision = stripDecisionMeta(decision);
       cache.byKey.set(key, { ts: now, source: "python_smc_priority", decision: publicDecision });
@@ -1276,6 +1325,7 @@ async function getGoldMt4Signal(payload = {}) {
                 slCluster,
                 openPositionsRisk,
                 tradePaceContext,
+                positionHoldSummary,
                 smcContextM15,
                 multiTimeframeHint,
                 pythonSmcDecision: pythonSmc?.decision || null
@@ -1326,6 +1376,7 @@ async function getGoldMt4Signal(payload = {}) {
     candlesM15: m15Normalized,
     smcContextM15,
     multiTimeframeHint,
+    positionHoldSummary,
     historyProfile,
     trendContext,
     smcContext,
@@ -1343,6 +1394,7 @@ async function getGoldMt4Signal(payload = {}) {
   };
   const actionBeforeGuard = normalizeAction(decision.action);
   decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
+  decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary);
   recordEntryThrottle(accountId, symbol, decision);
   const publicDecision = stripDecisionMeta(decision);
   cache.byKey.set(key, { ts: now, source: ai.source || "fallback", decision: publicDecision });
@@ -1366,6 +1418,7 @@ async function getGoldMt4Signal(payload = {}) {
             slCluster,
             openPositionsRisk,
             tradePaceContext,
+            positionHoldSummary,
             smcContextM15,
             multiTimeframeHint,
             pythonSmcDecision: pythonSmc?.decision || null

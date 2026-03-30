@@ -374,7 +374,8 @@ string BuildOpenPositionsJson() {
       arr += "\"entry\":" + NumToStr(OrderOpenPrice(), Digits) + ",";
       arr += "\"sl\":" + NumToStr(OrderStopLoss(), Digits) + ",";
       arr += "\"tp\":" + NumToStr(OrderTakeProfit(), Digits) + ",";
-      arr += "\"profit\":" + NumToStr(OrderProfit() + OrderSwap() + OrderCommission(), 2);
+      arr += "\"profit\":" + NumToStr(OrderProfit() + OrderSwap() + OrderCommission(), 2) + ",";
+      arr += "\"minutesOpen\":" + IntegerToString((int)((TimeCurrent() - OrderOpenTime()) / 60));
       arr += "}";
    }
    arr += "]";

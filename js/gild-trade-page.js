@@ -98,11 +98,11 @@
     const lines = [];
 
     lines.push(
-      `Decision: ${String(d.action || "--")} | Strategy: ${String(d.strategyMode || out?.strategyMode || "--")} | Confidence: ${pct(
+      `Lead analyst — Decision: ${String(d.action || "--")} | Strategy: ${String(d.strategyMode || out?.strategyMode || "--")} | Confidence: ${pct(
         d.confidence
       )} | Source: ${String(out?.source || "--")}`
     );
-    lines.push(`Reason: ${String(d.reason || "--")}`);
+    lines.push(`Thesis / note: ${String(d.reason || "--")}`);
     lines.push(`SL/TP: ${p3(d.sl)} / ${p3(d.tp)} | Risk: ${Number(d.riskPercent ?? 0).toFixed(2)}%`);
 
     const d1 = trend?.d1 ? `${trend.d1.bias} (${p3(trend.d1.strength)})` : "--";
