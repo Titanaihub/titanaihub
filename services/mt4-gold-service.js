@@ -658,24 +658,35 @@ function applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, a
   return d;
 }
 
-/** Optional: block CLOSE_ALL until youngest leg has aged (min minutes). Default off (0). Reduces churny exits. */
-function applySoftCloseAllHoldGuard(decision, positionHoldSummary) {
+/**
+ * AI-first: reduce "close early before SL" churn. Default: wait until youngest leg ages OR floating loss is large vs equity (emergency).
+ * Set MT4_AI_MIN_MINUTES_BEFORE_CLOSE_ALL=0 to disable time gate only.
+ */
+function applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload) {
   if (!decision || !isAiFirstMode()) return decision;
   const a = normalizeAction(decision.action);
   if (a !== "CLOSE_ALL") return decision;
-  const minM = Math.max(0, envNum("MT4_AI_MIN_MINUTES_BEFORE_CLOSE_ALL", 0));
+  const minM = Math.max(0, envNum("MT4_AI_MIN_MINUTES_BEFORE_CLOSE_ALL", 12));
   if (minM <= 0 || !positionHoldSummary) return decision;
   const y = positionHoldSummary.youngestMinutes;
   if (!Number.isFinite(y)) return decision;
-  if (y < minM) {
-    return {
-      ...decision,
-      action: "WAIT",
-      confidence: Math.min(Number(decision.confidence) || 0, 0.42),
-      reason: `close_hold_guard: youngest leg ${y}m < ${minM}m — ${String(decision.reason || "").slice(0, 130)}`
-    };
+  if (y >= minM) return decision;
+
+  const equity = Number(payload?.equity || 0);
+  const totalPnl = Number(positionHoldSummary.totalFloatingProfit ?? 0);
+  const emergencyPct = Math.max(0, envNum("MT4_AI_CLOSE_ALL_EMERGENCY_LOSS_PCT_EQUITY", 1.0));
+  if (equity > 0 && totalPnl < 0) {
+    const lossUsd = Math.abs(totalPnl);
+    const thresholdUsd = equity * (emergencyPct / 100);
+    if (lossUsd >= thresholdUsd) return decision;
   }
-  return decision;
+
+  return {
+    ...decision,
+    action: "WAIT",
+    confidence: Math.min(Number(decision.confidence) || 0, 0.42),
+    reason: `close_hold_guard: youngest ${y}m < ${minM}m and loss not emergency vs equity — ${String(decision.reason || "").slice(0, 110)}`
+  };
 }
 
 function applyContraTrendGuard(decision, trendContext, hasOpenPositions) {
@@ -930,6 +941,7 @@ async function callDeepSeekGoldDecision(payload) {
   const m15Tail = m15Rows.slice(-maxM15);
   const system = [
     "You are a senior XAUUSD market analyst and professional discretionary trader: disciplined, calm, and evidence-led — not a gambler or a noisy scalper.",
+    "Investor mindset: capital preservation first. Prefer fewer, higher-conviction actions over many small entries at nearly the same price. Stacking 3–4 legs within a few dollars without a clear scale-in plan is amateur; space adds meaningfully or WAIT.",
     "Act like a mentor: every decision should reflect clear logic — thesis (bullish/bearish/neutral), key levels (support/resistance, SMC), time horizon (M5 vs M15), and what would invalidate the trade.",
     "Risk management first: respect account equity, spread, and openPositionsRisk. Size riskPercent to the quality of the setup; never imply reckless leverage.",
     "Professional tone in `reason`: short but structured — e.g. thesis | key levels | invalidation | why this action now. No filler, no hype.",
@@ -953,6 +965,7 @@ async function callDeepSeekGoldDecision(payload) {
     "Exit discipline for open positions: avoid micro-scalping exits. Do not close only because of tiny fluctuation. Use tradePaceContext.minMeaningfulMove as noise threshold and prefer CLOSE_ALL only when structure invalidates, stop-run risk rises, or expected edge clearly deteriorates.",
     "Anti-churn: do not exit out of impatience. Small floating loss with young legs (see positionHoldSummary.youngestMinutes) is normal noise — WAIT unless M15 or SMC invalidates your thesis. Death-by-a-thousand-cuts is a failure mode to avoid.",
     "CLOSE_ALL is for clear thesis failure or emergency (e.g. stop-run into your cluster), not for 'slightly red' after 1–3 minutes. Prefer letting the trade breathe through at least one M15 bar when possible.",
+    "Never use CLOSE_ALL to scratch a tiny loss while price is still between entry and your stop — that realizes death-by-a-thousand-cuts. If the stop is valid, let it work or move to breakeven only after meaningful favorable move.",
     "Multi-timeframe workflow (when candlesM15 is present): M5 candles = entry timing and micro-structure; M15 candles + smcContextM15 = swing bias, hold vs exit, and whether to scale in. Roughly 3 M5 bars = 1 M15 bar — judge PnL path on M15, not every M5 tick.",
     "Multi-leg positions: OPEN_BUY/OPEN_SELL mean a new entry on that side; first leg when flat on that side. Use SCALE_IN_* for deliberate adds after price moves (do not spam OPEN_* every poll).",
     "Hedging is allowed: you may hold BUY and SELL at the same time if your thesis requires it; say so in reason. To flatten everything at once use CLOSE_ALL.",
@@ -1302,7 +1315,7 @@ async function getGoldMt4Signal(payload = {}) {
         metaAsk: ask
       };
       decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
-      decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary);
+      decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload);
       recordEntryThrottle(accountId, symbol, decision);
       const publicDecision = stripDecisionMeta(decision);
       cache.byKey.set(key, { ts: now, source: "python_smc_priority", decision: publicDecision });
@@ -1394,7 +1407,7 @@ async function getGoldMt4Signal(payload = {}) {
   };
   const actionBeforeGuard = normalizeAction(decision.action);
   decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
-  decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary);
+  decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload);
   recordEntryThrottle(accountId, symbol, decision);
   const publicDecision = stripDecisionMeta(decision);
   cache.byKey.set(key, { ts: now, source: ai.source || "fallback", decision: publicDecision });

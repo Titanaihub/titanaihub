@@ -5,7 +5,7 @@
 
 input string ApiBaseUrl = "https://titan-ai-api.onrender.com";
 input string ApiKey = "";
-input int PollSeconds = 30;
+input int PollSeconds = 60;
 input int SlippagePoints = 35;
 input int MagicNumber = 260326;
 input int CandlesToSend = 160;
@@ -19,11 +19,10 @@ input double AiRiskPercentMax = 2.00;
 input bool ForceMinLotOverride = true;
 input double ForcedMinLot = 0.10;
 input bool AllowScaleIn = true;
-input int MaxOpenPositionsPerSide = 10;
-// If false (default): EA does not block same-side adds by distance — spacing is the AI's job via SCALE_IN_* / reason.
-// If true: mechanical guard uses MinDollarsBetweenSameSideAdds (safety net only).
-input bool EnforceMinSpacingSameSide = false;
-input double MinDollarsBetweenSameSideAdds = 6.0;
+input int MaxOpenPositionsPerSide = 4;
+// Default ON: avoid many entries at nearly the same price (investor-style). Set false to rely on AI only.
+input bool EnforceMinSpacingSameSide = true;
+input double MinDollarsBetweenSameSideAdds = 8.0;
 
 string JsonEscape(string s) {
    string out = s;
