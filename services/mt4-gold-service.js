@@ -966,6 +966,8 @@ async function callDeepSeekGoldDecision(payload) {
     "Anti-churn: do not exit out of impatience. Small floating loss with young legs (see positionHoldSummary.youngestMinutes) is normal noise — WAIT unless M15 or SMC invalidates your thesis. Death-by-a-thousand-cuts is a failure mode to avoid.",
     "CLOSE_ALL is for clear thesis failure or emergency (e.g. stop-run into your cluster), not for 'slightly red' after 1–3 minutes. Prefer letting the trade breathe through at least one M15 bar when possible.",
     "Never use CLOSE_ALL to scratch a tiny loss while price is still between entry and your stop — that realizes death-by-a-thousand-cuts. If the stop is valid, let it work or move to breakeven only after meaningful favorable move.",
+    "Symmetric profit-taking: if positionHoldSummary.floatingPctOfEquity is very large (e.g. +40% to +150%+ of equity), you are obligated to seriously consider CLOSE_ALL to lock gains, or state a concrete trailing/hold plan in reason. Letting huge open profits run forever with zero plan is as bad as panic-closing tiny losses.",
+    "Do not be asymmetric: do not hold winners without exit discipline while repeatedly cutting small losers. Use M15 structure: take profit into obvious liquidity/resistance in profit, not only cut on fear in loss.",
     "Multi-timeframe workflow (when candlesM15 is present): M5 candles = entry timing and micro-structure; M15 candles + smcContextM15 = swing bias, hold vs exit, and whether to scale in. Roughly 3 M5 bars = 1 M15 bar — judge PnL path on M15, not every M5 tick.",
     "Multi-leg positions: OPEN_BUY/OPEN_SELL mean a new entry on that side; first leg when flat on that side. Use SCALE_IN_* for deliberate adds after price moves (do not spam OPEN_* every poll).",
     "Hedging is allowed: you may hold BUY and SELL at the same time if your thesis requires it; say so in reason. To flatten everything at once use CLOSE_ALL.",
@@ -1250,12 +1252,18 @@ async function getGoldMt4Signal(payload = {}) {
       if (Number.isFinite(pr)) totalFloating += pr;
     }
     if (!ages.length) return null;
+    const equity = Number(payload?.equity || 0);
+    const floatingPctOfEquity =
+      equity > 0 ? Number(((totalFloating / equity) * 100).toFixed(2)) : null;
     return {
       legCount: ages.length,
       youngestMinutes: Math.min(...ages),
       oldestMinutes: Math.max(...ages),
       totalFloatingProfit: Number(totalFloating.toFixed(2)),
-      note: "Young legs: do not CLOSE_ALL from impatience or tiny MAE; need invalidation on M15 or clear stop-run risk."
+      equitySnapshot: Number.isFinite(equity) && equity > 0 ? Number(equity.toFixed(2)) : null,
+      floatingPctOfEquity,
+      note:
+        "Symmetric book: if floatingPctOfEquity is large positive, bank gains or say why still holding; if small negative, do not panic-close."
     };
   })();
 

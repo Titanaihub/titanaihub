@@ -23,6 +23,10 @@ input int MaxOpenPositionsPerSide = 4;
 // Default ON: avoid many entries at nearly the same price (investor-style). Set false to rely on AI only.
 input bool EnforceMinSpacingSameSide = true;
 input double MinDollarsBetweenSameSideAdds = 8.0;
+// If AI returns sl/tp = 0, set broker stops from points (reduces "no TP" runaway wins / unmanaged risk).
+input bool ApplyFallbackStopsIfAiZero = true;
+input int FallbackStopPoints = 600;
+input double FallbackTpRR = 1.8;
 
 string JsonEscape(string s) {
    string out = s;
@@ -357,12 +361,27 @@ double ComputeLotByRiskPercent(int type, double sl, double fallbackLot, double r
    return ClampLotToBroker(lot);
 }
 
+void ApplyFallbackStopsIfNeeded(int type, double price, double &sl, double &tp) {
+   if(!ApplyFallbackStopsIfAiZero) return;
+   double minDist = MathMax(0, FallbackStopPoints) * Point;
+   if(minDist <= 0) return;
+   if(sl > 0 && tp > 0) return;
+   if(type == OP_BUY) {
+      if(sl <= 0) sl = NormalizeDouble(price - minDist, Digits);
+      if(tp <= 0) tp = NormalizeDouble(price + minDist * FallbackTpRR, Digits);
+   } else {
+      if(sl <= 0) sl = NormalizeDouble(price + minDist, Digits);
+      if(tp <= 0) tp = NormalizeDouble(price - minDist * FallbackTpRR, Digits);
+   }
+}
+
 bool OpenOrder(int type, double lot, double sl, double tp, string reason) {
    RefreshRates();
    double price = (type == OP_BUY ? Ask : Bid);
    lot = ClampLotToBroker(lot);
    sl = (sl > 0 ? NormalizeDouble(sl, Digits) : 0.0);
    tp = (tp > 0 ? NormalizeDouble(tp, Digits) : 0.0);
+   ApplyFallbackStopsIfNeeded(type, price, sl, tp);
    int ticket = OrderSend(Symbol(), type, lot, price, SlippagePoints, sl, tp, "TitanAI_BRIDGE", MagicNumber, 0, clrDeepSkyBlue);
    if(ticket < 0) {
       Print("Bridge OrderSend failed err=", GetLastError(), " reason=", reason);
