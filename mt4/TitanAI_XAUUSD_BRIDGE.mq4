@@ -25,6 +25,8 @@ input bool EnforceMinSpacingSameSide = true;
 input double MinDollarsBetweenSameSideAdds = 8.0;
 // If last closed trade on same side was a loss, wait before re-entering same side.
 input int ReentryAfterLossCooldownMinutes = 20;
+// If last closed trade on same side was profit, wait before re-entering same side.
+input int ReentryAfterProfitCooldownMinutes = 12;
 // If AI returns sl/tp = 0, set broker stops from points (reduces "no TP" runaway wins / unmanaged risk).
 input bool ApplyFallbackStopsIfAiZero = true;
 input int FallbackStopPoints = 600;
@@ -136,6 +138,42 @@ bool ShouldWaitAfterRecentSameSideLoss(int type) {
    if(!GetRecentClosedSideLoss(type, minutesAgo, pnl)) return false;
    if(minutesAgo < cool) {
       Print("Bridge wait after same-side loss: ", (type == OP_BUY ? "BUY" : "SELL"), " closed ", minutesAgo, "m ago pnl=", pnl, " cooldown=", cool, "m");
+      return true;
+   }
+   return false;
+}
+
+bool GetRecentClosedSideProfit(int type, int &minutesAgo, double &pnlOut) {
+   datetime latestClose = 0;
+   double latestPnl = 0;
+   int total = OrdersHistoryTotal();
+   for(int i = total - 1; i >= 0; i--) {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) continue;
+      if(OrderSymbol() != Symbol()) continue;
+      if(OrderMagicNumber() != MagicNumber) continue;
+      if(OrderType() != type) continue;
+      datetime ct = OrderCloseTime();
+      if(ct <= 0) continue;
+      if(ct > latestClose) {
+         latestClose = ct;
+         latestPnl = OrderProfit() + OrderSwap() + OrderCommission();
+      }
+   }
+   if(latestClose <= 0) return false;
+   if(latestPnl <= 0) return false;
+   minutesAgo = (int)((TimeCurrent() - latestClose) / 60);
+   pnlOut = latestPnl;
+   return true;
+}
+
+bool ShouldWaitAfterRecentSameSideProfit(int type) {
+   int cool = ReentryAfterProfitCooldownMinutes;
+   if(cool <= 0) return false;
+   int minutesAgo = 0;
+   double pnl = 0;
+   if(!GetRecentClosedSideProfit(type, minutesAgo, pnl)) return false;
+   if(minutesAgo < cool) {
+      Print("Bridge wait after same-side profit close: ", (type == OP_BUY ? "BUY" : "SELL"), " closed ", minutesAgo, "m ago pnl=", pnl, " cooldown=", cool, "m");
       return true;
    }
    return false;
@@ -447,6 +485,7 @@ void HandleSignal() {
    if(action == "SCALE_IN_BUY") {
       if(!AllowScaleIn) return;
       if(ShouldWaitAfterRecentSameSideLoss(OP_BUY)) return;
+      if(ShouldWaitAfterRecentSameSideProfit(OP_BUY)) return;
       if(CountMyOpenOrders(OP_BUY) >= MaxOpenPositionsPerSide) return;
       if(EnforceMinSpacingSameSide && CountMyOpenOrders(OP_BUY) > 0 && TooCloseSameSide(OP_BUY, MinDollarsBetweenSameSideAdds)) {
          Print("Bridge skip SCALE_IN_BUY: too close to avg entry (< ", MinDollarsBetweenSameSideAdds, " )");
@@ -459,6 +498,7 @@ void HandleSignal() {
    if(action == "SCALE_IN_SELL") {
       if(!AllowScaleIn) return;
       if(ShouldWaitAfterRecentSameSideLoss(OP_SELL)) return;
+      if(ShouldWaitAfterRecentSameSideProfit(OP_SELL)) return;
       if(CountMyOpenOrders(OP_SELL) >= MaxOpenPositionsPerSide) return;
       if(EnforceMinSpacingSameSide && CountMyOpenOrders(OP_SELL) > 0 && TooCloseSameSide(OP_SELL, MinDollarsBetweenSameSideAdds)) {
          Print("Bridge skip SCALE_IN_SELL: too close to avg entry (< ", MinDollarsBetweenSameSideAdds, " )");
@@ -470,6 +510,7 @@ void HandleSignal() {
    }
    if(action == "OPEN_BUY") {
       if(ShouldWaitAfterRecentSameSideLoss(OP_BUY)) return;
+      if(ShouldWaitAfterRecentSameSideProfit(OP_BUY)) return;
       if(CountMyOpenOrders(OP_BUY) > 0) {
          if(!AllowScaleIn) return;
          if(EnforceMinSpacingSameSide && TooCloseSameSide(OP_BUY, MinDollarsBetweenSameSideAdds)) {
@@ -484,6 +525,7 @@ void HandleSignal() {
    }
    if(action == "OPEN_SELL") {
       if(ShouldWaitAfterRecentSameSideLoss(OP_SELL)) return;
+      if(ShouldWaitAfterRecentSameSideProfit(OP_SELL)) return;
       if(CountMyOpenOrders(OP_SELL) > 0) {
          if(!AllowScaleIn) return;
          if(EnforceMinSpacingSameSide && TooCloseSameSide(OP_SELL, MinDollarsBetweenSameSideAdds)) {
