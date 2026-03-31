@@ -662,7 +662,7 @@ function applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, a
  * AI-first: reduce "close early before SL" churn. Default: wait until youngest leg ages OR floating loss is large vs equity (emergency).
  * Set MT4_AI_MIN_MINUTES_BEFORE_CLOSE_ALL=0 to disable time gate only.
  */
-function applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload) {
+function applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload, trendContext, openPositionsRisk) {
   if (!decision || !isAiFirstMode()) return decision;
   const a = normalizeAction(decision.action);
   if (a !== "CLOSE_ALL") return decision;
@@ -679,6 +679,34 @@ function applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload) {
     const lossUsd = Math.abs(totalPnl);
     const thresholdUsd = equity * (emergencyPct / 100);
     if (lossUsd >= thresholdUsd) return decision;
+  }
+
+  // Continuity guard: if current thesis still supports the open side, don't close then re-open same side.
+  const list = Array.isArray(openPositionsRisk) ? openPositionsRisk : [];
+  const buys = list.filter((p) => String(p?.side || "").toUpperCase() === "BUY");
+  const sells = list.filter((p) => String(p?.side || "").toUpperCase() === "SELL");
+  const dominantSide = buys.length > sells.length ? "BUY" : sells.length > buys.length ? "SELL" : "";
+  if (dominantSide) {
+    const d1b = String(trendContext?.d1?.bias || "").toLowerCase();
+    const h1b = String(trendContext?.h1?.bias || "").toLowerCase();
+    const m5b = String(trendContext?.m5?.bias || "").toLowerCase();
+    const trendSupportsBuy = d1b === "bullish" || h1b === "bullish" || m5b === "bullish";
+    const trendSupportsSell = d1b === "bearish" || h1b === "bearish" || m5b === "bearish";
+    const sideSupported = dominantSide === "BUY" ? trendSupportsBuy : trendSupportsSell;
+    const sideList = dominantSide === "BUY" ? buys : sells;
+    const nearestSlDist = sideList.reduce((m, p) => {
+      const d = Number(p?.distToSL);
+      return Number.isFinite(d) ? Math.min(m, d) : m;
+    }, Number.POSITIVE_INFINITY);
+    const minEmergencyDist = Math.max(0.3, envNum("MT4_AI_CLOSE_ALL_MIN_DIST_TO_SL_EMERGENCY", 1.2));
+    if (sideSupported && Number.isFinite(nearestSlDist) && nearestSlDist > minEmergencyDist) {
+      return {
+        ...decision,
+        action: "WAIT",
+        confidence: Math.min(Number(decision.confidence) || 0, 0.45),
+        reason: `close_continuity_guard: ${dominantSide} thesis still supported; avoid close-then-reopen churn ${String(decision.reason || "").slice(0, 90)}`
+      };
+    }
   }
 
   return {
@@ -1323,7 +1351,7 @@ async function getGoldMt4Signal(payload = {}) {
         metaAsk: ask
       };
       decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
-      decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload);
+      decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload, trendContext, openPositionsRisk);
       recordEntryThrottle(accountId, symbol, decision);
       const publicDecision = stripDecisionMeta(decision);
       cache.byKey.set(key, { ts: now, source: "python_smc_priority", decision: publicDecision });
@@ -1415,7 +1443,7 @@ async function getGoldMt4Signal(payload = {}) {
   };
   const actionBeforeGuard = normalizeAction(decision.action);
   decision = applyEntryDecisionGuards(decision, payload, mergedRows, trendContext, accountId, symbol, hasOpenPositions);
-  decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload);
+  decision = applySoftCloseAllHoldGuard(decision, positionHoldSummary, payload, trendContext, openPositionsRisk);
   recordEntryThrottle(accountId, symbol, decision);
   const publicDecision = stripDecisionMeta(decision);
   cache.byKey.set(key, { ts: now, source: ai.source || "fallback", decision: publicDecision });
